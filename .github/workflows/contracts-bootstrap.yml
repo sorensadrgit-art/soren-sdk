@@ -56,6 +56,39 @@ jobs:
       - name: Materialize full implementation
         run: node scripts/scaffold-contracts.mjs --full
 
+      - name: Apply NodeNext compatibility fixes
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          tsconfig = Path("tsconfig.json")
+          config = json.loads(tsconfig.read_text())
+          config["compilerOptions"]["esModuleInterop"] = True
+          config["compilerOptions"]["allowSyntheticDefaultImports"] = True
+          tsconfig.write_text(json.dumps(config, indent=2) + "\n")
+
+          validator = Path("packages/contracts/src/validation/validator.ts")
+          text = validator.read_text()
+          text = text.replace(
+              "  getContractValidator().assert<T>(name, value);",
+              "  const validator: ContractValidator = getContractValidator();\n  validator.assert<T>(name, value);"
+          )
+          validator.write_text(text)
+
+          registry = Path("packages/contracts/src/schemas/registry.ts")
+          text = registry.read_text()
+          text = text.replace(
+              'import { dirname, join, resolve } from "node:path";',
+              'import { dirname, join } from "node:path";'
+          )
+          text = text.replace(
+              "function candidateSchemaDirectories(): string[] {\n  const moduleDirectory = dirname(fileURLToPath(import.meta.url));\n\n  return [\n    join(moduleDirectory, \"../schema-data\"),\n    resolve(process.cwd(), \"schemas\")\n  ];\n}",
+              "function workspaceSchemaCandidates(): string[] {\n  const candidates: string[] = [];\n  let current = process.cwd();\n\n  for (let depth = 0; depth < 6; depth += 1) {\n    candidates.push(join(current, \"schemas\"));\n    const parent = dirname(current);\n    if (parent === current) break;\n    current = parent;\n  }\n\n  return candidates;\n}\n\nfunction candidateSchemaDirectories(): string[] {\n  const moduleDirectory = dirname(fileURLToPath(import.meta.url));\n\n  return [\n    join(moduleDirectory, \"../schema-data\"),\n    ...workspaceSchemaCandidates()\n  ];\n}"
+          )
+          registry.write_text(text)
+          PY
+
       - name: Remove bootstrap-only files
         run: |
           rm scripts/scaffold-contracts.mjs
