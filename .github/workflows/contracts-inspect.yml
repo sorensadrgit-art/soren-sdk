@@ -29,8 +29,8 @@ jobs:
           name: contracts-inspection
           path: |
             schemas/connector.schema.json
+            packages/contracts/src/**/*.ts
             packages/contracts/test/unit/connector-semantics.test.ts
-            packages/contracts/test/fixtures/invalid/connectors/selectable-with-blockers.json
-            packages/contracts/src/validation/connector-semantics.ts
+            packages/contracts/test/fixtures/**/*.json
           if-no-files-found: warn
           retention-days: 1
