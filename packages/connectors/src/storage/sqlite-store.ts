@@ -4,7 +4,8 @@ import { DatabaseSync } from "node:sqlite";
 import {
   canonicalJson,
   digestJson,
-  type CatalogSnapshot
+  type CatalogSnapshot,
+  type JsonValue
 } from "@soren-sdk/contracts";
 
 import {
@@ -34,6 +35,10 @@ function isSnapshotRow(value: unknown): value is SnapshotRow {
   );
 }
 
+function jsonValue(value: unknown): JsonValue {
+  return value as JsonValue;
+}
+
 export class SqliteCatalogSnapshotStore implements CatalogSnapshotStore {
   readonly #database: DatabaseSync;
   #closed = false;
@@ -57,8 +62,8 @@ export class SqliteCatalogSnapshotStore implements CatalogSnapshotStore {
   save(snapshot: CatalogSnapshot): void {
     this.#assertOpen();
     const validated = assertCatalogSnapshot(snapshot);
-    const source = canonicalJson(validated);
-    const digest = digestJson(validated);
+    const source = canonicalJson(jsonValue(validated));
+    const digest = digestJson(jsonValue(validated));
     this.#database
       .prepare(`
         INSERT INTO catalog_snapshots (
@@ -127,7 +132,7 @@ export class SqliteCatalogSnapshotStore implements CatalogSnapshotStore {
     if (snapshot.snapshotId !== value.snapshot_id) {
       throw new Error("Stored catalog snapshot ID does not match its payload.");
     }
-    if (digestJson(snapshot) !== value.content_digest) {
+    if (digestJson(jsonValue(snapshot)) !== value.content_digest) {
       throw new Error("Stored catalog snapshot failed its integrity check.");
     }
     return snapshot;
