@@ -3,7 +3,12 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { ConnectorManifest } from "@soren-sdk/contracts";
+import type {
+  CatalogSnapshot,
+  ConnectorManifest
+} from "@soren-sdk/contracts";
+import type { ConnectorRecord } from "@soren-sdk/core";
+import { buildCatalogSnapshot } from "../src/snapshot/build-snapshot.js";
 
 export type ManifestFixture = ConnectorManifest | Record<string, unknown> | string | null;
 
@@ -37,6 +42,28 @@ export function legacyConnectorManifest(): Record<string, unknown> {
     id: "legacy-motion",
     name: "Legacy Motion planning connector"
   };
+}
+
+export async function catalogSnapshotFixture(
+  connectorId: string,
+  createdAt: string
+): Promise<CatalogSnapshot> {
+  const manifest = await validConnectorManifest(connectorId);
+  const record: ConnectorRecord = {
+    kind: "schema-v2",
+    directoryId: connectorId,
+    path: `/tmp/${connectorId}/sdk.manifest.json`,
+    manifest,
+    selectable: manifest.connector.selectable
+  };
+  const catalog = JSON.parse(
+    await readFile(join(repositoryRoot(), "capabilities", "catalog.json"), "utf8")
+  );
+  return buildCatalogSnapshot({
+    capabilityCatalog: catalog,
+    connectors: [record],
+    createdAt
+  });
 }
 
 export async function createCatalogFixture(
