@@ -1,0 +1,37 @@
+{
+  "name": "@soren-sdk/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Read-only catalog CLI for Soren SDK.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "soren-sdk": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "start": "node ./dist/bin.js"
+  },
+  "dependencies": {
+    "@soren-sdk/contracts": "workspace:*",
+    "@soren-sdk/core": "workspace:*",
+    "@soren-sdk/connectors": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}
