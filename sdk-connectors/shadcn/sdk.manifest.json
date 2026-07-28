@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "1.0.0",
+  "connectorVersion": "0.1.0",
+  "id": "shadcn",
+  "name": "shadcn",
+  "status": "experimental",
+  "trust": "official",
+  "categories": [
+    "components",
+    "registry",
+    "source-distribution"
+  ],
+  "aliases": [
+    "shadcn-ui"
+  ],
+  "capabilities": [
+    "registry.search",
+    "registry.inspect",
+    "registry.install",
+    "component.source-distribution",
+    "component.project-aware-composition"
+  ],
+  "connectionMethods": [
+    {
+      "type": "official-mcp",
+      "status": "available"
+    },
+    {
+      "type": "official-skill",
+      "status": "available"
+    },
+    {
+      "type": "official-docs",
+      "status": "available"
+    }
+  ],
+  "runtime": {
+    "packages": [
+      "shadcn"
+    ],
+    "imports": {},
+    "supportedVersions": [
+      "define CLI support policy during implementation"
+    ]
+  },
+  "frameworks": [
+    "react",
+    "nextjs"
+  ],
+  "bestFor": [
+    "Source-owned component installation",
+    "Public and private registries",
+    "Agent registry search",
+    "Project-aware composition"
+  ],
+  "avoidFor": [
+    "Treating shadcn as a hidden runtime component library",
+    "Installing components without inspecting project conventions",
+    "Adding product business logic to shared registry items"
+  ],
+  "owns": [
+    "component-source-distribution",
+    "registry-workflow"
+  ],
+  "requiredChecks": [
+    "registry-validation",
+    "fixture-install",
+    "dependency-metadata",
+    "path-aliases",
+    "primitive-base"
+  ],
+  "security": {
+    "requiresAuth": false,
+    "requiresPaidPlan": false,
+    "remoteData": false
+  },
+  "knowledge": {
+    "retrievedAt": "2026-07-27",
+    "officialSources": [
+      "https://ui.shadcn.com/docs/mcp",
+      "https://ui.shadcn.com/docs/skills",
+      "https://ui.shadcn.com/docs/registry/mcp"
+    ]
+  }
+}
