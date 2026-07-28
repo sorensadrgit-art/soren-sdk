@@ -182,12 +182,62 @@ jobs:
               "oneOf",
               "prefixItems"
           }
+          object_type_keywords = {
+              "additionalProperties",
+              "dependentRequired",
+              "dependentSchemas",
+              "maxProperties",
+              "minProperties",
+              "patternProperties",
+              "properties",
+              "propertyNames",
+              "required",
+              "unevaluatedProperties"
+          }
+          array_type_keywords = {
+              "contains",
+              "items",
+              "maxContains",
+              "maxItems",
+              "minContains",
+              "minItems",
+              "prefixItems",
+              "uniqueItems"
+          }
+          string_type_keywords = {
+              "contentEncoding",
+              "contentMediaType",
+              "contentSchema",
+              "format",
+              "maxLength",
+              "minLength",
+              "pattern"
+          }
+          number_type_keywords = {
+              "exclusiveMaximum",
+              "exclusiveMinimum",
+              "maximum",
+              "minimum",
+              "multipleOf"
+          }
+
+          def infer_missing_type(schema):
+              if "type" in schema:
+                  return
+              keys = set(schema)
+              if keys & object_type_keywords:
+                  schema["type"] = "object"
+              elif keys & array_type_keywords:
+                  schema["type"] = "array"
+              elif keys & string_type_keywords:
+                  schema["type"] = "string"
+              elif keys & number_type_keywords:
+                  schema["type"] = "number"
 
           def normalize_strict_schema(schema):
               if not isinstance(schema, dict):
                   return
-              if "properties" in schema and "type" not in schema:
-                  schema["type"] = "object"
+              infer_missing_type(schema)
               for keyword, value in list(schema.items()):
                   if keyword in schema_map_keywords and isinstance(value, dict):
                       for child_schema in value.values():
