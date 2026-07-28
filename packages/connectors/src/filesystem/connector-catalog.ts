@@ -1,15 +1,21 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import {
   validateCapabilityCatalog,
   validateConnectorManifest,
   type CapabilityCatalog,
+  type CatalogSnapshot,
   type ConnectorManifest,
   type ContractIssue
 } from "@soren-sdk/contracts";
-import type { ConnectorRecord } from "@soren-sdk/core";
+import type {
+  ConnectorHealthReport,
+  ConnectorRecord
+} from "@soren-sdk/core";
 
+import { evaluateConnectorHealth } from "../health/evaluate-health.js";
+import { buildCatalogSnapshot } from "../snapshot/build-snapshot.js";
 import { ConnectorCatalogError } from "./errors.js";
 
 export interface FileSystemConnectorCatalogOptions {
@@ -32,6 +38,22 @@ function issueSummary(issues: readonly ContractIssue[]): string {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown filesystem error.";
+}
+
+function diagnosticHealth(
+  connectorId: string,
+  state: "invalid" | "missing",
+  message: string
+): ConnectorHealthReport {
+  return {
+    connectorId,
+    state,
+    selectable: false,
+    reviewStatus: null,
+    blockers: [],
+    warnings: [],
+    errors: [message]
+  };
 }
 
 export class FileSystemConnectorCatalog {
@@ -71,10 +93,63 @@ export class FileSystemConnectorCatalog {
   }
 
   get(connectorId: string): ConnectorRecord | undefined {
-    if (!this.#directoryIds.includes(connectorId)) {
-      return undefined;
+    if (this.#directoryIds.includes(connectorId)) {
+      return this.#loadRecord(connectorId);
     }
-    return this.#loadRecord(connectorId);
+    return this.list().find(
+      (record) =>
+        record.kind === "schema-v2" &&
+        record.manifest.connector.id === connectorId
+    );
+  }
+
+  health(connectorId: string): ConnectorHealthReport {
+    if (!this.#directoryIds.includes(connectorId)) {
+      const matchingDirectory = this.#directoryIds.find((directoryId) => {
+        try {
+          const record = this.#loadRecord(directoryId);
+          return (
+            record.kind === "schema-v2" &&
+            record.manifest.connector.id === connectorId
+          );
+        } catch {
+          return false;
+        }
+      });
+      if (matchingDirectory === undefined) {
+        return diagnosticHealth(
+          connectorId,
+          "missing",
+          `Connector "${connectorId}" was not found.`
+        );
+      }
+      connectorId = matchingDirectory;
+    }
+
+    try {
+      const record = this.#loadRecord(connectorId);
+      return evaluateConnectorHealth(record, {
+        now: new Date(),
+        connectorDirectory: dirname(record.path)
+      });
+    } catch (error) {
+      if (error instanceof ConnectorCatalogError) {
+        return diagnosticHealth(
+          connectorId,
+          error.code === "CONNECTOR_MANIFEST_MISSING" ? "missing" : "invalid",
+          error.message
+        );
+      }
+      return diagnosticHealth(connectorId, "invalid", errorMessage(error));
+    }
+  }
+
+  snapshot(createdAt = new Date().toISOString()): CatalogSnapshot {
+    return buildCatalogSnapshot({
+      capabilityCatalog: this.#capabilityCatalog,
+      connectors: this.list(),
+      createdAt
+    });
   }
 
   #loadCapabilityCatalog(path: string): CapabilityCatalog {
