@@ -41,7 +41,7 @@ permissions:
 jobs:
   contracts:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
 
     steps:
       - name: Checkout
@@ -75,3 +75,6 @@ jobs:
 
       - name: Validate repository contracts
         run: pnpm validate:repository
+
+      - name: CLI smoke tests
+        run: pnpm smoke:cli
