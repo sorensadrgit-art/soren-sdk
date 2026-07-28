@@ -1,0 +1,166 @@
+{
+  "$schema": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/connector.schema.json",
+  "schemaVersion": "2.0.0-draft.1",
+  "connectorVersion": "0.2.0",
+  "connector": {
+    "id": "web-platform",
+    "name": "Web Platform connector",
+    "publisher": "soren-sdk",
+    "reviewStatus": "experimental",
+    "selectable": false,
+    "blockers": [
+      "Built-in provider implementation is not yet available",
+      "Browser support policy is not yet encoded",
+      "Route evaluations are missing"
+    ]
+  },
+  "product": {
+    "canonicalName": "Web Platform",
+    "homepage": "https://developer.mozilla.org/",
+    "aliases": [
+      "css",
+      "waapi",
+      "browser-native"
+    ],
+    "categories": [
+      "platform",
+      "css",
+      "browser"
+    ]
+  },
+  "sourceTrust": {
+    "sourceAuthority": "official",
+    "integrityLevel": "url-recorded",
+    "reviewedAt": "2026-07-27",
+    "reviewer": "soren-sdk"
+  },
+  "capabilityClaims": [
+    {
+      "capability": "platform.css-transition",
+      "support": "primary",
+      "confidence": 1.0,
+      "conditions": [
+        "Visual state can be expressed with CSS"
+      ],
+      "limitations": [
+        "Not appropriate for complex imperative choreography"
+      ]
+    },
+    {
+      "capability": "platform.css-animation",
+      "support": "primary",
+      "confidence": 1.0,
+      "conditions": [
+        "Animation can be expressed declaratively"
+      ],
+      "limitations": [
+        "Limited orchestration compared with timeline engines"
+      ]
+    },
+    {
+      "capability": "platform.waapi-animation",
+      "support": "primary",
+      "confidence": 0.95,
+      "conditions": [
+        "Browser support meets project policy"
+      ],
+      "limitations": [
+        "Requires explicit lifecycle and cancellation management"
+      ]
+    }
+  ],
+  "integrations": [
+    {
+      "id": "remote-mcp",
+      "kind": "mcp-server",
+      "mode": "tool",
+      "status": "available",
+      "source": "https://example.com/mcp",
+      "version": {
+        "status": "resolved",
+        "value": "1.0.0"
+      },
+      "protocol": {
+        "name": "mcp",
+        "supportedVersions": [
+          "2025-11-25"
+        ],
+        "extensions": []
+      },
+      "authorization": {
+        "required": true,
+        "method": "oauth",
+        "paidPlan": false
+      },
+      "executionRisk": "read-only",
+      "dataExposure": "remote-project-content",
+      "permissions": {
+        "filesystem": "project-read",
+        "network": [],
+        "projectWrite": false
+      },
+      "licenseExpression": "MIT",
+      "fallback": null
+    }
+  ],
+  "ownershipClaims": [
+    {
+      "domain": "dom-style",
+      "scope": "selected-elements",
+      "exclusive": true,
+      "properties": [
+        "color",
+        "background",
+        "border",
+        "opacity"
+      ]
+    },
+    {
+      "domain": "dom-animation",
+      "scope": "selected-elements",
+      "exclusive": true,
+      "properties": [
+        "transform",
+        "opacity",
+        "filter"
+      ]
+    }
+  ],
+  "verification": {
+    "requiredChecks": [
+      "reduced-motion",
+      "browser-support",
+      "property-ownership",
+      "cleanup"
+    ],
+    "hardGates": [
+      "connector-schema-valid",
+      "version-policy-resolved",
+      "license-policy-resolved",
+      "no-ownership-conflict",
+      "no-unauthorized-permission"
+    ]
+  },
+  "relatedFiles": {
+    "skill": {
+      "path": "./SKILL.md",
+      "status": "planned"
+    },
+    "sources": {
+      "path": "./docs.sources.json",
+      "status": "planned"
+    },
+    "compatibility": {
+      "path": "./compatibility.json",
+      "status": "planned"
+    },
+    "evaluations": {
+      "path": "./evaluations/",
+      "status": "planned"
+    }
+  },
+  "knowledge": {
+    "retrievedAt": "2026-07-27",
+    "staleAfterDays": 30
+  }
+}

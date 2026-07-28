@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/route-request.schema.json",
+  "title": "Soren SDK Route Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contractKind",
+    "requestId",
+    "createdAt",
+    "projectSnapshotId",
+    "summary",
+    "capabilities",
+    "preferences"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0-draft.1"
+    },
+    "contractKind": {
+      "const": "route-request"
+    },
+    "requestId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "projectSnapshotId": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    },
+    "requestTextDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "required"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "quality": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "preferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preferredProviders",
+        "forbiddenProviders",
+        "maxProviders",
+        "allowPaidServices",
+        "allowExperimental"
+      ],
+      "properties": {
+        "preferredProviders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "forbiddenProviders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "maxProviders": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "allowPaidServices": {
+          "type": "boolean"
+        },
+        "allowExperimental": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

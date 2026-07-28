@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/evidence-envelope.schema.json",
+  "title": "Soren SDK Evidence Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contractKind",
+    "runId",
+    "startedAt",
+    "completedAt",
+    "principal",
+    "projectSnapshotId",
+    "catalogSnapshotId",
+    "policySnapshotId",
+    "routePlanId",
+    "checks",
+    "changes",
+    "unverified",
+    "resultingRevision",
+    "digest"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0-draft.1"
+    },
+    "contractKind": {
+      "const": "evidence-envelope"
+    },
+    "runId": {
+      "type": "string"
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "principal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "user",
+            "service",
+            "agent"
+          ]
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        }
+      }
+    },
+    "projectSnapshotId": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "catalogSnapshotId": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "policySnapshotId": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "routePlanId": {
+      "type": "string"
+    },
+    "executionPlanId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "status",
+          "artifacts"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "passed",
+              "failed",
+              "not-required",
+              "not-run"
+            ]
+          },
+          "command": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "exitCode": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "durationMs": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "operation"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "operation": {
+            "enum": [
+              "created",
+              "updated",
+              "deleted"
+            ]
+          }
+        }
+      }
+    },
+    "unverified": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "resultingRevision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/soren-sdk-lock.schema.json",
+  "title": "Soren SDK Lockfile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contractKind",
+    "generatedAt",
+    "capabilityOntologyVersion",
+    "catalogSnapshotDigest",
+    "policySnapshotDigest",
+    "projectSnapshotDigest",
+    "connectors",
+    "protocolResolutions",
+    "runtimeResolutions",
+    "digest"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0-draft.1"
+    },
+    "contractKind": {
+      "const": "soren-sdk-lock"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "capabilityOntologyVersion": {
+      "type": "string"
+    },
+    "catalogSnapshotDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "policySnapshotDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "projectSnapshotDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "connectors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "connectorVersion",
+          "digest",
+          "integrations"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "connectorVersion": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "integrations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "versionStatus"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "versionStatus": {
+                  "enum": [
+                    "resolved",
+                    "not-applicable"
+                  ]
+                },
+                "version": {
+                  "type": "string"
+                },
+                "digest": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "protocolResolutions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "version",
+          "extensions"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "extensions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        }
+      }
+    },
+    "runtimeResolutions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "version",
+          "integrity"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "integrity": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

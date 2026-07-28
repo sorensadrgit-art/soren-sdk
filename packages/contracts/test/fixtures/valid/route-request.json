@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0-draft.1",
+  "contractKind": "route-request",
+  "requestId": "req_1",
+  "createdAt": "2026-07-27T12:00:00Z",
+  "projectSnapshotId": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "summary": "Add a subtle hover transition.",
+  "requestTextDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "capabilities": [
+    {
+      "id": "platform.css-transition",
+      "required": true,
+      "quality": {
+        "subtle": true
+      }
+    }
+  ],
+  "preferences": {
+    "preferredProviders": [],
+    "forbiddenProviders": [],
+    "maxProviders": 1,
+    "allowPaidServices": false,
+    "allowExperimental": false
+  }
+}

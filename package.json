@@ -17,7 +17,6 @@
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm validate:repository"
   },
   "devDependencies": {
-    "@eslint/js": "9.39.5",
     "@types/node": "24.13.3",
     "eslint": "9.39.5",
     "typescript": "6.0.3",

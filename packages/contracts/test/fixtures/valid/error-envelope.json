@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0.0-draft.1",
+  "contractKind": "error-envelope",
+  "code": "VALIDATION_FAILED",
+  "message": "Invalid contract.",
+  "safeToContinue": false,
+  "details": {
+    "issueCount": 1
+  }
+}

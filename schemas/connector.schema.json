@@ -19,10 +19,15 @@
   ],
   "properties": {
     "$schema": {
-      "type": "string"
+      "type": "string",
+      "format": "uri"
     },
     "schemaVersion": {
       "const": "2.0.0-draft.1"
+    },
+    "connectorVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
     },
     "connector": {
       "type": "object",
@@ -65,7 +70,8 @@
         "blockers": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           }
         }
       }
@@ -81,7 +87,8 @@
       ],
       "properties": {
         "canonicalName": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "homepage": {
           "type": "string",
@@ -96,10 +103,10 @@
         },
         "categories": {
           "type": "array",
+          "minItems": 1,
           "items": {
             "type": "string"
           },
-          "minItems": 1,
           "uniqueItems": true
         }
       }
@@ -139,7 +146,8 @@
           "format": "date"
         },
         "reviewer": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -258,19 +266,119 @@
                 ]
               },
               "value": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1
               },
               "digest": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
               },
               "commit": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^[0-9a-f]{7,64}$"
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "resolved"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "type": "object"
+                },
+                "then": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "value"
+                      ],
+                      "properties": {
+                        "value": {}
+                      },
+                      "type": "object"
+                    },
+                    {
+                      "required": [
+                        "digest"
+                      ],
+                      "properties": {
+                        "digest": {}
+                      },
+                      "type": "object"
+                    },
+                    {
+                      "required": [
+                        "commit"
+                      ],
+                      "properties": {
+                        "commit": {}
+                      },
+                      "type": "object"
+                    }
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "not-applicable"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "type": "object"
+                },
+                "then": {
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "value"
+                        ],
+                        "properties": {
+                          "value": {}
+                        },
+                        "type": "object"
+                      },
+                      {
+                        "required": [
+                          "digest"
+                        ],
+                        "properties": {
+                          "digest": {}
+                        },
+                        "type": "object"
+                      },
+                      {
+                        "required": [
+                          "commit"
+                        ],
+                        "properties": {
+                          "commit": {}
+                        },
+                        "type": "object"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
           },
           "protocol": {
             "type": "object",
             "additionalProperties": false,
+            "required": [
+              "name",
+              "supportedVersions",
+              "extensions"
+            ],
             "properties": {
               "name": {
                 "enum": [
@@ -285,13 +393,15 @@
                 "type": "array",
                 "items": {
                   "type": "string"
-                }
+                },
+                "uniqueItems": true
               },
               "extensions": {
                 "type": "array",
                 "items": {
                   "type": "string"
-                }
+                },
+                "uniqueItems": true
               }
             }
           },
@@ -363,7 +473,8 @@
                 "type": "array",
                 "items": {
                   "type": "string"
-                }
+                },
+                "uniqueItems": true
               },
               "projectWrite": {
                 "type": "boolean"
@@ -371,7 +482,8 @@
             }
           },
           "licenseExpression": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "fallback": {
             "type": [
@@ -400,7 +512,86 @@
               "type": "string"
             }
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "runtime-package"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "type": "object"
+            },
+            "then": {
+              "required": [
+                "packageName",
+                "licenseExpression"
+              ],
+              "properties": {
+                "packageName": {},
+                "licenseExpression": {}
+              },
+              "type": "object"
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "mcp-server"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "type": "object"
+            },
+            "then": {
+              "required": [
+                "protocol",
+                "licenseExpression"
+              ],
+              "properties": {
+                "protocol": {
+                  "properties": {
+                    "name": {
+                      "const": "mcp"
+                    }
+                  },
+                  "type": "object"
+                },
+                "licenseExpression": {}
+              },
+              "type": "object"
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "agent-skill"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "type": "object"
+            },
+            "then": {
+              "required": [
+                "licenseExpression"
+              ],
+              "properties": {
+                "licenseExpression": {}
+              },
+              "type": "object"
+            }
+          }
+        ]
       }
     },
     "ownershipClaims": {
@@ -415,10 +606,12 @@
         ],
         "properties": {
           "domain": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "scope": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "exclusive": {
             "type": "boolean"
@@ -427,7 +620,8 @@
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "uniqueItems": true
           }
         }
       }
@@ -497,10 +691,6 @@
           "minimum": 1
         }
       }
-    },
-    "connectorVersion": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$"
     }
   },
   "$defs": {
@@ -513,7 +703,8 @@
       ],
       "properties": {
         "path": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "status": {
           "enum": [
