@@ -1,19 +1,18 @@
 # Soren SDK
 
-> Agent-native SDK intelligence, policy, routing, tool brokering, execution planning, and verification for premium frontend development.
+> Agent-native SDK intelligence, policy, cataloging, routing, tool brokering, execution planning, and verification for premium frontend development.
 
-**Repository slug:** `soren-sdk`  
-**Project name:** **Soren SDK**  
-**Status:** Architecture hardening and contract design  
+**Repository:** `sorensadrgit-art/soren-sdk`  
+**Status:** Phase 2 executable catalog foundation  
 **Primary owner:** Soren  
-**Reference agents:** Hermes as primary implementer; OpenClaw as independent auditor  
-**Platform goal:** Universal agent support through CLI, REST, MCP, and TypeScript SDK parity
+**Runtime baseline:** Node.js 24, pnpm 11.17.0, TypeScript 6  
+**Reference workflow:** Hermes may implement; OpenClaw or another independent reviewer audits before merge
 
 ## What Soren SDK is
 
-Soren SDK helps coding agents correctly discover, select, combine, and verify modern frontend SDKs.
+Soren SDK is a platform that helps coding agents correctly discover, select, combine, and verify modern frontend SDKs.
 
-It is not another animation library and it does not install every frontend dependency.
+It is not an animation library, a package installer, or a prompt containing every SDK. It is the intelligence and governance layer between a user request and the SDKs used to implement that request.
 
 ```text
 User request
@@ -41,32 +40,140 @@ Optional explicitly approved apply
 Verification and evidence
 ```
 
-## Architecture hardening v2
+## Current executable foundation
 
-A critical review on 2026-07-27 identified foundational improvements required before implementation:
+The repository now contains two completed implementation phases.
 
-- Separate SDK products from packages, MCP servers, skills, documentation, and validators
-- Separate connector publisher from source authority
-- Add a built-in Web Platform provider so CSS, WAAPI, or no SDK can win
-- Replace pairwise-only compatibility with scoped claims and policy constraints
-- Make CLI, REST, MCP, and TypeScript SDK surfaces behaviorally equivalent
-- Remove hardcoded agent and model identity from core contracts
-- Add local-first storage, policy files, and `soren-sdk.lock`
-- Add explicit `plan` and sandboxed `apply` contracts
-- Treat documentation and tool descriptions as untrusted input
-- Add protocol negotiation, consent, provenance, license, and hard evaluation gates
+### Phase 1 — Contracts
 
-Read:
+`@soren-sdk/contracts` provides:
 
-- [`docs/ARCHITECTURE-REVIEW-2026-07-27.md`](./docs/ARCHITECTURE-REVIEW-2026-07-27.md)
-- [`docs/PLATFORM-CONTRACTS-V2.md`](./docs/PLATFORM-CONTRACTS-V2.md)
-- [`docs/THREAT-MODEL.md`](./docs/THREAT-MODEL.md)
+- JSON Schema Draft 2020-12 contracts
+- Connector Manifest v2 structural and semantic validation
+- Capability, project, catalog, policy, route, execution, evidence, error, and lockfile contracts
+- Canonical JSON serialization
+- Deterministic SHA-256 digests
+- Typed errors
+- Explicit migration scaffolding
+- Repository-wide contract validation
+
+### Phase 2 — Read-only catalog and CLI
+
+The current executable layer provides:
+
+- `@soren-sdk/core` — provider-neutral catalog interfaces and service
+- `@soren-sdk/connectors` — filesystem catalog, health evaluation, deterministic snapshots, and storage adapters
+- `@soren-sdk/cli` — read-only catalog commands
+- Real SQLite snapshot persistence through Node.js `node:sqlite`
+- Permanent CI with frozen lockfile, pinned Actions, read-only permissions, tests, builds, repository validation, and CLI smoke checks
+
+No routing, SDK scoring, MCP execution, package installation, command execution, or project mutation exists yet.
+
+## Try the catalog CLI
+
+Install and build:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm build
+```
+
+List the catalog:
+
+```bash
+node packages/cli/dist/bin.js catalog list
+node packages/cli/dist/bin.js catalog list --json
+```
+
+Inspect one connector:
+
+```bash
+node packages/cli/dist/bin.js catalog get web-platform --json
+```
+
+Inspect connector health:
+
+```bash
+node packages/cli/dist/bin.js connector health web-platform --json
+```
+
+Create a deterministic snapshot without writing a database:
+
+```bash
+node packages/cli/dist/bin.js catalog snapshot --json
+```
+
+Persist the snapshot to an explicitly requested local SQLite database:
+
+```bash
+node packages/cli/dist/bin.js \
+  catalog snapshot \
+  --database .soren-sdk/catalog.sqlite \
+  --json
+```
+
+### CLI write boundary
+
+These commands are read-only:
+
+- `catalog list`
+- `catalog get`
+- `connector health`
+- `catalog snapshot` without `--database`
+
+Only `catalog snapshot --database <path>` creates or updates a file, and it writes only to the requested SQLite database.
+
+## Connector catalog behavior
+
+The catalog:
+
+- Loads and validates `capabilities/catalog.json`
+- Discovers `sdk-connectors/*` deterministically
+- Skips only underscore-prefixed template directories
+- Loads connector manifests lazily
+- Keeps legacy manifests visible but permanently non-selectable
+- Rejects missing, malformed, invalid, and duplicate connector manifests
+- Treats connector files as untrusted data
+- Never imports or executes connector runtime artifacts
+
+Connector health reports:
+
+- Review and selectable state
+- Explicit blockers
+- Source freshness
+- Unresolved available artifact versions
+- Unresolved executable-artifact licenses
+- Missing related files marked present
+- Related paths escaping connector boundaries
+
+Health is diagnostic information. It is not a routing approval.
+
+## Deterministic catalog snapshots
+
+Catalog snapshots contain:
+
+- Capability-catalog digest
+- Sorted Schema v2 connector records
+- Connector content digests
+- Review and selectable status
+- Stable snapshot ID
+
+The snapshot ID excludes `createdAt`, so identical catalog content produces the same ID at different times and in different filesystem enumeration orders.
+
+Storage is defined through a replaceable `CatalogSnapshotStore` interface.
+
+Current adapters:
+
+- In-memory store for tests and temporary processes
+- SQLite store for local persistence
+
+The SQLite adapter uses prepared statements, canonical JSON, contract validation, integrity verification, and explicit resource closure. It makes no network calls and loads no extensions.
 
 ## Core product systems
 
 ### Capability ontology
 
-Defines provider-independent behaviors such as:
+Provider-independent behaviors such as:
 
 - `platform.css-transition`
 - `motion.layout`
@@ -77,7 +184,7 @@ Defines provider-independent behaviors such as:
 
 ### Connector catalog
 
-Stores Soren-authored connector packages and their independent integration artifacts:
+Separates an SDK product from its integration artifacts:
 
 - Runtime package
 - MCP server
@@ -87,25 +194,15 @@ Stores Soren-authored connector packages and their independent integration artif
 - Validator
 - Recipe source
 
-### Policy engine
+### Policy engine — planned
 
-Enforces:
+Will enforce allowed SDKs, licenses, versions, paid services, network and filesystem access, experimental status, bundle budgets, accessibility, and approvals.
 
-- Allowed SDKs
-- Licenses
-- Versions
-- Paid services
-- Network and filesystem access
-- Experimental status
-- Bundle and performance budgets
-- Accessibility requirements
-- Approval requirements
+### Router — planned
 
-### Router
+Will select the smallest provider set satisfying capabilities and policy.
 
-Selects the smallest provider set that satisfies capabilities and policy.
-
-Valid outcomes:
+Valid outcomes will include:
 
 - `native`
 - `selected`
@@ -113,68 +210,50 @@ Valid outcomes:
 - `needs-input`
 - `blocked`
 
-### Context broker and tool gateway
+### Context broker and tool gateway — planned
 
-Loads only relevant knowledge and brokers MCP or other tool access through explicit permissions, version negotiation, inventory checks, and audit events.
+Will load only task-relevant knowledge and broker external tools through explicit permissions, version negotiation, inventory checks, and audit events.
 
-### Plan and apply
+### Plan and apply — planned
 
-`plan` is read-only.
+`plan` remains read-only.
 
-`apply` is a later, explicitly approved operation requiring isolation, scoped permissions, drift detection, rollback data, diff review, and verification.
+`apply` will be a later, explicitly approved operation requiring isolation, scoped permissions, plan-drift detection, rollback data, diff review, and verification.
 
-### Verification and evidence
+## First routing vertical slice
 
-Records factual results tied to:
-
-- Project snapshot
-- Catalog snapshot
-- Policy snapshot
-- Route plan
-- Execution plan
-- Check-run output
-- Resulting revision
-
-Evidence never includes hidden reasoning or credential values.
-
-## First implementation vertical slice
-
-Do not start with all SDKs.
-
-Prove the architecture using:
+After the project inspector, the first router will support only:
 
 1. Web Platform
 2. Motion
 3. GSAP
 
-This slice must correctly determine:
+It must correctly determine:
 
 - When CSS is enough
-- When WAAPI is enough
+- When Web Animations API is enough
 - When Motion is correct
 - When GSAP is correct
 - When Motion and GSAP may coexist
-- When the route needs user input
+- When user input is required
 - When policy blocks a route
 
-After the slice passes, activate:
-
-4. Lenis
-5. React Three Fiber
-6. Storybook
-7. shadcn
+Only after that slice is proven will Lenis, React Three Fiber, Storybook, and shadcn become active routing candidates.
 
 ## Current connector status
 
-The existing first-wave manifests are planning artifacts. They must migrate to Connector Schema v2 and remain non-selectable until versions, licenses, related files, permissions, compatibility, and evaluations resolve.
+- `web-platform` is the first Schema v2 connector.
+- Motion, GSAP, Lenis, React Three Fiber, Storybook, and shadcn remain legacy planning manifests.
+- Legacy manifests are visible through the catalog but never selectable.
+- Connectors remain non-selectable until required versions, licenses, related files, permissions, compatibility rules, and evaluations resolve.
 
-The connector standard lives at:
+Standards:
 
 - [`docs/SDK-CONNECTOR-STANDARD.md`](./docs/SDK-CONNECTOR-STANDARD.md)
 - [`schemas/connector.schema.json`](./schemas/connector.schema.json)
 - [`capabilities/catalog.json`](./capabilities/catalog.json)
 
-## Target repository structure
+## Repository structure
 
 ```text
 soren-sdk/
@@ -183,80 +262,54 @@ soren-sdk/
 │   ├── core/
 │   ├── connectors/
 │   ├── cli/
-│   ├── protocol-server/
-│   └── testing/
-│
+│   ├── protocol-server/      # planned
+│   └── testing/              # planned
 ├── sdk-connectors/
 ├── capabilities/
 ├── schemas/
 ├── evaluations/
 ├── apps/
-│   ├── control-center/
-│   ├── docs/
-│   ├── evaluation-lab/
-│   └── playground/
+│   ├── control-center/       # planned
+│   ├── docs/                 # planned
+│   ├── evaluation-lab/       # planned
+│   └── playground/           # planned
 ├── docs/
 ├── AGENTS.md
 └── README.md
 ```
 
-The compact package topology avoids premature micro-package fragmentation. Logical modules may split later when release cadence, dependencies, or ownership justify it.
-
-## Universal interfaces
-
-The same application services must power:
-
-```text
-CLI
-REST
-MCP
-TypeScript SDK
-```
-
-Target operations:
-
-```bash
-soren-sdk inspect
-soren-sdk catalog list
-soren-sdk catalog get motion
-soren-sdk connector health motion
-soren-sdk route "Build a cinematic product page"
-soren-sdk explain
-soren-sdk plan
-soren-sdk verify
-soren-sdk report
-```
-
-`apply` remains disabled until the execution-safety phase is complete.
-
 ## Security position
 
-- Public source and tool metadata are untrusted input
-- Runtime packages are installed only in target workspaces
+- Public documentation and tool metadata are untrusted input
+- Connector files are parsed as data and never executed by the catalog
+- Runtime packages belong only in target workspaces
 - No silent global skill installation
 - No hardcoded credentials, agents, or model IDs
-- Remote MCP servers require policy approval
-- Mutating tools require explicit consent
 - No token passthrough
-- Local MCP commands require review and sandboxing
-- Project inspection is read-only
-- Protected branches are changed through pull requests
-- Releases require complete evidence
+- Remote MCP servers will require policy approval
+- Mutating tools will require explicit consent
+- Project inspection will remain read-only
+- Protected branches change through pull requests
+- Releases require evidence-backed checks
 
-See:
+Read:
 
 - [`SECURITY.md`](./SECURITY.md)
 - [`docs/GOVERNANCE-SECURITY.md`](./docs/GOVERNANCE-SECURITY.md)
+- [`docs/THREAT-MODEL.md`](./docs/THREAT-MODEL.md)
 - [`docs/LICENSE-POLICY.md`](./docs/LICENSE-POLICY.md)
 
 ## Roadmap
 
-The authoritative execution order is:
+Completed:
 
 1. Architecture hardening
 2. Contract implementation
-3. Compact core and CLI
-4. Project inspector
+3. Compact read-only catalog and CLI
+
+Next:
+
+4. Read-only project inspector
 5. Web Platform + Motion + GSAP routing slice
 6. Policy, configuration, and lockfile
 7. Universal protocol surfaces
@@ -270,15 +323,8 @@ The authoritative execution order is:
 
 Read [`docs/ROADMAP.md`](./docs/ROADMAP.md).
 
-## Current definition of done
+## Release direction
 
-The planning stage is complete when:
+Release `0.1` remains read-only.
 
-- Architecture v2 is accepted
-- Connector Schema v2 is accepted
-- Capability ontology is accepted
-- Threat model is accepted
-- Existing manifests are explicitly non-selectable pending migration
-- Issue #1 reflects the v2 execution sequence
-
-The first software release, `0.1`, is read-only. Package mutation and command execution are out of scope until the apply sandbox is independently reviewed.
+Package installation, command execution, and application-source mutation are explicitly out of scope until the apply sandbox is implemented and independently reviewed.
