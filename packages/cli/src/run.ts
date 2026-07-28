@@ -31,19 +31,29 @@ class CliUsageError extends Error {
   override readonly name = "CliUsageError";
 }
 
-interface ParsedOptions {
-  json: boolean;
-  database?: string;
+function parseJsonOption(args: string[]): { json: boolean } {
+  const parsed = parseArgs({
+    args,
+    allowPositionals: false,
+    strict: true,
+    options: {
+      json: { type: "boolean", default: false }
+    }
+  });
+  return { json: parsed.values.json ?? false };
 }
 
-function parseOptions(args: string[], allowDatabase: boolean): ParsedOptions {
+function parseSnapshotOptions(args: string[]): {
+  json: boolean;
+  database?: string;
+} {
   const parsed = parseArgs({
     args,
     allowPositionals: false,
     strict: true,
     options: {
       json: { type: "boolean", default: false },
-      ...(allowDatabase ? { database: { type: "string" as const } } : {})
+      database: { type: "string" }
     }
   });
   const database = parsed.values.database;
@@ -72,7 +82,7 @@ export function runCli(options: RunCliOptions): number {
       if (identifier !== undefined) {
         throw new CliUsageError("catalog list does not accept a connector ID.");
       }
-      const parsed = parseOptions(rest, false);
+      const parsed = parseJsonOption(rest);
       const records = service.listConnectors();
       options.io.stdout(
         parsed.json
@@ -86,7 +96,7 @@ export function runCli(options: RunCliOptions): number {
       if (identifier === undefined || identifier.startsWith("--")) {
         throw new CliUsageError("catalog get requires a connector ID.");
       }
-      const parsed = parseOptions(rest, false);
+      const parsed = parseJsonOption(rest);
       const record = service.getConnector(identifier);
       if (record === undefined) {
         options.io.stderr(`Unknown connector: ${identifier}\n`);
@@ -100,7 +110,7 @@ export function runCli(options: RunCliOptions): number {
       if (identifier === undefined || identifier.startsWith("--")) {
         throw new CliUsageError("connector health requires a connector ID.");
       }
-      const parsed = parseOptions(rest, false);
+      const parsed = parseJsonOption(rest);
       const record = service.getConnector(identifier);
       if (record === undefined) {
         options.io.stderr(`Unknown connector: ${identifier}\n`);
@@ -113,7 +123,7 @@ export function runCli(options: RunCliOptions): number {
 
     if (domain === "catalog" && action === "snapshot") {
       const optionArgs = identifier === undefined ? rest : [identifier, ...rest];
-      const parsed = parseOptions(optionArgs, true);
+      const parsed = parseSnapshotOptions(optionArgs);
       const snapshot = service.createSnapshot(new Date().toISOString());
       if (parsed.database !== undefined) {
         const databasePath = resolve(options.cwd, parsed.database);
@@ -125,7 +135,7 @@ export function runCli(options: RunCliOptions): number {
           store.close();
         }
       }
-      options.io.stdout(parsed.json ? formatJson(snapshot) : formatJson(snapshot));
+      options.io.stdout(formatJson(snapshot));
       return 0;
     }
 
