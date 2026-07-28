@@ -263,6 +263,25 @@ jobs:
                           if isinstance(child_schema, dict):
                               normalize_strict_schema(child_schema)
 
+          def is_selectable_semantic_rule(rule):
+              try:
+                  return (
+                      rule["if"]["properties"]["connector"]
+                      ["properties"]["selectable"]["const"] is True
+                  )
+              except (KeyError, TypeError):
+                  return False
+
+          def remove_duplicate_semantic_rule(schema):
+              rules = schema.get("allOf")
+              if not isinstance(rules, list):
+                  return
+              remaining = [rule for rule in rules if not is_selectable_semantic_rule(rule)]
+              if remaining:
+                  schema["allOf"] = remaining
+              else:
+                  schema.pop("allOf", None)
+
           for schema_directory in (
               Path("schemas"),
               Path("packages/contracts/src/schema-data")
@@ -271,18 +290,21 @@ jobs:
                   continue
               for schema_path in schema_directory.glob("*.schema.json"):
                   schema = json.loads(schema_path.read_text())
+                  if schema_path.name == "connector.schema.json":
+                      remove_duplicate_semantic_rule(schema)
                   normalize_strict_schema(schema)
                   schema_path.write_text(json.dumps(schema, indent=2) + "\n")
           PY
 
       - name: Remove bootstrap-only files
         run: |
-          rm scripts/scaffold-contracts.mjs
-          rm scripts/scaffold-payload-1.txt
-          rm scripts/scaffold-payload-2.txt
-          rm scripts/scaffold-payload-3.txt
-          rm scripts/scaffold-payload-4.txt
-          rm .github/workflows/contracts-bootstrap.yml
+          rm -f scripts/scaffold-contracts.mjs
+          rm -f scripts/scaffold-payload-1.txt
+          rm -f scripts/scaffold-payload-2.txt
+          rm -f scripts/scaffold-payload-3.txt
+          rm -f scripts/scaffold-payload-4.txt
+          rm -f .github/workflows/contracts-bootstrap.yml
+          rm -f .github/workflows/contracts-inspect.yml
 
       - name: Refresh lockfile
         run: pnpm install --no-frozen-lockfile
