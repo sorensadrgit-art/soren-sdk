@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1.0.0",
+  "connectorVersion": "0.1.0",
+  "id": "replace-me",
+  "name": "Replace Me",
+  "status": "proposed",
+  "trust": "experimental",
+  "categories": [],
+  "aliases": [],
+  "capabilities": [],
+  "connectionMethods": [],
+  "runtime": {
+    "packages": [],
+    "imports": {},
+    "supportedVersions": []
+  },
+  "frameworks": [],
+  "bestFor": [],
+  "avoidFor": [],
+  "owns": [],
+  "requiredChecks": [],
+  "security": {
+    "requiresAuth": false,
+    "requiresPaidPlan": false,
+    "remoteData": false
+  },
+  "knowledge": {
+    "retrievedAt": "2026-07-27",
+    "officialSources": []
+  }
+}
