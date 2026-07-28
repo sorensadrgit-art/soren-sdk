@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "1.0.0",
+  "connectorVersion": "0.1.0",
+  "id": "lenis",
+  "name": "Lenis",
+  "status": "experimental",
+  "trust": "soren-approved",
+  "categories": [
+    "scroll",
+    "synchronization"
+  ],
+  "aliases": [],
+  "capabilities": [
+    "scroll.smooth-transport",
+    "scroll.normalization",
+    "scroll.dom-webgl-sync"
+  ],
+  "connectionMethods": [
+    {
+      "type": "official-docs",
+      "status": "available"
+    },
+    {
+      "type": "soren-skill",
+      "status": "planned"
+    },
+    {
+      "type": "runtime-adapter",
+      "status": "planned"
+    }
+  ],
+  "runtime": {
+    "packages": [
+      "lenis"
+    ],
+    "imports": {
+      "javascript": "lenis"
+    },
+    "supportedVersions": [
+      "define during implementation"
+    ]
+  },
+  "frameworks": [
+    "react",
+    "nextjs",
+    "javascript"
+  ],
+  "bestFor": [
+    "Smooth-scroll transport",
+    "Scroll normalization",
+    "DOM and WebGL synchronization"
+  ],
+  "avoidFor": [
+    "Element animation",
+    "Timeline sequencing",
+    "Component presence animation"
+  ],
+  "owns": [
+    "scroll-transport"
+  ],
+  "requiredChecks": [
+    "single-instance",
+    "cleanup",
+    "anchor-navigation",
+    "native-fallback",
+    "reduced-motion"
+  ],
+  "security": {
+    "requiresAuth": false,
+    "requiresPaidPlan": false,
+    "remoteData": false
+  },
+  "knowledge": {
+    "retrievedAt": "2026-07-27",
+    "officialSources": [
+      "https://lenis.darkroom.engineering/",
+      "https://github.com/darkroomengineering/lenis"
+    ]
+  }
+}
