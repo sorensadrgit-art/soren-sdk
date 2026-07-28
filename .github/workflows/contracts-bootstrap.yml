@@ -157,15 +157,48 @@ jobs:
               raise SystemExit("Expected schema candidate block was not found.")
           registry.write_text(text.replace(old_candidates, new_candidates))
 
-          def normalize_strict_schema(node):
-              if isinstance(node, dict):
-                  if "properties" in node and "type" not in node:
-                      node["type"] = "object"
-                  for value in node.values():
+          schema_map_keywords = {
+              "$defs",
+              "definitions",
+              "dependentSchemas",
+              "patternProperties",
+              "properties"
+          }
+          schema_single_keywords = {
+              "additionalProperties",
+              "contains",
+              "contentSchema",
+              "else",
+              "if",
+              "items",
+              "not",
+              "propertyNames",
+              "then",
+              "unevaluatedProperties"
+          }
+          schema_array_keywords = {
+              "allOf",
+              "anyOf",
+              "oneOf",
+              "prefixItems"
+          }
+
+          def normalize_strict_schema(schema):
+              if not isinstance(schema, dict):
+                  return
+              if "properties" in schema and "type" not in schema:
+                  schema["type"] = "object"
+              for keyword, value in list(schema.items()):
+                  if keyword in schema_map_keywords and isinstance(value, dict):
+                      for child_schema in value.values():
+                          if isinstance(child_schema, dict):
+                              normalize_strict_schema(child_schema)
+                  elif keyword in schema_single_keywords and isinstance(value, dict):
                       normalize_strict_schema(value)
-              elif isinstance(node, list):
-                  for value in node:
-                      normalize_strict_schema(value)
+                  elif keyword in schema_array_keywords and isinstance(value, list):
+                      for child_schema in value:
+                          if isinstance(child_schema, dict):
+                              normalize_strict_schema(child_schema)
 
           for schema_directory in (
               Path("schemas"),
