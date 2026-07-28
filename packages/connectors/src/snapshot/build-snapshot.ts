@@ -2,7 +2,8 @@ import {
   digestJson,
   validateContract,
   type CapabilityCatalog,
-  type CatalogSnapshot
+  type CatalogSnapshot,
+  type JsonValue
 } from "@soren-sdk/contracts";
 import type { ConnectorRecord } from "@soren-sdk/core";
 
@@ -12,16 +13,20 @@ export interface BuildCatalogSnapshotInput {
   createdAt: string;
 }
 
+function jsonValue(value: unknown): JsonValue {
+  return value as JsonValue;
+}
+
 export function buildCatalogSnapshot(
   input: BuildCatalogSnapshotInput
 ): CatalogSnapshot {
-  const capabilityCatalogDigest = digestJson(input.capabilityCatalog);
+  const capabilityCatalogDigest = digestJson(jsonValue(input.capabilityCatalog));
   const connectors = input.connectors
     .filter((record) => record.kind === "schema-v2")
     .map((record) => ({
       id: record.manifest.connector.id,
       connectorVersion: record.manifest.connectorVersion,
-      digest: digestJson(record.manifest),
+      digest: digestJson(jsonValue(record.manifest)),
       reviewStatus: record.manifest.connector.reviewStatus,
       selectable: record.manifest.connector.selectable
     }))
