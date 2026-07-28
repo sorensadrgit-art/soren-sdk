@@ -1,6 +1,3 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import type { SchemaV2ConnectorRecord } from "@soren-sdk/core";
@@ -52,7 +49,11 @@ describe("connector health", () => {
     manifest.connector.blockers = [];
     manifest.knowledge.retrievedAt = "2020-01-01";
     manifest.knowledge.staleAfterDays = 1;
-    manifest.integrations[0]!.version.status = "unresolved";
+    const integration = manifest.integrations[0];
+    if (integration === undefined) {
+      throw new Error("Expected at least one integration fixture.");
+    }
+    integration.version.status = "unresolved";
     const record: SchemaV2ConnectorRecord = {
       kind: "schema-v2",
       directoryId: "stale",
@@ -102,14 +103,6 @@ describe("connector health", () => {
     manifest.knowledge.retrievedAt = "2026-07-28";
     manifest.knowledge.staleAfterDays = 365;
     const fixture = await createCatalogFixture({ healthy: manifest });
-    await mkdir(join(fixture.root, "sdk-connectors", "healthy"), {
-      recursive: true
-    });
-    await writeFile(
-      join(fixture.root, "sdk-connectors", "healthy", "SKILL.md"),
-      "# Healthy\n",
-      "utf8"
-    );
     try {
       const report = new FileSystemConnectorCatalog({ root: fixture.root }).health(
         "healthy"
