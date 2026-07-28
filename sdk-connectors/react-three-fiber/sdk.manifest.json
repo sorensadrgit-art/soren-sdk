@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "1.0.0",
+  "connectorVersion": "0.1.0",
+  "id": "react-three-fiber",
+  "name": "React Three Fiber",
+  "status": "experimental",
+  "trust": "soren-approved",
+  "categories": [
+    "three",
+    "webgl",
+    "react"
+  ],
+  "aliases": [
+    "r3f"
+  ],
+  "capabilities": [
+    "webgl.react-scene",
+    "webgl.model",
+    "webgl.interaction",
+    "webgl.render-loop",
+    "webgl.camera"
+  ],
+  "connectionMethods": [
+    {
+      "type": "official-docs",
+      "status": "available"
+    },
+    {
+      "type": "soren-skill",
+      "status": "planned"
+    },
+    {
+      "type": "runtime-adapter",
+      "status": "planned"
+    }
+  ],
+  "runtime": {
+    "packages": [
+      "three",
+      "@react-three/fiber"
+    ],
+    "imports": {
+      "react": "@react-three/fiber",
+      "three": "three"
+    },
+    "supportedVersions": [
+      "define during implementation"
+    ]
+  },
+  "frameworks": [
+    "react",
+    "nextjs"
+  ],
+  "bestFor": [
+    "React-managed Three.js scenes",
+    "Interactive 3D products",
+    "WebGL interfaces",
+    "Camera and scene animation"
+  ],
+  "avoidFor": [
+    "Standard DOM UI",
+    "Simple decorative effects that can be CSS",
+    "Essential content without an accessible fallback"
+  ],
+  "owns": [
+    "webgl-rendering",
+    "webgl-transform",
+    "webgl-camera"
+  ],
+  "requiredChecks": [
+    "lazy-loading",
+    "static-fallback",
+    "dpr-cap",
+    "resource-cleanup",
+    "mobile-quality",
+    "frame-loop-discipline"
+  ],
+  "security": {
+    "requiresAuth": false,
+    "requiresPaidPlan": false,
+    "remoteData": false
+  },
+  "knowledge": {
+    "retrievedAt": "2026-07-27",
+    "officialSources": [
+      "https://r3f.docs.pmnd.rs/",
+      "https://r3f.docs.pmnd.rs/advanced/scaling-performance",
+      "https://github.com/pmndrs/react-three-fiber"
+    ]
+  }
+}
