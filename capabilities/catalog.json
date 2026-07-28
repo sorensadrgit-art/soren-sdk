@@ -1,0 +1,180 @@
+{
+  "schemaVersion": "1.0.0-draft.1",
+  "capabilities": [
+    {
+      "id": "platform.css-transition",
+      "family": "platform",
+      "description": "Simple CSS transition for state changes.",
+      "native": true,
+      "ownershipDomain": "dom-style"
+    },
+    {
+      "id": "platform.css-animation",
+      "family": "platform",
+      "description": "Keyframe animation expressible with CSS.",
+      "native": true,
+      "ownershipDomain": "dom-animation"
+    },
+    {
+      "id": "platform.waapi-animation",
+      "family": "platform",
+      "description": "Imperative browser-native animation through Web Animations API.",
+      "native": true,
+      "ownershipDomain": "dom-animation"
+    },
+    {
+      "id": "motion.presence",
+      "family": "motion",
+      "description": "Mount and unmount animation.",
+      "native": false,
+      "ownershipDomain": "presence"
+    },
+    {
+      "id": "motion.layout",
+      "family": "motion",
+      "description": "Animate layout changes.",
+      "native": false,
+      "ownershipDomain": "layout"
+    },
+    {
+      "id": "motion.shared-layout",
+      "family": "motion",
+      "description": "Shared element or shared layout transition.",
+      "native": false,
+      "ownershipDomain": "layout"
+    },
+    {
+      "id": "motion.spring",
+      "family": "motion",
+      "description": "Spring-based transition behavior.",
+      "native": false,
+      "ownershipDomain": "timing"
+    },
+    {
+      "id": "motion.timeline",
+      "family": "motion",
+      "description": "Sequenced multi-step animation timeline.",
+      "native": false,
+      "ownershipDomain": "timeline"
+    },
+    {
+      "id": "motion.svg",
+      "family": "motion",
+      "description": "SVG drawing or choreography.",
+      "native": false,
+      "ownershipDomain": "svg-animation"
+    },
+    {
+      "id": "motion.flip",
+      "family": "motion",
+      "description": "FLIP-based transition behavior.",
+      "native": false,
+      "ownershipDomain": "layout"
+    },
+    {
+      "id": "interaction.drag",
+      "family": "interaction",
+      "description": "Direct-manipulation drag interaction.",
+      "native": false,
+      "ownershipDomain": "gesture"
+    },
+    {
+      "id": "interaction.gesture",
+      "family": "interaction",
+      "description": "Pointer, hover, press, or pan gesture animation.",
+      "native": false,
+      "ownershipDomain": "gesture"
+    },
+    {
+      "id": "scroll.smooth-transport",
+      "family": "scroll",
+      "description": "Smooth-scroll transport and normalization.",
+      "native": false,
+      "ownershipDomain": "scroll-transport"
+    },
+    {
+      "id": "scroll.triggered-animation",
+      "family": "scroll",
+      "description": "Animation triggered or controlled by scroll position.",
+      "native": false,
+      "ownershipDomain": "scroll-trigger"
+    },
+    {
+      "id": "scroll.pinned-sequence",
+      "family": "scroll",
+      "description": "Pinned scroll-driven storytelling sequence.",
+      "native": false,
+      "ownershipDomain": "scroll-trigger"
+    },
+    {
+      "id": "scroll.dom-webgl-sync",
+      "family": "scroll",
+      "description": "Synchronize DOM and WebGL movement with scroll.",
+      "native": false,
+      "ownershipDomain": "scroll-transport"
+    },
+    {
+      "id": "webgl.react-scene",
+      "family": "webgl",
+      "description": "React-managed Three.js scene.",
+      "native": false,
+      "ownershipDomain": "webgl-rendering"
+    },
+    {
+      "id": "webgl.model",
+      "family": "webgl",
+      "description": "Load and display an interactive 3D model.",
+      "native": false,
+      "ownershipDomain": "webgl-rendering"
+    },
+    {
+      "id": "webgl.interaction",
+      "family": "webgl",
+      "description": "Pointer or gesture interaction inside WebGL.",
+      "native": false,
+      "ownershipDomain": "webgl-interaction"
+    },
+    {
+      "id": "component.agent-context",
+      "family": "component",
+      "description": "Expose component documentation and examples to agents.",
+      "native": false,
+      "ownershipDomain": "component-context"
+    },
+    {
+      "id": "component.source-distribution",
+      "family": "component",
+      "description": "Distribute source-owned components.",
+      "native": false,
+      "ownershipDomain": "component-distribution"
+    },
+    {
+      "id": "registry.search",
+      "family": "registry",
+      "description": "Search compatible component registries.",
+      "native": false,
+      "ownershipDomain": "registry"
+    },
+    {
+      "id": "registry.install",
+      "family": "registry",
+      "description": "Install source items from a component registry.",
+      "native": false,
+      "ownershipDomain": "registry"
+    },
+    {
+      "id": "testing.story-interaction",
+      "family": "testing",
+      "description": "Run story-level interaction tests.",
+      "native": false,
+      "ownershipDomain": "testing"
+    },
+    {
+      "id": "testing.accessibility",
+      "family": "testing",
+      "description": "Run automated accessibility checks.",
+      "native": false,
+      "ownershipDomain": "testing"
+    }
+  ]
+}

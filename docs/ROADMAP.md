@@ -1,281 +1,332 @@
-# Soren SDK Roadmap
+# Soren SDK Roadmap v2
 
-The roadmap prioritizes a trustworthy core before a polished dashboard.
+## Strategy
 
-## Phase 0 — Repository foundation
+Build one secure, inspectable vertical slice before expanding the catalog or creating the Control Center.
 
-### Goal
+The MVP is read-only. It must prove that Soren SDK can inspect a project, select native or SDK providers correctly, explain the decision, and produce a reproducible route plan.
 
-Create a stable place for humans and agents to collaborate.
+## Phase 0 — Architecture hardening
 
-### Deliverables
+Deliverables:
 
-- pnpm/Turborepo workspace
-- TypeScript configuration
-- Root AGENTS.md
-- Contributor documentation
-- Contracts package
-- Connector schema
-- Evidence schema
-- ADR template
-- Pull request template
-- CI for schema, lint, type check, and tests
+- Architecture review
+- Platform Contracts v2
+- Threat model
+- Connector Schema v2
+- Capability catalog draft
+- Native-provider requirement
+- License policy
+- GitHub security policy
+- CODEOWNERS
+- Existing connectors marked non-selectable until migrated
 
-### Exit criteria
+Exit criteria:
 
-- A sample connector validates
-- Invalid connectors fail CI
-- Human and agent instructions agree
-- No runtime SDK integration is required yet
+- No document treats source authority as connector authorship
+- No machine version field contains prose
+- Security and execution boundaries are explicit
+- CLI, REST, MCP, and TypeScript SDK parity is an invariant
+- The repository has one authoritative roadmap
 
----
+## Phase 1 — Contract implementation
 
-## Phase 1 — Catalog and connector loader
-
-### Goal
-
-Load and query structured SDK metadata.
-
-### Deliverables
+Create:
 
 - `@soren-sdk/contracts`
-- `@soren-sdk/sdk-catalog`
-- Manifest validation
-- Connector discovery
-- Alias resolution
-- Status and trust filtering
-- CLI catalog commands
+- JSON Schema validation
+- TypeScript types generated or synchronized from schemas
+- Canonical JSON serialization
+- Typed error model
+- Evidence schema
+- Project snapshot schema
+- Route plan schema
+- Execution plan schema
+- Policy schema
+- Lockfile schema
 
-### Exit criteria
+Exit criteria:
+
+- Valid fixtures pass
+- Invalid fixtures fail with actionable errors
+- Schema changes require migration tests
+- All first-wave manifests validate or remain explicitly blocked
+
+## Phase 2 — Compact core and CLI
+
+Create:
+
+- `@soren-sdk/core`
+- `@soren-sdk/connectors`
+- `@soren-sdk/cli`
+- SQLite storage adapter
+- Catalog snapshot loader
+- Capability registry loader
+- Connector status and blocker handling
+
+CLI target:
 
 ```bash
 soren-sdk catalog list
-soren-sdk connector show motion
+soren-sdk catalog get motion
+soren-sdk connector health motion
 ```
 
-work against the first six connector manifests.
+Exit criteria:
 
----
+- Catalog loading is deterministic
+- Non-selectable connectors cannot enter routes
+- Catalog snapshot has a stable digest
 
-## Phase 2 — Project inspector
+## Phase 3 — Project inspector
 
-### Goal
+Detect:
 
-Understand the target project before routing.
+- Package manager
+- Workspace graph
+- Framework and React versions
+- Lockfile digest
+- Installed dependencies
+- Motion, scroll, WebGL, component, and testing tools
+- Storybook and shadcn configuration
+- Existing ownership declarations
+- Soren SDK config and policy files
+- Browser and runtime targets
 
-### Deliverables
+Exit criteria:
 
-- package manager detection
-- workspace detection
-- framework detection
-- installed dependency detection
-- Storybook detection
-- shadcn configuration detection
-- animation and scroll dependency detection
-- read-only JSON report
+- Inspector is read-only
+- Output is content-addressed
+- Clean Next.js, Soren Design System, and animation-heavy fixtures pass
 
-### Exit criteria
+## Phase 4 — First routing vertical slice
 
-The inspector correctly reads at least three fixture projects:
+Implement only:
 
-- Clean Next.js app
-- Soren Design System monorepo
-- Existing animation-heavy React app
+- Web Platform
+- Motion
+- GSAP
 
----
+Capabilities:
 
-## Phase 3 — Capability router
+- CSS transition
+- CSS animation
+- WAAPI
+- Presence
+- Layout
+- Gesture and drag
+- Timeline
+- ScrollTrigger and pinned sequence
 
-### Goal
+Route statuses:
 
-Select SDKs based on requested behavior.
+- `native`
+- `selected`
+- `no-sdk`
+- `needs-input`
+- `blocked`
 
-### Deliverables
+Exit criteria:
 
-- Capability taxonomy
-- Request normalization
-- Candidate retrieval
-- Deterministic scoring
-- Set minimization
-- Human-readable explanation
-- Positive and negative route tests
+- Hard constraint violations: 0
+- Forbidden connector selections: 0
+- Native solution selected for simple cases
+- Existing approved dependency reused
+- Motion/GSAP ownership conflicts rejected
+- Route explanation is human-readable
+- 30+ positive, negative, and metamorphic fixtures pass
 
-### Exit criteria
+## Phase 5 — Policy, configuration, and lockfile
 
-At least 90% of approved first-wave route fixtures select the expected SDK set with no forbidden connectors.
+Add:
 
----
+```text
+.soren-sdk/config.yaml
+.soren-sdk/policy.yaml
+soren-sdk.lock
+```
 
-## Phase 4 — Compatibility and ownership
+Policies cover:
 
-### Goal
+- Allowed connectors
+- Experimental status
+- License
+- Paid services
+- Network
+- Filesystem
+- Remote project content
+- Bundle budgets
+- Accessibility
+- Required approval
 
-Safely combine selected SDKs.
+Exit criteria:
 
-### Deliverables
+- Higher-level denies cannot be weakened
+- Same snapshot and lock produce the same route
+- Policy decisions are included in evidence
 
-- Relationship schema
-- Ownership domains
-- Conflict detection
-- Resolution suggestions
-- Adapter-required state
-- Motion/GSAP conflict rules
-- Lenis transport rules
-- R3F boundary rules
+## Phase 6 — Universal protocol surfaces
 
-### Exit criteria
+Implement:
 
-Known conflicts are rejected before dependency planning.
+- CLI
+- REST
+- MCP
+- TypeScript SDK
 
----
+All surfaces expose the same operations and schemas.
 
-## Phase 5 — Context builder and agent adapters
+Add agent capability negotiation rather than hardcoded routing logic.
 
-### Goal
+Optional setup profiles:
 
-Give each agent the smallest correct knowledge set.
+- Hermes
+- OpenClaw
+- OpenCode
+- Codex
+- Claude Code
+- Other clients
 
-### Deliverables
+Exit criteria:
 
-- Connector section retrieval
-- Recipe retrieval
-- Context budgeting
-- Hermes adapter
-- OpenClaw adapter
-- OpenCode adapter
-- Generic Markdown adapter
-- Source traceability
+- Contract tests prove equivalent behavior
+- No SDK knowledge is duplicated in agent profiles
+- No model ID is required by core contracts
 
-### Exit criteria
+## Phase 7 — Context broker and tool gateway
 
-Two different agents can consume the same route decision without duplicating connector knowledge.
+Add:
 
----
+- Progressive connector context
+- Agent Skills validation
+- Source freshness and digest checks
+- MCP protocol negotiation
+- Tool inventory and diff
+- Per-run grants
+- Read-only tool calls
+- Audit events
+- Kill switch
+- Fallback behavior
 
-## Phase 6 — First connector implementations
+MCP baseline:
 
-### Motion
+- Support current stable protocol negotiation
+- Keep release-candidate support behind a feature flag until final and tested
+- Treat official registry records as discovery, not approval
 
-- Official MCP configuration metadata
-- Official skill source metadata
-- Context fallback
-- Motion-specific validators
-- First recipes
-- Evaluation fixtures
+Exit criteria:
 
-### GSAP
+- Retrieved content cannot grant permissions
+- Tool changes require review when material
+- Remote project-content exposure requires explicit policy and consent
 
-- Official skill integration
-- Timeline and ScrollTrigger recipes
-- Cleanup validator
-- Ownership rules
-- Evaluation fixtures
+## Phase 8 — Plan and verification
 
-### Lenis
+Add:
 
-- Soren skill
-- Official docs adapter
-- Provider recipe
-- Duplicate-instance validator
-- Evaluation fixtures
+- Dependency plan
+- File-change plan
+- Command plan
+- Permission plan
+- Verification plan
+- Evidence envelope
+- Affected-scope checks
+- Screenshot and performance artifacts
 
-### React Three Fiber
+Still no automatic apply.
 
-- Soren skill
-- Scene shell recipe
-- DPR and fallback validators
-- Evaluation fixtures
+Exit criteria:
 
-### Storybook
+- Plans are reviewable and content-addressed
+- Evidence distinguishes passed, failed, not-required, and not-run
+- Required checks cannot be marked passed without runner evidence
 
-- MCP setup
-- Agent manifest validation
-- Interaction test integration
-- Evaluation fixtures
+## Phase 9 — Approved apply sandbox
 
-### shadcn
+Add:
 
-- MCP setup
-- Private registry configuration
-- Fixture installation tests
-- Evaluation fixtures
+- Branch or worktree isolation
+- Exact-plan approval
+- Plan-drift detection
+- Command allowlist
+- Filesystem and network scopes
+- Time and resource limits
+- Before-state snapshot
+- Rollback
+- Diff
+- Post-apply verification
 
-### Exit criteria
+Exit criteria:
 
-Each connector has one successful positive benchmark and one successful negative benchmark.
+- No direct protected-branch writes
+- Failed apply can be rolled back or clearly reports rollback failure
+- Approval is scoped to one immutable plan
+- Mutation is auditable
 
----
+## Phase 10 — Remaining first-wave connectors
 
-## Phase 7 — Verification and evidence
+Activate in this order:
 
-### Goal
+1. Lenis
+2. React Three Fiber
+3. Storybook
+4. shadcn
 
-Prove generated work.
+Each connector must migrate to Schema v2 and pass:
 
-### Deliverables
+- Contract tests
+- Positive routes
+- Negative routes
+- Metamorphic routes
+- Security review
+- Implementation benchmark
+- Human review
 
-- Verification planner
-- Check runners
-- Affected-scope logic
-- Structured evidence JSON
-- Markdown report
-- Failure normalization
-- Screenshot and performance artifact support
+## Phase 11 — Soren Design System integration
 
-### Exit criteria
+Reference workflow:
 
-A multi-SDK benchmark generates complete evidence without claiming unrun checks passed.
+```text
+Hermes
+→ primary implementation
 
----
+OpenClaw
+→ independent audit
+```
 
-## Phase 8 — Soren Design System integration
+Both use the same normalized route, policy, context, and evidence.
 
-### Goal
+Deliverables:
 
-Use Soren SDK in a real premium workspace.
-
-### Deliverables
-
-- Storybook exposed to agents
-- Private shadcn registry exposed
-- Design-system package rules
-- Approved component recipes
+- Storybook component context
+- Private shadcn registry
 - Approved motion recipes
-- Full composition benchmark
-- GitHub pull-request workflow
+- Design-system policy
+- Multi-SDK benchmark
+- GitHub PR workflow
 
-### Exit criteria
+## Phase 12 — Control Center
 
-Hermes can implement a design-system task using routed SDK context, and a second agent can independently review it using the same evidence.
+Build only after the APIs are stable.
 
----
+Views:
 
-## Phase 9 — Control Center
-
-### Goal
-
-Provide a visual management interface.
-
-### Deliverables
-
-- SDK catalog dashboard
-- Connector health
-- Version and source freshness
+- Catalog and capability explorer
+- Connector blockers
+- Source freshness
+- Integration permissions
 - MCP and skill status
-- Compatibility explorer
-- Evaluation scores
+- Policy decisions
+- Route explanations
+- Evaluation results
 - Evidence history
-- Workspace dependency view
+- Workspace dependency graph
 
-### Exit criteria
+The UI remains a client of the core.
 
-The dashboard reads core package data and does not contain duplicated routing logic.
+## Phase 13 — Expansion
 
----
-
-## Phase 10 — Expansion
-
-Add connectors in controlled waves.
+Potential connector waves:
 
 ### Motion and creative media
 
@@ -304,73 +355,22 @@ Add connectors in controlled waves.
 - Monaco
 - Tiptap
 
-Every new connector must pass the connector acceptance criteria.
+No connector is added merely because it is popular. It must satisfy a defined capability gap.
 
----
+## Release 0.1 definition of done
 
-## Recommended first GitHub milestones
+Release 0.1 is read-only and complete when:
 
-### Milestone 1 — Contracts
+- Contracts validate
+- SQLite catalog snapshots work
+- Project inspection works
+- Web Platform, Motion, and GSAP route correctly
+- Policy and lockfile work
+- CLI, REST, MCP, and TypeScript SDK are contract-equivalent
+- Context is selectively loaded
+- Tool access is read-only and permissioned
+- Verification and evidence work
+- Hard safety gates have zero failures
+- Hermes and OpenClaw can consume the same route package
 
-Issues:
-
-- Create monorepo
-- Create connector schema
-- Create evidence schema
-- Create sample Motion manifest
-- Add schema CI
-
-### Milestone 2 — Read-only intelligence
-
-Issues:
-
-- Catalog loader
-- Project inspector
-- Capability taxonomy
-- Route explanation
-
-### Milestone 3 — First routing
-
-Issues:
-
-- Motion routing
-- GSAP routing
-- Lenis routing
-- R3F routing
-- Storybook routing
-- shadcn routing
-- Negative route cases
-
-### Milestone 4 — Composition safety
-
-Issues:
-
-- Ownership model
-- Compatibility matrix
-- Conflict reports
-- Multi-SDK route benchmark
-
-### Milestone 5 — Agent integration
-
-Issues:
-
-- Hermes adapter
-- OpenClaw adapter
-- Generic skill output
-- MCP configuration output
-- Evidence report
-
----
-
-## Scope discipline
-
-Do not begin with:
-
-- A large Control Center
-- Dozens of connectors
-- Automatic package mutation
-- Automatic global skill installation
-- Public registry publishing
-- Complex machine learning for selection
-
-Begin with deterministic, inspectable rules and six excellent connectors.
+Package mutation and command execution are explicitly out of scope for 0.1.

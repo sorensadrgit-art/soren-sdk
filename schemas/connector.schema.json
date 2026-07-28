@@ -1,0 +1,529 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/connector.schema.json",
+  "title": "Soren SDK Connector Manifest v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "connectorVersion",
+    "connector",
+    "product",
+    "sourceTrust",
+    "capabilityClaims",
+    "integrations",
+    "ownershipClaims",
+    "verification",
+    "relatedFiles",
+    "knowledge"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "2.0.0-draft.1"
+    },
+    "connector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "publisher",
+        "reviewStatus",
+        "selectable",
+        "blockers"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publisher": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewStatus": {
+          "enum": [
+            "proposed",
+            "experimental",
+            "approved",
+            "stable",
+            "deprecated",
+            "retired",
+            "blocked"
+          ]
+        },
+        "selectable": {
+          "type": "boolean"
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "product": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonicalName",
+        "homepage",
+        "aliases",
+        "categories"
+      ],
+      "properties": {
+        "canonicalName": {
+          "type": "string"
+        },
+        "homepage": {
+          "type": "string",
+          "format": "uri"
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+    "sourceTrust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceAuthority",
+        "integrityLevel",
+        "reviewedAt",
+        "reviewer"
+      ],
+      "properties": {
+        "sourceAuthority": {
+          "enum": [
+            "official",
+            "maintainer",
+            "soren-approved",
+            "community",
+            "unknown"
+          ]
+        },
+        "integrityLevel": {
+          "enum": [
+            "unverified",
+            "url-recorded",
+            "version-pinned",
+            "commit-pinned",
+            "digest-pinned",
+            "signed",
+            "attested"
+          ]
+        },
+        "reviewedAt": {
+          "type": "string",
+          "format": "date"
+        },
+        "reviewer": {
+          "type": "string"
+        }
+      }
+    },
+    "capabilityClaims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "capability",
+          "support",
+          "confidence",
+          "conditions",
+          "limitations"
+        ],
+        "properties": {
+          "capability": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"
+          },
+          "support": {
+            "enum": [
+              "primary",
+              "secondary",
+              "fallback"
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "limitations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "integrations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "mode",
+          "status",
+          "source",
+          "version",
+          "authorization",
+          "executionRisk",
+          "dataExposure",
+          "permissions"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "kind": {
+            "enum": [
+              "documentation",
+              "agent-skill",
+              "mcp-server",
+              "runtime-package",
+              "cli",
+              "validator",
+              "recipe-source",
+              "built-in"
+            ]
+          },
+          "mode": {
+            "enum": [
+              "knowledge",
+              "tool",
+              "runtime",
+              "verification"
+            ]
+          },
+          "status": {
+            "enum": [
+              "available",
+              "planned",
+              "unverified",
+              "deprecated"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "format": "uri"
+          },
+          "version": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "resolved",
+                  "unresolved",
+                  "not-applicable"
+                ]
+              },
+              "value": {
+                "type": "string"
+              },
+              "digest": {
+                "type": "string"
+              },
+              "commit": {
+                "type": "string"
+              }
+            }
+          },
+          "protocol": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "enum": [
+                  "mcp",
+                  "http",
+                  "stdio",
+                  "cli",
+                  "none"
+                ]
+              },
+              "supportedVersions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "extensions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "authorization": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "required",
+              "method",
+              "paidPlan"
+            ],
+            "properties": {
+              "required": {
+                "type": "boolean"
+              },
+              "method": {
+                "enum": [
+                  "none",
+                  "api-key",
+                  "oauth",
+                  "environment",
+                  "project-config",
+                  "unknown"
+                ]
+              },
+              "paidPlan": {
+                "type": "boolean"
+              }
+            }
+          },
+          "executionRisk": {
+            "enum": [
+              "none",
+              "read-only",
+              "project-write",
+              "command-execution",
+              "network-and-command",
+              "privileged"
+            ]
+          },
+          "dataExposure": {
+            "enum": [
+              "none",
+              "local-only",
+              "remote-metadata",
+              "remote-source",
+              "remote-project-content"
+            ]
+          },
+          "permissions": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "filesystem",
+              "network",
+              "projectWrite"
+            ],
+            "properties": {
+              "filesystem": {
+                "enum": [
+                  "none",
+                  "project-read",
+                  "project-write",
+                  "scoped",
+                  "unknown"
+                ]
+              },
+              "network": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "projectWrite": {
+                "type": "boolean"
+              }
+            }
+          },
+          "licenseExpression": {
+            "type": "string"
+          },
+          "fallback": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "packageName": {
+            "type": "string"
+          },
+          "importPaths": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "command": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "ownershipClaims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "domain",
+          "scope",
+          "exclusive"
+        ],
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "exclusive": {
+            "type": "boolean"
+          },
+          "properties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requiredChecks",
+        "hardGates"
+      ],
+      "properties": {
+        "requiredChecks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "hardGates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "relatedFiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "skill",
+        "sources",
+        "compatibility",
+        "evaluations"
+      ],
+      "properties": {
+        "skill": {
+          "$ref": "#/$defs/fileStatus"
+        },
+        "sources": {
+          "$ref": "#/$defs/fileStatus"
+        },
+        "compatibility": {
+          "$ref": "#/$defs/fileStatus"
+        },
+        "evaluations": {
+          "$ref": "#/$defs/fileStatus"
+        }
+      }
+    },
+    "knowledge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "retrievedAt",
+        "staleAfterDays"
+      ],
+      "properties": {
+        "retrievedAt": {
+          "type": "string",
+          "format": "date"
+        },
+        "staleAfterDays": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "connectorVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$"
+    }
+  },
+  "$defs": {
+    "fileStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "status"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "present",
+            "planned",
+            "missing",
+            "not-applicable"
+          ]
+        }
+      }
+    }
+  }
+}
