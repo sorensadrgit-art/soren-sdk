@@ -8,6 +8,13 @@ on:
     paths:
       - "scripts/scaffold-contracts.mjs"
       - ".github/workflows/contracts-bootstrap.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "scripts/scaffold-contracts.mjs"
+      - "scripts/scaffold-payload-*.txt"
+      - ".github/workflows/contracts-bootstrap.yml"
 
 permissions:
   contents: write
