@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "1.0.0",
+  "connectorVersion": "0.1.0",
+  "id": "storybook",
+  "name": "Storybook",
+  "status": "experimental",
+  "trust": "official",
+  "categories": [
+    "component-context",
+    "documentation",
+    "testing"
+  ],
+  "aliases": [],
+  "capabilities": [
+    "component.isolated-development",
+    "component.agent-context",
+    "testing.story-interaction",
+    "testing.accessibility",
+    "documentation.component"
+  ],
+  "connectionMethods": [
+    {
+      "type": "official-mcp",
+      "status": "available"
+    },
+    {
+      "type": "official-docs",
+      "status": "available"
+    }
+  ],
+  "runtime": {
+    "packages": [
+      "storybook",
+      "@storybook/addon-mcp"
+    ],
+    "imports": {},
+    "supportedVersions": [
+      "confirm current MCP requirements during implementation"
+    ]
+  },
+  "frameworks": [
+    "react"
+  ],
+  "bestFor": [
+    "Agent-readable component context",
+    "Isolated component states",
+    "Interaction tests",
+    "Accessibility checks",
+    "Design-system documentation"
+  ],
+  "avoidFor": [
+    "Production runtime behavior",
+    "Replacing application integration tests",
+    "Assuming automated checks prove complete accessibility"
+  ],
+  "owns": [
+    "component-agent-context",
+    "story-testing",
+    "component-documentation"
+  ],
+  "requiredChecks": [
+    "storybook-build",
+    "story-discovery",
+    "interaction-tests",
+    "accessibility-checks"
+  ],
+  "security": {
+    "requiresAuth": false,
+    "requiresPaidPlan": false,
+    "remoteData": false
+  },
+  "knowledge": {
+    "retrievedAt": "2026-07-27",
+    "officialSources": [
+      "https://storybook.js.org/docs/ai",
+      "https://storybook.js.org/docs/ai/mcp/overview",
+      "https://storybook.js.org/docs/ai/mcp/api"
+    ]
+  }
+}
