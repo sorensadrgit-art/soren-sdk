@@ -1,6 +1,7 @@
 import {
   canonicalJson,
-  type CatalogSnapshot
+  type CatalogSnapshot,
+  type JsonValue
 } from "@soren-sdk/contracts";
 
 import {
@@ -9,7 +10,9 @@ import {
 } from "./types.js";
 
 function cloneSnapshot(snapshot: CatalogSnapshot): CatalogSnapshot {
-  return assertCatalogSnapshot(JSON.parse(canonicalJson(snapshot)) as unknown);
+  return assertCatalogSnapshot(
+    JSON.parse(canonicalJson(snapshot as unknown as JsonValue)) as unknown
+  );
 }
 
 export class MemoryCatalogSnapshotStore implements CatalogSnapshotStore {
