@@ -25,6 +25,7 @@
     "@soren-sdk/core": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "24.13.3",
     "typescript": "6.0.3",
     "vitest": "4.1.10"
   }
