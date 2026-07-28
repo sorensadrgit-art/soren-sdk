@@ -1,0 +1,92 @@
+name: Bootstrap Contracts v2
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "feat/contracts-v2"
+    paths:
+      - "scripts/scaffold-contracts.mjs"
+      - ".github/workflows/contracts-bootstrap.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout implementation branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/contracts-v2
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.17.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Materialize RED fixture
+        run: node scripts/scaffold-contracts.mjs --red
+
+      - name: Install dependencies and create lockfile
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Verify RED state
+        shell: bash
+        run: |
+          set +e
+          pnpm test > red-test.log 2>&1
+          status=$?
+          set -e
+          cat red-test.log
+          if [ "$status" -eq 0 ]; then
+            echo "Expected the canonical JSON test to fail before implementation."
+            exit 1
+          fi
+
+      - name: Materialize full implementation
+        run: node scripts/scaffold-contracts.mjs --full
+
+      - name: Remove bootstrap-only files
+        run: |
+          rm scripts/scaffold-contracts.mjs
+          rm scripts/scaffold-payload-1.txt
+          rm scripts/scaffold-payload-2.txt
+          rm scripts/scaffold-payload-3.txt
+          rm scripts/scaffold-payload-4.txt
+          rm .github/workflows/contracts-bootstrap.yml
+
+      - name: Refresh lockfile
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Validate repository contracts
+        run: pnpm validate:repository
+
+      - name: Commit verified implementation
+        run: |
+          git config user.name "soren-sdk-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(contracts): implement versioned contracts and validation"
+          git push origin HEAD:feat/contracts-v2
