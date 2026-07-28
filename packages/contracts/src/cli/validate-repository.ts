@@ -19,6 +19,20 @@ function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8")) as unknown;
 }
 
+function repositoryIssue(keyword: string, message: string): ContractIssue {
+  return {
+    instancePath: "/",
+    schemaPath: "#/repository",
+    keyword,
+    message,
+    params: {}
+  };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown repository read error.";
+}
+
 export function validateRepository(root: string): RepositoryValidationReport {
   const report: RepositoryValidationReport = {
     errors: [],
@@ -50,7 +64,18 @@ export function validateRepository(root: string): RepositoryValidationReport {
     let value: unknown;
     try {
       value = readJson(manifestPath);
-    } catch {
+    } catch (error) {
+      report.errors.push({
+        path: manifestPath,
+        issues: [
+          repositoryIssue(
+            error instanceof SyntaxError ? "manifest-json" : "manifest-read",
+            error instanceof SyntaxError
+              ? `Connector manifest is not valid JSON: ${errorMessage(error)}`
+              : `Unable to read connector manifest: ${errorMessage(error)}`
+          )
+        ]
+      });
       continue;
     }
 
