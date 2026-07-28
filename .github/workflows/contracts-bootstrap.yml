@@ -56,7 +56,7 @@ jobs:
       - name: Materialize full implementation
         run: node scripts/scaffold-contracts.mjs --full
 
-      - name: Apply NodeNext compatibility fixes
+      - name: Apply NodeNext and strict-schema compatibility fixes
         run: |
           python - <<'PY'
           import json
@@ -156,6 +156,27 @@ jobs:
           if old_candidates not in text:
               raise SystemExit("Expected schema candidate block was not found.")
           registry.write_text(text.replace(old_candidates, new_candidates))
+
+          def normalize_strict_schema(node):
+              if isinstance(node, dict):
+                  if "properties" in node and "type" not in node:
+                      node["type"] = "object"
+                  for value in node.values():
+                      normalize_strict_schema(value)
+              elif isinstance(node, list):
+                  for value in node:
+                      normalize_strict_schema(value)
+
+          for schema_directory in (
+              Path("schemas"),
+              Path("packages/contracts/src/schema-data")
+          ):
+              if not schema_directory.exists():
+                  continue
+              for schema_path in schema_directory.glob("*.schema.json"):
+                  schema = json.loads(schema_path.read_text())
+                  normalize_strict_schema(schema)
+                  schema_path.write_text(json.dumps(schema, indent=2) + "\n")
           PY
 
       - name: Remove bootstrap-only files
