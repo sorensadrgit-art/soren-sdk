@@ -2,12 +2,6 @@ name: Bootstrap Contracts v2
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - "feat/contracts-v2"
-    paths:
-      - "scripts/scaffold-contracts.mjs"
-      - ".github/workflows/contracts-bootstrap.yml"
   pull_request:
     branches:
       - main
@@ -83,14 +77,13 @@ jobs:
           pnpm typecheck 2>&1 | tee typecheck.log
           exit ${PIPESTATUS[0]}
 
-      - name: Commit typecheck diagnostics
+      - name: Upload typecheck diagnostics
         if: failure()
-        run: |
-          git config user.name "soren-sdk-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add typecheck.log
-          git commit -m "chore(contracts): capture typecheck diagnostics" || true
-          git push origin HEAD:feat/contracts-v2
+        uses: actions/upload-artifact@v4
+        with:
+          name: typecheck-diagnostics
+          path: typecheck.log
+          retention-days: 1
 
       - name: Test
         run: pnpm test
