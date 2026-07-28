@@ -79,10 +79,8 @@ export function runCli(options: RunCliOptions): number {
     const service = new CatalogService(catalog);
 
     if (domain === "catalog" && action === "list") {
-      if (identifier !== undefined) {
-        throw new CliUsageError("catalog list does not accept a connector ID.");
-      }
-      const parsed = parseJsonOption(rest);
+      const optionArgs = identifier === undefined ? rest : [identifier, ...rest];
+      const parsed = parseJsonOption(optionArgs);
       const records = service.listConnectors();
       options.io.stdout(
         parsed.json
