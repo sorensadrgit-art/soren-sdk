@@ -1,0 +1,11 @@
+{
+  "name": "soren-sdk",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Agent-native SDK intelligence, routing, compatibility, and verification platform.",
+  "packageManager": "pnpm@11",
+  "scripts": {
+    "docs:check": "node -e \"console.log('Planning repository: implementation scripts begin in Phase 0')\"",
+    "connector:list": "node -e \"const fs=require('fs'); console.log(fs.readdirSync('sdk-connectors').filter(x=>x!=='_template').join('\\n'))\""
+  }
+}
