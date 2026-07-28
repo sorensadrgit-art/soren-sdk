@@ -1,390 +1,284 @@
 # Soren SDK
 
-> Agent-native SDK intelligence, routing, installation, composition, and verification for premium frontend development.
+> Agent-native SDK intelligence, policy, routing, tool brokering, execution planning, and verification for premium frontend development.
 
 **Repository slug:** `soren-sdk`  
 **Project name:** **Soren SDK**  
-**Status:** Architecture and implementation blueprint  
+**Status:** Architecture hardening and contract design  
 **Primary owner:** Soren  
-**Intended agents:** Hermes, OpenClaw, OpenCode, Codex, Claude Code, GitHub Copilot, and future coding agents
+**Reference agents:** Hermes as primary implementer; OpenClaw as independent auditor  
+**Platform goal:** Universal agent support through CLI, REST, MCP, and TypeScript SDK parity
 
----
+## What Soren SDK is
 
-## 1. What Soren SDK is
+Soren SDK helps coding agents correctly discover, select, combine, and verify modern frontend SDKs.
 
-Soren SDK is a platform that teaches coding agents how to correctly discover, select, combine, install, use, and verify modern frontend SDKs.
-
-It is not another animation library and it is not a package that blindly installs every frontend dependency.
-
-Soren SDK sits between a user request and the application code:
+It is not another animation library and it does not install every frontend dependency.
 
 ```text
 User request
     ↓
-Project inspection
+Authenticated run context
     ↓
-Capability decomposition
+Read-only project snapshot
     ↓
-SDK routing
+Capability resolution
     ↓
-Compatibility and ownership resolution
+Native and SDK provider candidates
     ↓
-Relevant documentation, skills, MCP tools, and recipes
+Policy and hard constraints
     ↓
-Runtime dependency planning
+Smallest safe provider set
     ↓
-Implementation
+Ownership plan
     ↓
-SDK-specific verification
+Selective context and tool plan
     ↓
-Evidence report
+Reviewable execution plan
+    ↓
+Optional explicitly approved apply
+    ↓
+Verification and evidence
 ```
 
-The platform should make an agent better at tasks such as:
+## Architecture hardening v2
 
-- Premium React UI construction
-- Cinematic timelines
-- Scroll-driven storytelling
-- Component and layout animation
-- Smooth scrolling
-- 3D and WebGL experiences
-- Interactive vector animation
-- Data visualization
-- Accessible component composition
-- Storybook documentation
-- Browser and performance testing
+A critical review on 2026-07-27 identified foundational improvements required before implementation:
 
----
+- Separate SDK products from packages, MCP servers, skills, documentation, and validators
+- Separate connector publisher from source authority
+- Add a built-in Web Platform provider so CSS, WAAPI, or no SDK can win
+- Replace pairwise-only compatibility with scoped claims and policy constraints
+- Make CLI, REST, MCP, and TypeScript SDK surfaces behaviorally equivalent
+- Remove hardcoded agent and model identity from core contracts
+- Add local-first storage, policy files, and `soren-sdk.lock`
+- Add explicit `plan` and sandboxed `apply` contracts
+- Treat documentation and tool descriptions as untrusted input
+- Add protocol negotiation, consent, provenance, license, and hard evaluation gates
 
-## 2. The problem
+Read:
 
-Installing an SDK does not teach an agent how to use it well.
+- [`docs/ARCHITECTURE-REVIEW-2026-07-27.md`](./docs/ARCHITECTURE-REVIEW-2026-07-27.md)
+- [`docs/PLATFORM-CONTRACTS-V2.md`](./docs/PLATFORM-CONTRACTS-V2.md)
+- [`docs/THREAT-MODEL.md`](./docs/THREAT-MODEL.md)
 
-An agent may know that Motion, GSAP, Lenis, Three.js, React Three Fiber, Storybook, and shadcn exist, but still:
+## Core product systems
 
-- Choose the wrong SDK for a behavior
-- Use outdated APIs
-- Mix animation engines on the same property
-- Install unnecessary dependencies
-- Put browser-only logic in server code
-- Forget cleanup
-- Ignore reduced motion
-- Generate untested examples
-- Break existing design-system conventions
-- Load excessive documentation into every prompt
-- Claim completion without evidence
+### Capability ontology
 
-Soren SDK solves this by creating a structured connector for every supported SDK.
+Defines provider-independent behaviors such as:
 
----
+- `platform.css-transition`
+- `motion.layout`
+- `motion.timeline`
+- `scroll.smooth-transport`
+- `webgl.react-scene`
+- `registry.install`
 
-## 3. The product model
+### Connector catalog
 
-Soren SDK contains seven major systems.
+Stores Soren-authored connector packages and their independent integration artifacts:
 
-### 3.1 SDK Catalog
+- Runtime package
+- MCP server
+- Agent Skill
+- Documentation source
+- CLI
+- Validator
+- Recipe source
 
-A machine-readable inventory of supported SDKs, their capabilities, trust level, connection methods, versions, licenses, and project compatibility.
+### Policy engine
 
-### 3.2 SDK Router
+Enforces:
 
-Converts a user request into required capabilities, then selects the smallest correct SDK set.
+- Allowed SDKs
+- Licenses
+- Versions
+- Paid services
+- Network and filesystem access
+- Experimental status
+- Bundle and performance budgets
+- Accessibility requirements
+- Approval requirements
 
-### 3.3 Connector System
+### Router
 
-Connects an SDK to agents through one or more methods:
+Selects the smallest provider set that satisfies capabilities and policy.
 
-1. Official MCP server
-2. Official agent skill
-3. Official documentation adapter
-4. Soren-authored specialist skill
-5. Runtime adapter or package installer
+Valid outcomes:
 
-### 3.4 Compatibility Engine
+- `native`
+- `selected`
+- `no-sdk`
+- `needs-input`
+- `blocked`
 
-Prevents conflicting SDK combinations and assigns ownership for scrolling, transforms, layout, gestures, rendering, timelines, and other behaviors.
+### Context broker and tool gateway
 
-### 3.5 Context Builder
+Loads only relevant knowledge and brokers MCP or other tool access through explicit permissions, version negotiation, inventory checks, and audit events.
 
-Loads only the documentation, rules, recipes, and examples relevant to the current task.
+### Plan and apply
 
-### 3.6 Verification Engine
+`plan` is read-only.
 
-Runs SDK-specific static checks, tests, browser checks, accessibility validation, performance audits, and cleanup validation.
+`apply` is a later, explicitly approved operation requiring isolation, scoped permissions, drift detection, rollback data, diff review, and verification.
 
-### 3.7 Evidence Reporter
+### Verification and evidence
 
-Produces a structured record of:
+Records factual results tied to:
 
-- SDKs selected
-- Why each SDK was selected
-- Files changed
-- Dependencies added
-- Tests executed
-- Checks passed or failed
-- Work that remains unverified
+- Project snapshot
+- Catalog snapshot
+- Policy snapshot
+- Route plan
+- Execution plan
+- Check-run output
+- Resulting revision
 
----
+Evidence never includes hidden reasoning or credential values.
 
-## 4. First supported SDK wave
+## First implementation vertical slice
 
-The first implementation wave contains six connectors.
+Do not start with all SDKs.
 
-| Connector | Primary use | Preferred agent connection |
-|---|---|---|
-| Motion | React state, layout, gestures, springs, presence | Official MCP and official skills |
-| GSAP | Timelines, ScrollTrigger, sequencing, advanced choreography | Official GSAP skills and official docs |
-| Lenis | Smooth-scroll transport and DOM/WebGL synchronization | Soren skill and official docs |
-| React Three Fiber | React-based Three.js scenes and render-loop behavior | Soren skill and official docs |
-| Storybook | Component context, stories, tests, documentation | Official Storybook MCP |
-| shadcn | Registry search, component installation, composition | Official MCP and official skills |
+Prove the architecture using:
 
-These six connectors create a complete first vertical slice:
+1. Web Platform
+2. Motion
+3. GSAP
 
-- UI components
-- UI motion
-- Cinematic sequencing
-- Scroll transport
-- 3D
-- Component documentation
-- Agent-readable testing
-- Private registry installation
+This slice must correctly determine:
 
----
+- When CSS is enough
+- When WAAPI is enough
+- When Motion is correct
+- When GSAP is correct
+- When Motion and GSAP may coexist
+- When the route needs user input
+- When policy blocks a route
 
-## 5. Design-system relationship
+After the slice passes, activate:
 
-The existing Soren Design System becomes the first reference workspace for Soren SDK.
+4. Lenis
+5. React Three Fiber
+6. Storybook
+7. shadcn
 
-```text
-Soren SDK
-    ├── teaches agents which SDKs to use
-    ├── connects agents to trusted knowledge
-    ├── prevents conflicts
-    ├── installs selected runtime dependencies
-    └── verifies implementations
+## Current connector status
 
-Soren Design System
-    ├── supplies tokens and UI standards
-    ├── supplies approved components
-    ├── supplies motion recipes
-    ├── supplies Storybook documentation
-    └── proves the SDK platform in production
-```
+The existing first-wave manifests are planning artifacts. They must migrate to Connector Schema v2 and remain non-selectable until versions, licenses, related files, permissions, compatibility, and evaluations resolve.
 
-The design system is not discarded. It becomes the premium proving ground and reference implementation.
+The connector standard lives at:
 
----
+- [`docs/SDK-CONNECTOR-STANDARD.md`](./docs/SDK-CONNECTOR-STANDARD.md)
+- [`schemas/connector.schema.json`](./schemas/connector.schema.json)
+- [`capabilities/catalog.json`](./capabilities/catalog.json)
 
-## 6. Core rules
-
-1. **All SDKs are discoverable; only relevant SDKs are activated.**
-2. **Official sources take priority over remembered model knowledge.**
-3. **Runtime dependencies are installed only in the project that needs them.**
-4. **Frontend SDKs are not globally installed into agents.**
-5. **One engine owns a property or behavior at a time.**
-6. **Every connector must define when not to use its SDK.**
-7. **Every generated implementation must include verification appropriate to the SDK.**
-8. **Agents may not silently install untrusted global skills.**
-9. **The smallest sufficient SDK set is preferred.**
-10. **Completion claims require evidence.**
-
----
-
-## 7. Planned repository structure
+## Target repository structure
 
 ```text
 soren-sdk/
+├── packages/
+│   ├── contracts/
+│   ├── core/
+│   ├── connectors/
+│   ├── cli/
+│   ├── protocol-server/
+│   └── testing/
+│
+├── sdk-connectors/
+├── capabilities/
+├── schemas/
+├── evaluations/
 ├── apps/
 │   ├── control-center/
 │   ├── docs/
 │   ├── evaluation-lab/
 │   └── playground/
-│
-├── packages/
-│   ├── sdk-catalog/
-│   ├── sdk-router/
-│   ├── sdk-context-builder/
-│   ├── compatibility-engine/
-│   ├── project-inspector/
-│   ├── dependency-planner/
-│   ├── verification-engine/
-│   ├── evidence-reporter/
-│   └── agent-adapters/
-│
-├── sdk-connectors/
-│   ├── _template/
-│   ├── motion/
-│   ├── gsap/
-│   ├── lenis/
-│   ├── react-three-fiber/
-│   ├── storybook/
-│   └── shadcn/
-│
-├── evaluations/
 ├── docs/
 ├── AGENTS.md
 └── README.md
 ```
 
-This planning package contains the contracts and documents required before implementation begins.
+The compact package topology avoids premature micro-package fragmentation. Logical modules may split later when release cadence, dependencies, or ownership justify it.
 
----
+## Universal interfaces
 
-## 8. Human workflow
-
-A typical human request may be:
-
-> Create a premium product page with smooth scrolling, pinned cinematic sections, draggable cards, and an interactive 3D product.
-
-Soren SDK should respond internally with:
+The same application services must power:
 
 ```text
-Capability: smooth-scroll transport
-Selected: Lenis
-
-Capability: pinned cinematic choreography
-Selected: GSAP + ScrollTrigger
-
-Capability: draggable cards and layout transitions
-Selected: Motion
-
-Capability: interactive WebGL product
-Selected: React Three Fiber
-
-Capability: existing component reuse and testing
-Selected: Storybook MCP + shadcn registry
+CLI
+REST
+MCP
+TypeScript SDK
 ```
 
-It should then declare ownership:
-
-```text
-Lenis owns scroll transport.
-GSAP owns pinned section timelines.
-Motion owns card gestures and card layout transitions.
-React Three Fiber owns objects inside the canvas.
-CSS owns simple color and focus transitions.
-```
-
----
-
-## 9. Agent workflow
-
-Every agent task follows this order:
-
-1. Read `AGENTS.md`.
-2. Inspect the target repository.
-3. Identify requested visual and interaction capabilities.
-4. Query the SDK catalog.
-5. Select the smallest sufficient SDK set.
-6. Run compatibility checks.
-7. Load only selected connector context.
-8. Plan runtime dependencies.
-9. Implement within package boundaries.
-10. Execute connector-required verification.
-11. Produce an evidence report.
-
-Agents must never skip directly from a request to installing libraries.
-
----
-
-## 10. Implementation order
-
-### Phase 0 — Foundation
-
-- Approve architecture
-- Create monorepo
-- Add catalog and connector schemas
-- Add agent rules
-- Add evaluation format
-- Add source trust policy
-
-### Phase 1 — Router prototype
-
-- Project inspector
-- Capability taxonomy
-- Deterministic SDK selection
-- Compatibility rules
-- Human-readable selection report
-
-### Phase 2 — First connectors
-
-- Motion
-- GSAP
-- Lenis
-- React Three Fiber
-- Storybook
-- shadcn
-
-### Phase 3 — Verification
-
-- Static validators
-- Browser checks
-- Accessibility checks
-- Animation ownership checks
-- Evidence reports
-
-### Phase 4 — Control Center
-
-- Connected SDK dashboard
-- Health status
-- Version and documentation freshness
-- Connector enable/disable
-- Conflict reports
-- Evaluation results
-
-### Phase 5 — Design-system integration
-
-- Connect Soren Design System
-- Expose Storybook to agents
-- Expose private shadcn registry
-- Import approved motion recipes
-- Run end-to-end benchmarks
-
----
-
-## 11. Definition of done for the first release
-
-The first release is complete when:
-
-- The catalog can describe the six first-wave SDKs
-- A request can be decomposed into capabilities
-- The router can select one or more appropriate SDKs
-- The compatibility engine can reject known conflicts
-- Connector context can be loaded selectively
-- Runtime dependencies can be planned without global installation
-- At least one benchmark exists per connector
-- Verification results are stored in a structured evidence report
-- The Soren Design System can consume the platform
-- Hermes and at least one second agent can follow the same repository rules
-
----
-
-## 12. Documents in this package
-
-- [`AGENTS.md`](./AGENTS.md) — mandatory agent behavior
-- [`docs/PROJECT-BLUEPRINT.md`](./docs/PROJECT-BLUEPRINT.md) — complete product definition
-- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — packages, layers, and data flow
-- [`docs/SDK-CONNECTOR-STANDARD.md`](./docs/SDK-CONNECTOR-STANDARD.md) — connector contract
-- [`docs/FIRST-SDK-WAVE.md`](./docs/FIRST-SDK-WAVE.md) — first six integrations
-- [`docs/EVALUATIONS.md`](./docs/EVALUATIONS.md) — benchmark and quality system
-- [`docs/ROADMAP.md`](./docs/ROADMAP.md) — phased execution plan
-- [`docs/GOVERNANCE-SECURITY.md`](./docs/GOVERNANCE-SECURITY.md) — trust, updates, and safety
-- [`docs/OFFICIAL-SOURCES.md`](./docs/OFFICIAL-SOURCES.md) — initial authoritative references
-
----
-
-## 13. Immediate next action
-
-The first engineering milestone is not the Control Center UI.
-
-It is a command-line proof of concept that can:
+Target operations:
 
 ```bash
 soren-sdk inspect
-soren-sdk route "Build a cinematic product page..."
+soren-sdk catalog list
+soren-sdk catalog get motion
+soren-sdk connector health motion
+soren-sdk route "Build a cinematic product page"
 soren-sdk explain
+soren-sdk plan
 soren-sdk verify
+soren-sdk report
 ```
 
-The router must work reliably before a visual dashboard is built around it.
+`apply` remains disabled until the execution-safety phase is complete.
+
+## Security position
+
+- Public source and tool metadata are untrusted input
+- Runtime packages are installed only in target workspaces
+- No silent global skill installation
+- No hardcoded credentials, agents, or model IDs
+- Remote MCP servers require policy approval
+- Mutating tools require explicit consent
+- No token passthrough
+- Local MCP commands require review and sandboxing
+- Project inspection is read-only
+- Protected branches are changed through pull requests
+- Releases require complete evidence
+
+See:
+
+- [`SECURITY.md`](./SECURITY.md)
+- [`docs/GOVERNANCE-SECURITY.md`](./docs/GOVERNANCE-SECURITY.md)
+- [`docs/LICENSE-POLICY.md`](./docs/LICENSE-POLICY.md)
+
+## Roadmap
+
+The authoritative execution order is:
+
+1. Architecture hardening
+2. Contract implementation
+3. Compact core and CLI
+4. Project inspector
+5. Web Platform + Motion + GSAP routing slice
+6. Policy, configuration, and lockfile
+7. Universal protocol surfaces
+8. Context broker and tool gateway
+9. Plan and verification
+10. Approved apply sandbox
+11. Remaining first-wave connectors
+12. Soren Design System integration
+13. Control Center
+14. Controlled connector expansion
+
+Read [`docs/ROADMAP.md`](./docs/ROADMAP.md).
+
+## Current definition of done
+
+The planning stage is complete when:
+
+- Architecture v2 is accepted
+- Connector Schema v2 is accepted
+- Capability ontology is accepted
+- Threat model is accepted
+- Existing manifests are explicitly non-selectable pending migration
+- Issue #1 reflects the v2 execution sequence
+
+The first software release, `0.1`, is read-only. Package mutation and command execution are out of scope until the apply sandbox is independently reviewed.

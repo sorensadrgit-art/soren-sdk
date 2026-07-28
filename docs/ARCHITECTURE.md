@@ -1,447 +1,507 @@
-# Soren SDK Architecture
+# Soren SDK Architecture v2
 
-## 1. Architectural style
+## 1. Architecture objective
 
-Soren SDK should be a TypeScript monorepo with a framework-independent core and optional user interfaces.
+Soren SDK is a local-first, agent-neutral platform that helps coding agents choose and safely use frontend SDKs.
 
-Recommended baseline:
+The architecture must support two modes:
 
-- Node.js
-- pnpm workspaces
-- TypeScript
-- Turborepo
-- Zod or JSON Schema for contracts
-- Vitest for core tests
-- Playwright for browser verification
-- Next.js or Vite for visual applications
+1. **Read-only intelligence:** inspect, route, explain, and plan.
+2. **Approved execution:** apply a reviewed plan in isolation, verify it, and record evidence.
 
-The core routing packages must not depend on a specific UI framework.
+The first mode is the MVP. The second mode must not be added until the threat model, approval model, and rollback contract are implemented.
 
----
+## 2. Core invariants
 
-## 2. Layer model
+- Native Web Platform capabilities are evaluated before third-party SDKs.
+- `no-sdk` is a valid successful route.
+- Core logic contains no hardcoded agent or model identifiers.
+- CLI, REST, MCP, and TypeScript SDK surfaces call the same application services.
+- Connector knowledge is separate from runtime dependencies.
+- Project inspection is read-only.
+- `plan` and `apply` are separate contracts.
+- `apply` requires explicit authorization and isolation.
+- Tool descriptions and retrieved documentation are untrusted input.
+- A connector is not selectable while required metadata is unresolved.
+- Compatibility is evaluated from scoped claims and policy, not only pairwise matrices.
+- Every route is reproducible from project, catalog, and policy snapshots.
+- Evidence records facts and structured rationale, not hidden reasoning.
+- The Control Center is a client, not the system of record.
 
-### Layer 1 — Domain contracts
+## 3. Three-plane model
 
-Contains stable shared types:
+### 3.1 Control plane
 
-- SDK identifier
-- Capability identifier
-- Connector manifest
-- Project inspection result
-- Compatibility relationship
-- Route request
-- Route decision
-- Verification requirement
-- Evidence report
+Owns durable administrative state:
 
-Suggested package:
+- Capability ontology
+- SDK product registry
+- Integration artifact registry
+- Connector review status
+- Source freshness and integrity
+- Policies and approvals
+- Evaluation definitions and results
+- Catalog snapshots
+- Workspace configuration
 
-```text
-packages/contracts
-```
+### 3.2 Data plane
 
-### Layer 2 — Intelligence data
-
-Contains:
-
-- SDK catalog
-- Connector manifests
-- Compatibility rules
-- Capability mappings
-- Approved recipes
-- Source records
-
-Suggested locations:
+Processes one request:
 
 ```text
-packages/sdk-catalog
-sdk-connectors/
+Authenticated principal
+    ↓
+Project snapshot
+    ↓
+Request normalization
+    ↓
+Capability resolution
+    ↓
+Candidate claims
+    ↓
+Policy and hard constraints
+    ↓
+Provider-set minimization
+    ↓
+Ownership resolution
+    ↓
+Route plan
+    ↓
+Context and tool plan
+    ↓
+Execution plan
+    ↓
+Optional approved apply
+    ↓
+Verification
+    ↓
+Evidence envelope
 ```
 
-### Layer 3 — Decision engines
+### 3.3 Protocol plane
 
-Contains:
+Exposes equivalent operations through:
 
-- Request decomposition
-- Candidate retrieval
-- SDK scoring
-- Set minimization
-- Compatibility resolution
-- Ownership assignment
+- CLI
+- REST
+- MCP
+- TypeScript SDK
 
-Suggested packages:
+Protocol adapters do not own routing, policy, or connector knowledge.
+
+## 4. Domain model
+
+The full contracts are defined in `docs/PLATFORM-CONTRACTS-V2.md`.
+
+Key entities:
+
+- `Capability`
+- `SdkProduct`
+- `IntegrationArtifact`
+- `CapabilityClaim`
+- `OwnershipClaim`
+- `Policy`
+- `ProjectSnapshot`
+- `RoutePlan`
+- `ExecutionPlan`
+- `EvidenceEnvelope`
+- `CatalogSnapshot`
+
+This separation corrects the v1 model in which one connector represented a product, package, skill, MCP server, documentation source, and validator simultaneously.
+
+## 5. MVP package topology
+
+Avoid creating a package for every logical module before there is working code.
 
 ```text
-packages/sdk-router
-packages/compatibility-engine
+packages/
+├── contracts/
+├── core/
+├── connectors/
+├── cli/
+├── protocol-server/
+└── testing/
 ```
-
-### Layer 4 — Project operations
-
-Contains:
-
-- Project inspection
-- Dependency planning
-- Connector context selection
-- Verification selection
-- Evidence generation
-
-Suggested packages:
-
-```text
-packages/project-inspector
-packages/dependency-planner
-packages/sdk-context-builder
-packages/verification-engine
-packages/evidence-reporter
-```
-
-### Layer 5 — Agent adapters
-
-Translates normalized Soren SDK operations into agent-specific formats.
-
-```text
-packages/agent-adapters/hermes
-packages/agent-adapters/openclaw
-packages/agent-adapters/opencode
-packages/agent-adapters/codex
-packages/agent-adapters/claude-code
-```
-
-Agent adapters must not contain duplicated SDK knowledge.
-
-### Layer 6 — Applications
-
-```text
-apps/control-center
-apps/evaluation-lab
-apps/docs
-apps/playground
-```
-
-Applications consume core packages. They do not redefine routing or compatibility rules.
-
----
-
-## 3. Proposed repository structure
-
-```text
-soren-sdk/
-├── apps/
-│   ├── control-center/
-│   ├── docs/
-│   ├── evaluation-lab/
-│   └── playground/
-│
-├── packages/
-│   ├── contracts/
-│   ├── sdk-catalog/
-│   ├── sdk-router/
-│   ├── sdk-context-builder/
-│   ├── compatibility-engine/
-│   ├── project-inspector/
-│   ├── dependency-planner/
-│   ├── verification-engine/
-│   ├── evidence-reporter/
-│   ├── cli/
-│   ├── testing/
-│   └── agent-adapters/
-│
-├── sdk-connectors/
-│   ├── _template/
-│   ├── motion/
-│   ├── gsap/
-│   ├── lenis/
-│   ├── react-three-fiber/
-│   ├── storybook/
-│   └── shadcn/
-│
-├── evaluations/
-│   ├── routing/
-│   ├── implementation/
-│   └── fixtures/
-│
-├── docs/
-├── .github/
-├── AGENTS.md
-├── package.json
-├── pnpm-workspace.yaml
-└── turbo.json
-```
-
----
-
-## 4. Core package responsibilities
 
 ### `@soren-sdk/contracts`
 
 Owns:
 
-- Shared schemas
-- Stable enums
-- Validation errors
-- Schema versioning
+- JSON Schema and TypeScript contracts
+- Schema migrations
+- Error codes
+- Canonical serialization rules
 
-Does not own:
+### `@soren-sdk/core`
 
-- SDK records
-- Routing logic
-- File-system inspection
+Contains separated internal modules:
 
-### `@soren-sdk/sdk-catalog`
+```text
+src/
+├── capabilities/
+├── catalog/
+├── inspector/
+├── policy/
+├── router/
+├── compatibility/
+├── context/
+├── tools/
+├── execution/
+├── verification/
+├── evidence/
+├── storage/
+└── observability/
+```
 
-Owns:
+A module becomes its own package only when dependency boundaries, release cadence, or ownership require it.
 
-- Loading connector manifests
-- SDK lookup
-- Capability indexes
-- Trust filtering
-- Version metadata
-- Catalog validation
-
-Does not own:
-
-- Final route selection
-- Package installation
-- Browser tests
-
-### `@soren-sdk/sdk-router`
-
-Owns:
-
-- Capability request
-- Candidate ranking
-- Set minimization
-- Selection explanation
-- Alternative analysis
-
-Does not own:
-
-- Project file parsing
-- Dependency writes
-- External MCP execution
-
-### `@soren-sdk/compatibility-engine`
+### `@soren-sdk/connectors`
 
 Owns:
 
-- SDK relationship rules
-- Property ownership
-- Behavior ownership
-- Conflict detection
-- Adapter requirements
-- Resolution suggestions
-
-### `@soren-sdk/project-inspector`
-
-Owns:
-
-- Reading package manifests
-- Detecting workspaces
-- Detecting frameworks
-- Detecting current dependencies
-- Detecting relevant config
-- Detecting server/client boundaries where possible
-
-It must be read-only.
-
-### `@soren-sdk/dependency-planner`
-
-Owns:
-
-- Proposed dependency changes
-- Target workspace selection
-- Install command generation
-- Existing alternative detection
-- Dependency reason report
-
-Writing changes should be a separate explicit execution operation.
-
-### `@soren-sdk/sdk-context-builder`
-
-Owns:
-
-- Relevant connector section selection
-- Source link selection
-- Recipe selection
-- Context budget enforcement
-- Agent-neutral context output
-
-### `@soren-sdk/verification-engine`
-
-Owns:
-
-- Verification requirement aggregation
-- Affected-scope test planning
-- Validator execution
-- Check normalization
-- Failure reporting
-
-### `@soren-sdk/evidence-reporter`
-
-Owns:
-
-- JSON evidence
-- Markdown summary
-- Stable run identifiers
-- Source and version traceability
+- Connector loading
+- Manifest validation
+- Source records
+- Integration artifact records
+- Connector health
+- Catalog snapshots
 
 ### `@soren-sdk/cli`
 
-First user interface:
+First operational surface:
 
 ```bash
 soren-sdk inspect
 soren-sdk catalog list
-soren-sdk connector show motion
+soren-sdk catalog get motion
 soren-sdk route "<request>"
-soren-sdk conflicts
+soren-sdk explain
 soren-sdk plan
 soren-sdk verify
 soren-sdk report
 ```
 
----
+`apply` is not enabled until the execution-safety phase.
 
-## 5. Data flow
+### `@soren-sdk/protocol-server`
+
+Exposes REST and MCP operations over the same use cases as the CLI.
+
+### `@soren-sdk/testing`
+
+Owns:
+
+- Fixture projects
+- Route golden tests
+- Metamorphic tests
+- Connector contract tests
+- Multi-agent evaluation harnesses
+- Evidence assertions
+
+## 6. Native provider
+
+Create a built-in Web Platform provider for:
+
+- CSS transitions
+- CSS animations
+- Web Animations API
+- Native scrolling
+- HTML semantics
+- Browser focus behavior
+
+The router checks native providers before adding an SDK.
+
+Route result statuses:
 
 ```text
-Input request
-    ↓
-Request normalizer
-    ↓
-Project inspector
-    ↓
-Capability resolver
-    ↓
-Catalog candidate search
-    ↓
-Hard constraints
-    ↓
-Candidate scoring
-    ↓
-Set minimization
-    ↓
-Compatibility engine
-    ↓
-Ownership plan
-    ↓
-Context builder
-    ↓
-Dependency planner
-    ↓
-Agent execution
-    ↓
-Verification engine
-    ↓
-Evidence reporter
+selected
+native
+no-sdk
+needs-input
+blocked
 ```
 
-Agent execution may happen outside the core repository. Soren SDK should produce a stable plan that different agents can consume.
+## 7. Routing architecture
 
----
+### 7.1 Request normalization
 
-## 6. Connector loading
+Convert natural language into a structured request:
 
-Connectors should be loaded lazily.
+- Required capabilities
+- Quality requirements
+- Framework constraints
+- Existing project preferences
+- Accessibility requirements
+- Performance budgets
+- Allowed cost and network behavior
+- User-specified SDK requirements
 
-At startup, the catalog may load small manifest indexes.
+### 7.2 Candidate retrieval
 
-Large items should be loaded only after selection:
+Retrieve capability claims from:
 
-- Skill instructions
-- Recipes
-- Detailed docs indexes
-- Validators
-- Migration records
+- Native providers
+- Existing approved project dependencies
+- Approved connectors
+- Experimental connectors only when policy allows them
 
-This prevents memory and context growth as the catalog expands.
+### 7.3 Hard constraints
 
----
+Run before scoring:
 
-## 7. Version strategy
+- Policy denies
+- Unsupported environment
+- Unresolved version
+- Unresolved license
+- Required permission not granted
+- Known security block
+- Ownership conflict
+- Incompatible framework
+- Missing required fallback
 
-Each connector should distinguish:
+### 7.4 Scoring
 
-- Connector schema version
-- Connector content version
-- SDK runtime version range
-- Official skill version or commit
-- MCP server version
-- Documentation retrieval date
+Score only candidates that pass hard constraints.
+
+Possible dimensions:
+
+- Capability fit
+- Existing dependency reuse
+- Quality fit
+- Framework fit
+- Accessibility support
+- Performance suitability
+- Source freshness
+- Agent integration quality
+- Bundle impact
+- Cost
+- Project preference
+- Evaluation score
+
+### 7.5 Provider-set minimization
+
+Select the smallest provider set that satisfies all required capabilities and quality constraints.
+
+### 7.6 Abstention
+
+Return `needs-input` when materially different routes remain and project evidence cannot resolve the choice.
+
+Return `blocked` when no route satisfies hard constraints.
+
+## 8. Compatibility and ownership
+
+Pairwise compatibility files are supporting metadata, not the main engine.
+
+The policy engine evaluates:
+
+- Capability claims
+- Required companion artifacts
+- Environment constraints
+- Version constraints
+- Ownership claims
+- Exclusive domains
+- Element or scope
+- Property lists
+- Resource budgets
+- Permission needs
+- License and cost policy
 
 Example:
 
-```json
-{
-  "schemaVersion": "1.0.0",
-  "connectorVersion": "0.1.0",
-  "runtime": {
-    "package": "motion",
-    "supported": ">=12 <13"
-  },
-  "knowledge": {
-    "retrievedAt": "2026-07-27"
-  }
-}
+```text
+Motion owns transform on CardGroup.
+GSAP owns transform on HeroMedia.
+Lenis owns scroll transport for the route.
+R3F owns objects inside ProductCanvas.
+CSS owns color and focus transitions.
 ```
 
-Do not imply that connector version equals runtime SDK version.
+The same SDK pair may be allowed in one scope and rejected in another.
 
----
+## 9. Context broker
 
-## 8. Failure model
+The context broker loads only:
 
-Use typed errors.
+1. Hard constraints
+2. Current API and version information
+3. Ownership rules
+4. Project conventions
+5. Relevant approved recipes
+6. Required checks
+7. Source links
 
-Examples:
+It must not treat retrieved source text as instructions with system authority.
 
-- `PROJECT_NOT_DETECTED`
-- `CONNECTOR_INVALID`
-- `CAPABILITY_UNSUPPORTED`
-- `NO_COMPATIBLE_SDK_SET`
-- `OWNERSHIP_CONFLICT`
-- `SOURCE_UNAVAILABLE`
-- `CREDENTIAL_REQUIRED`
-- `RUNTIME_VERSION_UNSUPPORTED`
-- `VERIFICATION_FAILED`
-- `EVIDENCE_INCOMPLETE`
+Agent Skills use progressive disclosure:
 
-Every failure should include:
+- Metadata at discovery
+- `SKILL.md` when activated
+- References and scripts only when needed
 
-- Human-readable explanation
-- Machine-readable code
-- Relevant connector
-- Suggested next action
-- Whether execution may safely continue
+## 10. Tool gateway
 
----
+Agents should not connect independently to every MCP server.
 
-## 9. Extension model
+Soren SDK should broker tool access through a gateway that:
 
-A new connector should not require modifying router source code when its capabilities and rules fit existing schemas.
+- Negotiates MCP protocol versions
+- Records server and tool inventory
+- Diffs tool changes
+- Enforces per-run grants
+- Validates inputs
+- Applies time and response-size limits
+- Audits calls
+- Supports kill switches
+- Normalizes fallback behavior
 
-The router reads connector metadata.
+As of 2026-07-27, the current stable MCP protocol version is `2025-11-25`; a breaking `2026-07-28` release candidate has been announced. Therefore, protocol version and extension negotiation must be first-class metadata rather than a hidden assumption.
 
-Core code changes should be needed only for:
+The official MCP Registry may be used as a discovery source, but registry presence is not a security approval.
 
-- New capability semantics
-- New relationship types
-- New execution methods
-- New verification engine type
-- New agent adapter protocol
+## 11. Plan and apply
 
----
+### `plan`
 
-## 10. Architecture constraints
+Read-only. Produces:
 
-- Core packages must run without a browser.
-- Connector knowledge must remain separate from runtime application code.
-- Agent adapters must remain thin.
-- The Control Center cannot become the system of record.
-- Every public schema must be versioned.
-- Project inspection is read-only.
-- Dependency execution is separate from dependency planning.
-- External service access must be explicit.
-- Connectors must be testable without loading all other connectors.
+- Proposed file changes
+- Dependency changes
+- Commands
+- Permissions
+- Network destinations
+- Credential names
+- Rollback strategy
+- Verification plan
+
+### `apply`
+
+Explicitly approved. Requires:
+
+- Branch or worktree
+- Exact-plan approval token
+- Plan-drift detection
+- Filesystem scope
+- Network scope
+- Command allowlist
+- Time and resource limits
+- Before-state snapshot
+- Diff
+- Rollback data
+- Post-apply verification
+
+No agent can silently escalate a route or plan into apply.
+
+## 12. Configuration and lockfile
+
+Suggested files:
+
+```text
+.soren-sdk/config.yaml
+.soren-sdk/policy.yaml
+soren-sdk.lock
+```
+
+Policy precedence:
+
+1. Built-in safety
+2. Organization
+3. Workspace
+4. Project
+5. Per-run preferences
+
+Lower levels may tighten but not weaken higher-level denies.
+
+The lockfile records catalog, connector, source, skill, MCP protocol, policy, and runtime resolution digests. It contains no credentials.
+
+## 13. Storage
+
+Use a storage interface.
+
+Initial default:
+
+- SQLite
+- Local-first
+- Easy backup
+- Single-user friendly
+
+Optional future adapter:
+
+- PostgreSQL for shared deployments
+
+Store:
+
+- Catalog snapshots
+- Connector health
+- Policies and approvals
+- Evaluation history
+- Evidence
+- Audit events
+
+## 14. Observability
+
+Instrument the pipeline using privacy-safe OpenTelemetry traces and metrics.
+
+Trace stages:
+
+- Inspect
+- Normalize
+- Resolve
+- Policy
+- Route
+- Context
+- Tool
+- Execute
+- Verify
+- Report
+
+Do not record prompts, source files, credentials, or raw tool bodies by default.
+
+## 15. Failure model
+
+Typed failures include:
+
+```text
+PROJECT_NOT_DETECTED
+CAPABILITY_UNKNOWN
+CONNECTOR_INVALID
+CONNECTOR_NOT_SELECTABLE
+SOURCE_STALE
+SOURCE_UNAVAILABLE
+VERSION_UNRESOLVED
+LICENSE_UNRESOLVED
+POLICY_DENIED
+NO_COMPATIBLE_PROVIDER_SET
+OWNERSHIP_CONFLICT
+NEEDS_USER_INPUT
+CREDENTIAL_REQUIRED
+PROTOCOL_NEGOTIATION_FAILED
+TOOL_PERMISSION_DENIED
+PLAN_DRIFT
+EXECUTION_FAILED
+ROLLBACK_FAILED
+VERIFICATION_FAILED
+EVIDENCE_INCOMPLETE
+```
+
+Every failure includes:
+
+- Code
+- Human explanation
+- Affected entity
+- Safe-to-continue flag
+- Suggested remediation
+- Evidence reference
+
+## 16. Reference agent workflow
+
+The platform is universal, but the first internal workflow may use:
+
+```text
+Hermes
+→ primary planner and implementer
+
+OpenClaw
+→ independent auditor and conflict reviewer
+```
+
+Both consume the same contracts, catalog, policies, and evidence. Neither receives special logic inside the router.
