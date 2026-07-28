@@ -1,0 +1,36 @@
+name: Inspect Contracts Fixture
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/contracts-inspect.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout implementation branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/contracts-v2
+
+      - name: Materialize generated contracts
+        run: node scripts/scaffold-contracts.mjs --full
+
+      - name: Upload focused inspection files
+        uses: actions/upload-artifact@v4
+        with:
+          name: contracts-inspection
+          path: |
+            schemas/connector.schema.json
+            packages/contracts/test/unit/connector-semantics.test.ts
+            packages/contracts/test/fixtures/invalid/connectors/selectable-with-blockers.json
+            packages/contracts/src/validation/connector-semantics.ts
+          if-no-files-found: warn
+          retention-days: 1
