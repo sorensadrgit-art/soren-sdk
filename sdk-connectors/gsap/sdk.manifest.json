@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "1.0.0",
+  "connectorVersion": "0.1.0",
+  "id": "gsap",
+  "name": "GSAP",
+  "status": "experimental",
+  "trust": "official",
+  "categories": [
+    "motion",
+    "timeline",
+    "scroll"
+  ],
+  "aliases": [
+    "greensock"
+  ],
+  "capabilities": [
+    "motion.timeline",
+    "motion.svg",
+    "scroll.triggered-animation",
+    "scroll.pinned-sequence",
+    "interaction.drag-advanced",
+    "motion.flip"
+  ],
+  "connectionMethods": [
+    {
+      "type": "official-skill",
+      "status": "available"
+    },
+    {
+      "type": "official-docs",
+      "status": "available"
+    }
+  ],
+  "runtime": {
+    "packages": [
+      "gsap"
+    ],
+    "imports": {
+      "javascript": "gsap"
+    },
+    "supportedVersions": [
+      "define during implementation"
+    ]
+  },
+  "frameworks": [
+    "react",
+    "vue",
+    "svelte",
+    "javascript"
+  ],
+  "bestFor": [
+    "Cinematic multi-step timelines",
+    "ScrollTrigger choreography",
+    "Pinned storytelling",
+    "Advanced sequencing",
+    "Framework-independent animation"
+  ],
+  "avoidFor": [
+    "Simple CSS transitions",
+    "Smooth-scroll transport",
+    "A property on an element already owned by Motion"
+  ],
+  "owns": [
+    "timeline",
+    "scroll-trigger",
+    "selected-dom-properties"
+  ],
+  "requiredChecks": [
+    "plugin-registration",
+    "cleanup",
+    "responsive-context",
+    "property-ownership",
+    "reduced-motion"
+  ],
+  "security": {
+    "requiresAuth": false,
+    "requiresPaidPlan": false,
+    "remoteData": false
+  },
+  "knowledge": {
+    "retrievedAt": "2026-07-27",
+    "officialSources": [
+      "https://github.com/greensock/gsap-skills",
+      "https://gsap.com/docs/v3/"
+    ]
+  }
+}
