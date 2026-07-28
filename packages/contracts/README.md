@@ -16,7 +16,7 @@ Every contract change must update:
 4. An invalid runtime fixture
 5. Schema-version and migration tests when persisted shape changes
 
-CI checks runtime fixtures, TypeScript compilation, unknown-property rejection, schema-version rejection, and deterministic serialization.
+CI checks runtime fixtures, TypeScript compilation, unknown-property rejection, schema-version rejection, deterministic serialization, and repository-level connector validation.
 
 ## Public exports
 
@@ -31,6 +31,26 @@ CI checks runtime fixtures, TypeScript compilation, unknown-property rejection, 
 - `digestJson`
 - Typed errors and migration registry
 
+## Validation layers
+
+Connector validation intentionally has two layers:
+
+1. **Structural JSON Schema validation** for shape, primitive constraints, unknown fields, and artifact requirements.
+2. **Semantic validation** for cross-field and catalog-aware rules such as selectable connectors with blockers, publisher policy, version placeholders, license resolution, remote MCP network scopes, and exclusive ownership conflicts.
+
+This separation keeps public diagnostic keywords stable instead of exposing incidental Ajv keywords for domain rules.
+
+## Reproducibility
+
+Canonical JSON sorts object keys recursively, rejects non-finite numbers, cycles, and non-plain objects, and normalizes negative zero. SHA-256 digests are computed over canonical bytes so equivalent JSON values produce identical digests regardless of key insertion order.
+
 ## Security
 
-The package never stores credentials and does not execute commands or mutate projects.
+The package:
+
+- Never stores credentials
+- Never executes commands
+- Never mutates target projects
+- Rejects unknown stable contract fields
+- Uses strict Ajv validation
+- Runs in CI with read-only repository permissions and a frozen lockfile
