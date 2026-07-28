@@ -221,6 +221,18 @@ jobs:
               "multipleOf"
           }
 
+          def add_local_required_properties(schema):
+              required_fields = schema.get("required")
+              if not isinstance(required_fields, list):
+                  return
+              properties = schema.get("properties")
+              if not isinstance(properties, dict):
+                  properties = {}
+                  schema["properties"] = properties
+              for field in required_fields:
+                  if isinstance(field, str):
+                      properties.setdefault(field, {})
+
           def infer_missing_type(schema):
               if "type" in schema:
                   return
@@ -237,6 +249,7 @@ jobs:
           def normalize_strict_schema(schema):
               if not isinstance(schema, dict):
                   return
+              add_local_required_properties(schema)
               infer_missing_type(schema)
               for keyword, value in list(schema.items()):
                   if keyword in schema_map_keywords and isinstance(value, dict):
