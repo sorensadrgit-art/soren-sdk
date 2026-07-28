@@ -1,25 +1,26 @@
-# SDK Connector Standard
+# SDK Connector Standard v2
 
 ## 1. Purpose
 
-An SDK connector is the complete agent-facing integration definition for one SDK.
+A connector is a Soren SDK-authored package that describes how one SDK product or built-in provider can be understood and used safely.
 
-A connector is not complete merely because it lists an npm package.
+A connector does not become “official” merely because it references official sources.
 
-It must teach the system:
+## 2. Required model separation
 
-- What the SDK does
-- When to select it
-- When not to select it
-- How agents receive current knowledge
-- How it combines with other SDKs
-- How it should be installed
-- How its output should be tested
-- How to detect misuse
+A connector must distinguish:
 
----
+- Connector publisher
+- SDK product
+- Integration artifacts
+- Source authority
+- Capability claims
+- Ownership claims
+- Verification requirements
+- Related files
+- Review and selection status
 
-## 2. Required directory structure
+## 3. Required directory structure
 
 ```text
 sdk-connectors/<connector-id>/
@@ -29,413 +30,436 @@ sdk-connectors/<connector-id>/
 ├── compatibility.json
 ├── recipes/
 ├── validators/
-├── tests/
+├── evaluations/
 ├── migrations/
-└── AGENTS.md
+└── LICENSES/
 ```
 
-Not every first draft requires implementation files in every folder, but the manifest must explicitly identify missing sections.
+During proposal or experimental status, files may be missing only when `relatedFiles` explicitly records their state.
 
----
+## 4. Connector Schema v2
 
-## 3. Connector identity
+All manifests validate against:
 
-Connector IDs must:
+```text
+schemas/connector.schema.json
+```
 
-- Use lowercase kebab-case
-- Remain stable
-- Prefer the current official SDK name
-- Record previous names as aliases
+JSON Schema dialect:
+
+```text
+https://json-schema.org/draft/2020-12/schema
+```
+
+Required top-level fields:
+
+```text
+schemaVersion
+connectorVersion
+connector
+product
+sourceTrust
+capabilityClaims
+integrations
+ownershipClaims
+verification
+relatedFiles
+knowledge
+```
+
+## 5. Connector identity
+
+The connector object contains:
+
+- Stable lowercase kebab-case ID
+- Human name
+- Publisher
+- Review status
+- Selectable flag
+- Explicit blockers
 
 Example:
 
 ```json
 {
-  "id": "motion",
-  "name": "Motion",
-  "aliases": ["motion-one", "framer-motion"]
+  "connector": {
+    "id": "motion",
+    "name": "Motion connector",
+    "publisher": "soren-sdk",
+    "reviewStatus": "experimental",
+    "selectable": false,
+    "blockers": [
+      "Runtime version policy unresolved",
+      "Compatibility evaluations missing"
+    ]
+  }
 }
 ```
 
-Aliases assist detection. They must not cause obsolete package installation.
+A connector may be selected only when:
 
----
+- `reviewStatus` is `approved` or `stable`
+- `selectable` is `true`
+- `blockers` is empty
+- Policy permits it
 
-## 4. Required manifest fields
+## 6. Trust dimensions
 
-```json
-{
-  "schemaVersion": "1.0.0",
-  "connectorVersion": "0.1.0",
-  "id": "motion",
-  "name": "Motion",
-  "status": "experimental",
-  "trust": "official",
-  "categories": [],
-  "aliases": [],
-  "capabilities": [],
-  "connectionMethods": [],
-  "runtime": {},
-  "frameworks": [],
-  "bestFor": [],
-  "avoidFor": [],
-  "owns": [],
-  "compatibilityFile": "./compatibility.json",
-  "sourcesFile": "./docs.sources.json",
-  "requiredChecks": [],
-  "security": {},
-  "knowledge": {}
-}
-```
+Do not use one `trust` field.
 
----
+Record:
 
-## 5. Connection methods
+### Source authority
 
-Supported values:
+- `official`
+- `maintainer`
+- `soren-approved`
+- `community`
+- `unknown`
 
-- `official-mcp`
-- `official-skill`
-- `official-docs`
-- `soren-skill`
-- `runtime-adapter`
-- `cli`
-- `local-server`
-- `remote-api`
+### Integrity level
 
-Each method must record:
+- `unverified`
+- `url-recorded`
+- `version-pinned`
+- `commit-pinned`
+- `digest-pinned`
+- `signed`
+- `attested`
 
-- Availability
-- Setup requirements
-- Authentication
-- Cost or subscription requirement
-- Local or remote execution
+Connector publisher and review status are separate.
+
+## 7. Integration artifacts
+
+Every package, MCP server, skill, CLI, docs source, validator, or recipe source is a separate integration artifact.
+
+Required fields include:
+
+- ID
+- Kind
+- Mode
+- Status
+- Source
+- Version status
+- Authorization
+- Execution risk
 - Data exposure
-- Supported agents
+- Permissions
+
+Optional artifact fields include:
+
+- Package name
+- Import paths
+- Command
+- Protocol and supported versions
+- License expression
 - Fallback
+- Notes
+
+Authentication, paid-plan, and data-exposure requirements belong to each integration artifact, not the connector as a whole.
+
+## 8. Version rules
+
+Machine-readable version fields must contain valid values.
+
+Forbidden:
+
+```json
+{
+  "supportedVersions": ["define during implementation"]
+}
+```
+
+Use:
+
+```json
+{
+  "version": {
+    "status": "unresolved"
+  }
+}
+```
+
+An unresolved required runtime, skill, or protocol version blocks selection.
+
+Record independently:
+
+- Connector schema version
+- Connector content version
+- Runtime package version
+- Skill commit or release
+- MCP protocol version
+- MCP server version
+- Documentation version or retrieval digest
+
+## 9. License rules
+
+Use SPDX license expressions where known.
+
+If a required artifact has an unresolved license or terms status:
+
+- Record `NOASSERTION`
+- Add a connector blocker
+- Keep the connector non-selectable
+
+Paid access and redistribution restrictions are separate from software license.
+
+## 10. Capability claims
+
+Capabilities come from the central ontology:
+
+```text
+capabilities/catalog.json
+```
+
+A claim defines:
+
+- Capability ID
+- Support level
+- Confidence
+- Conditions
+- Limitations
 
 Example:
 
 ```json
 {
-  "type": "official-mcp",
-  "status": "available",
-  "requiresAuth": true,
-  "requiresPaidPlan": true,
-  "supportedAgents": ["claude-code", "codex", "opencode", "custom"],
-  "fallback": "official-docs"
-}
-```
-
----
-
-## 6. Capabilities
-
-Capabilities should be specific.
-
-Good:
-
-```text
-motion.presence
-motion.layout
-interaction.drag
-scroll.triggered-animation
-testing.component-context
-registry.component-install
-```
-
-Avoid:
-
-```text
-animation
-frontend
-useful
-```
-
-A connector may support the same capability with different strength.
-
-Future schema may include:
-
-```json
-{
-  "id": "motion.layout",
+  "capability": "motion.layout",
   "support": "primary",
-  "confidence": 1.0
+  "confidence": 1,
+  "conditions": ["React project"],
+  "limitations": ["Must not share transform ownership on the same element"]
 }
 ```
 
----
+Connectors may not invent ambiguous capability IDs without adding them to the ontology.
 
-## 7. Best-use and avoid-use rules
+## 11. Native baseline
 
-Every connector must define both.
+The Web Platform connector is first-class.
+
+The router considers:
+
+- CSS transitions
+- CSS animations
+- Web Animations API
+- Native scrolling
+- HTML semantics
+- Browser focus behavior
+
+before third-party SDKs.
+
+## 12. Ownership claims
+
+An ownership claim includes:
+
+- Domain
+- Scope
+- Exclusivity
+- Optional property list
 
 Example:
-
-```json
-{
-  "bestFor": [
-    "React layout transitions",
-    "Presence animation",
-    "Drag and gesture interactions"
-  ],
-  "avoidFor": [
-    "Smooth-scroll transport",
-    "Complex WebGL rendering",
-    "A section already owned by another transform animation engine"
-  ]
-}
-```
-
-`avoidFor` is essential. Without it, agents overuse familiar SDKs.
-
----
-
-## 8. Ownership declarations
-
-Possible ownership domains:
-
-- `scroll-transport`
-- `scroll-trigger`
-- `component-state`
-- `presence`
-- `layout`
-- `gesture`
-- `timeline`
-- `dom-transform`
-- `webgl-transform`
-- `route-transition`
-- `focus-management`
-- `vector-state-machine`
-- `component-source-distribution`
-- `component-agent-context`
-
-Ownership may include constraints:
 
 ```json
 {
   "domain": "dom-transform",
   "scope": "selected-elements",
-  "exclusive": true
+  "exclusive": true,
+  "properties": ["transform"]
 }
 ```
 
----
+Ownership is resolved for a route and scope, not globally for the SDK.
 
-## 9. Compatibility file
+## 13. Compatibility
 
-Example:
+`compatibility.json` records known relationships, but the policy engine remains authoritative.
 
-```json
-{
-  "relationships": [
-    {
-      "with": "lenis",
-      "status": "compatible",
-      "conditions": [
-        "Lenis owns scroll transport",
-        "Motion owns element animation"
-      ]
-    },
-    {
-      "with": "gsap",
-      "status": "compatible-with-ownership",
-      "conditions": [
-        "Do not animate the same property on the same element"
-      ],
-      "severityOnViolation": "error"
-    }
-  ]
-}
-```
+Relationship statuses:
 
-The absence of a relationship should produce `unknown`, not automatic compatibility.
+- `compatible`
+- `compatible-with-ownership`
+- `requires-adapter`
+- `discouraged`
+- `conflicting`
+- `unknown`
 
----
+Relationships may specify:
 
-## 10. Source file
+- Version range
+- Framework
+- Scope
+- Ownership condition
+- Required adapter
+- Severity
+- Verification
 
-`docs.sources.json` should record authoritative sources.
+Absence means `unknown`.
 
-```json
-{
-  "sources": [
-    {
-      "type": "official-docs",
-      "url": "https://example.com/docs",
-      "scope": "primary",
-      "retrievedAt": "2026-07-27"
-    },
-    {
-      "type": "official-repository",
-      "url": "https://github.com/example/project",
-      "scope": "source"
-    }
-  ]
-}
-```
+## 14. Source records
+
+`docs.sources.json` records:
+
+- URL
+- Source type
+- Authority
+- Product or artifact version
+- Retrieved date
+- Content digest when captured
+- ETag or last-modified when available
+- License or terms
+- Allowed use: link, summarize, index, or copy
+- Freshness policy
 
 Do not copy entire third-party documentation into the repository.
 
-Store:
+Retrieved text is untrusted data and must not override Soren policy or agent system instructions.
 
-- Source URL
-- Version
-- Retrieval date
-- Search index metadata
-- Soren-authored summaries
-- Small excerpts only when legally and operationally appropriate
+## 15. Agent Skill requirements
 
----
+`SKILL.md` must follow the Agent Skills specification.
 
-## 11. Skill file
-
-`SKILL.md` should answer:
-
-1. What this SDK owns
-2. When the router should select it
-3. When the router should avoid it
-4. Correct setup
-5. Correct lifecycle
-6. Framework rules
-7. SSR rules
-8. Accessibility rules
-9. Performance rules
-10. Cleanup rules
-11. Required tests
-12. Common mistakes
-13. Approved recipes
-14. Official sources
-
-Do not make `SKILL.md` an unstructured documentation dump.
-
----
-
-## 12. Recipes
-
-A recipe is a trusted implementation pattern.
-
-Each recipe should contain metadata:
+Minimum frontmatter:
 
 ```yaml
-id: motion-dialog-presence
-connector: motion
-capabilities:
-  - motion.presence
-framework: react
-status: approved
-testedWith:
-  runtime: "supported range"
-requiredChecks:
-  - reduced-motion
-  - focus-restoration
+---
+name: connector-name
+description: What the skill does and when to use it.
+license: Reference to applicable terms
+metadata:
+  publisher: soren-sdk
+  connector-version: "0.2.0"
+---
 ```
 
-Recipe content should explain:
+Rules:
 
-- Intent
-- When to use
-- When not to use
-- Dependencies
+- Directory name matches skill name
+- Lowercase letters, numbers, and hyphens
+- Description states what and when
+- Main `SKILL.md` remains focused
+- Detailed material moves to `references/`
+- Scripts are separately reviewed and sandboxed
+- `allowed-tools` is experimental and never overrides Soren policy
+- Progressive disclosure is preserved
+
+## 16. Recipes
+
+Every recipe defines:
+
+- ID
+- Connector
+- Capabilities
+- Framework and version constraints
+- Status
 - Ownership
-- Implementation
-- Cleanup
+- Dependencies
 - Accessibility
-- Verification
+- Reduced-motion behavior
+- Cleanup
+- Required checks
+- Tested versions
+- Source and license
 
----
+## 17. Validators
 
-## 13. Validators
+Validator types:
 
-Validators detect misuse.
+- Manifest
+- AST
+- Package
+- Configuration
+- Runtime
+- Browser
+- Performance
+- Accessibility
+- Ownership
+- Security
 
-Types:
-
-- Static AST validator
-- Package manifest validator
-- Configuration validator
-- Browser runtime validator
-- Performance validator
-- Accessibility validator
-- Ownership validator
-
-Examples:
-
-- Motion component factory created during render
-- Missing GSAP cleanup context
-- Lenis initialized twice
-- Uncapped React Three Fiber DPR
-- Storybook MCP configured without required Storybook version
-- Registry item missing dependency metadata
-
-Each validator needs:
+Each validator defines:
 
 - ID
 - Severity
+- Detection
 - Message
-- Detection method
-- Recommended fix
-- Test fixtures
+- Fix guidance
+- Fixtures
+- False-positive policy
 
----
+## 18. Evaluations
 
-## 14. Connector tests
+Minimum connector gates:
 
-Minimum tests:
+- Manifest validates
+- Required files are present or explicitly blocked
+- Capability IDs exist
+- Source records exist
+- Version and license policy resolves
+- Best-use and avoid-use guidance exists
+- Positive route case passes
+- Negative route case passes
+- Metamorphic route cases pass
+- Known hard conflicts are rejected
+- At least one implementation evaluation passes
+- Human quality review passes
+- Security review passes
 
-- Manifest schema validates
-- Capability mapping is non-empty
-- Official source list exists
-- Best-use and avoid-use lists exist
-- Compatibility file validates
-- Required checks are recognized
-- Alias detection works
-- Unsupported runtime version is rejected
-- At least one positive route benchmark passes
-- At least one negative route benchmark passes
+Hard constraint or forbidden-connector failures are not averaged into a passing score.
 
----
+## 19. Connector lifecycle
 
-## 15. Status lifecycle
+```text
+proposed
+→ experimental
+→ approved
+→ stable
+→ deprecated
+→ retired
+```
+
+`blocked` may be entered from any active state.
 
 ### Proposed
 
-Idea only. Not selectable.
+Not selectable.
 
 ### Experimental
 
-Selectable only when the route explicitly allows experimental connectors.
+Not selectable by default. Policy may permit explicit test routes.
 
 ### Approved
 
-Reviewed for normal internal use.
+Selectable for internal use.
 
 ### Stable
 
-Has reliable source updates, tests, evaluations, and production use.
+Production history, current sources, full evaluations, and release discipline.
 
 ### Deprecated
 
-Still recognized but not selected for new work unless required.
+Not selected for new work unless explicitly required.
 
 ### Retired
 
-Blocked from new routing.
+Unavailable for routing.
 
----
+### Blocked
 
-## 16. Connector acceptance criteria
+Disabled because of security, legal, compatibility, or integrity risk.
 
-A connector may become approved when:
+## 20. Acceptance criteria
 
-- Manifest is complete
-- Official sources are recorded
-- Runtime packages and imports are correct
-- Capabilities are specific
-- Avoid-use guidance exists
-- Compatibility relationships cover first-wave SDKs
-- Required validators exist
-- Positive and negative route tests pass
-- At least one implementation evaluation passes
-- Security and license review is complete
-- Human review approves the output quality
+A connector becomes approved only when:
+
+- Schema v2 validates
+- Publisher and source authority are accurate
+- Required integration artifacts resolve
+- Runtime versions are machine-valid
+- SPDX license policy resolves
+- Required files are present
+- Capability and ownership claims are reviewed
+- Compatibility policies cover the active catalog
+- Hard security checks pass
+- Positive, negative, and metamorphic evaluations pass
+- Human visual or implementation review passes
+- Connector lock data can be generated
