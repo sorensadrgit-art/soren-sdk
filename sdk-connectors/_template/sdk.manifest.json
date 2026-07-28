@@ -1,31 +1,93 @@
 {
-  "schemaVersion": "1.0.0",
-  "connectorVersion": "0.1.0",
-  "id": "replace-me",
-  "name": "Replace Me",
-  "status": "proposed",
-  "trust": "experimental",
-  "categories": [],
-  "aliases": [],
-  "capabilities": [],
-  "connectionMethods": [],
-  "runtime": {
-    "packages": [],
-    "imports": {},
-    "supportedVersions": []
+  "$schema": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/connector.schema.json",
+  "schemaVersion": "2.0.0-draft.1",
+  "connectorVersion": "0.2.0",
+  "connector": {
+    "id": "replace-me",
+    "name": "Replace Me connector",
+    "publisher": "soren-sdk",
+    "reviewStatus": "proposed",
+    "selectable": false,
+    "blockers": [
+      "Complete all required metadata and evaluations"
+    ]
   },
-  "frameworks": [],
-  "bestFor": [],
-  "avoidFor": [],
-  "owns": [],
-  "requiredChecks": [],
-  "security": {
-    "requiresAuth": false,
-    "requiresPaidPlan": false,
-    "remoteData": false
+  "product": {
+    "canonicalName": "Replace Me",
+    "homepage": "https://example.com/",
+    "aliases": [],
+    "categories": [
+      "replace-me"
+    ]
+  },
+  "sourceTrust": {
+    "sourceAuthority": "unknown",
+    "integrityLevel": "unverified",
+    "reviewedAt": "2026-07-27",
+    "reviewer": "soren-sdk"
+  },
+  "capabilityClaims": [
+    {
+      "capability": "replace.me",
+      "support": "primary",
+      "confidence": 0,
+      "conditions": [],
+      "limitations": []
+    }
+  ],
+  "integrations": [
+    {
+      "id": "replace-me-docs",
+      "kind": "documentation",
+      "mode": "knowledge",
+      "status": "unverified",
+      "source": "https://example.com/",
+      "version": {
+        "status": "unresolved"
+      },
+      "authorization": {
+        "required": false,
+        "method": "none",
+        "paidPlan": false
+      },
+      "executionRisk": "none",
+      "dataExposure": "none",
+      "permissions": {
+        "filesystem": "none",
+        "network": [],
+        "projectWrite": false
+      },
+      "licenseExpression": "NOASSERTION",
+      "fallback": null
+    }
+  ],
+  "ownershipClaims": [],
+  "verification": {
+    "requiredChecks": [],
+    "hardGates": [
+      "connector-schema-valid"
+    ]
+  },
+  "relatedFiles": {
+    "skill": {
+      "path": "./SKILL.md",
+      "status": "planned"
+    },
+    "sources": {
+      "path": "./docs.sources.json",
+      "status": "planned"
+    },
+    "compatibility": {
+      "path": "./compatibility.json",
+      "status": "planned"
+    },
+    "evaluations": {
+      "path": "./evaluations/",
+      "status": "planned"
+    }
   },
   "knowledge": {
     "retrievedAt": "2026-07-27",
-    "officialSources": []
+    "staleAfterDays": 30
   }
 }
