@@ -1,0 +1,98 @@
+{
+  "schemaVersion": "1.0.0",
+  "connectorVersion": "0.1.0",
+  "id": "motion",
+  "name": "Motion",
+  "status": "experimental",
+  "trust": "official",
+  "categories": [
+    "motion",
+    "interaction",
+    "react"
+  ],
+  "aliases": [
+    "motion-one",
+    "framer-motion"
+  ],
+  "capabilities": [
+    "motion.presence",
+    "motion.layout",
+    "motion.shared-layout",
+    "motion.spring",
+    "interaction.drag",
+    "interaction.gesture",
+    "motion.component-scroll"
+  ],
+  "connectionMethods": [
+    {
+      "type": "official-mcp",
+      "status": "available",
+      "requiresAuth": true,
+      "requiresPaidPlan": true,
+      "fallback": "official-docs"
+    },
+    {
+      "type": "official-skill",
+      "status": "available"
+    },
+    {
+      "type": "official-docs",
+      "status": "available"
+    }
+  ],
+  "runtime": {
+    "packages": [
+      "motion"
+    ],
+    "imports": {
+      "react": "motion/react",
+      "javascript": "motion"
+    },
+    "supportedVersions": [
+      "define during implementation"
+    ]
+  },
+  "frameworks": [
+    "react",
+    "javascript",
+    "vue"
+  ],
+  "bestFor": [
+    "React state-driven animation",
+    "Presence and exit animation",
+    "Layout transitions",
+    "Drag and gesture interactions",
+    "Spring-based UI motion"
+  ],
+  "avoidFor": [
+    "Smooth-scroll transport",
+    "WebGL rendering",
+    "A property on an element already owned by GSAP"
+  ],
+  "owns": [
+    "component-state",
+    "presence",
+    "layout",
+    "gesture",
+    "selected-dom-properties"
+  ],
+  "requiredChecks": [
+    "reduced-motion",
+    "cleanup",
+    "property-ownership",
+    "animation-performance"
+  ],
+  "security": {
+    "requiresAuth": true,
+    "requiresPaidPlan": true,
+    "remoteData": true
+  },
+  "knowledge": {
+    "retrievedAt": "2026-07-27",
+    "officialSources": [
+      "https://motion.dev/docs/ai-kit-context",
+      "https://motion.dev/docs/ai-kit-install",
+      "https://motion.dev/docs/react"
+    ]
+  }
+}
