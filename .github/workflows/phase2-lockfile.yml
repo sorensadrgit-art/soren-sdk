@@ -7,6 +7,8 @@ on:
     paths:
       - ".github/workflows/phase2-lockfile.yml"
       - "packages/connectors/package.json"
+      - "packages/cli/package.json"
+      - "package.json"
 
 permissions:
   contents: write
@@ -42,6 +44,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Lockfile already current."
           else
-            git commit -m "chore(connectors): refresh workspace lockfile"
+            git commit -m "chore(catalog): refresh workspace lockfile"
             git push origin HEAD:feat/catalog-core-v1
           fi
