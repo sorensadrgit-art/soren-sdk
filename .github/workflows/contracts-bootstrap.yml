@@ -39,7 +39,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: pnpm
 
       - name: Materialize RED fixture
         run: node scripts/scaffold-contracts.mjs --red
