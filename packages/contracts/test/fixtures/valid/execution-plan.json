@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "1.0.0-draft.1",
+  "contractKind": "execution-plan",
+  "executionPlanId": "exec_1",
+  "createdAt": "2026-07-27T12:00:00Z",
+  "routePlanId": "plan_1",
+  "mode": "plan",
+  "immutableDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "fileChanges": [
+    {
+      "operation": "update",
+      "path": "src/button.css",
+      "contentDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ],
+  "dependencyChanges": [],
+  "commands": [],
+  "networkDestinations": [],
+  "credentials": [],
+  "rollback": [
+    "Restore the previous file."
+  ],
+  "verification": [
+    "pnpm test"
+  ],
+  "approval": {
+    "required": false,
+    "scopes": []
+  }
+}

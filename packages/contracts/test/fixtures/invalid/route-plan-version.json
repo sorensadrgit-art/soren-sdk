@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "0.0.0",
+  "contractKind": "route-plan",
+  "planId": "plan_1",
+  "createdAt": "2026-07-27T12:00:00Z",
+  "status": "native",
+  "requestId": "req_1",
+  "projectSnapshotId": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "catalogSnapshotId": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "policySnapshotId": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "requestedCapabilities": [
+    "platform.css-transition"
+  ],
+  "selectedProviders": [],
+  "rejectedProviders": [],
+  "ownership": [
+    {
+      "providerId": "web-platform",
+      "domain": "dom-style",
+      "scope": "button",
+      "properties": [
+        "color",
+        "background"
+      ]
+    }
+  ],
+  "constraints": [
+    {
+      "code": "POLICY_ALLOWED",
+      "status": "passed",
+      "message": "Native provider allowed."
+    }
+  ],
+  "uncertainty": 0.0,
+  "requiredInput": [],
+  "digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+}

@@ -1,0 +1,28 @@
+{
+  "name": "@soren-sdk/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Versioned contracts, validation, canonical serialization, and digests for Soren SDK.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node ./scripts/prepare-build.mjs && tsc -p tsconfig.build.json && node ./scripts/copy-schemas.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "validate:repository": "node ./dist/cli/validate-repository.js"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
+  }
+}

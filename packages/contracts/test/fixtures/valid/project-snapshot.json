@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1.0.0-draft.1",
+  "contractKind": "project-snapshot",
+  "snapshotId": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "createdAt": "2026-07-27T12:00:00Z",
+  "root": ".",
+  "revision": {
+    "vcs": "git",
+    "commit": "abc1234",
+    "dirty": false
+  },
+  "packageManager": {
+    "name": "pnpm",
+    "version": "11.17.0",
+    "lockfile": "pnpm-lock.yaml",
+    "lockfileDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "workspace": {
+    "isMonorepo": true,
+    "packages": [
+      {
+        "name": "@soren-sdk/contracts",
+        "path": "packages/contracts",
+        "private": true
+      }
+    ]
+  },
+  "runtimes": [
+    {
+      "name": "node",
+      "version": "24.0.0"
+    }
+  ],
+  "frameworks": [],
+  "dependencies": [],
+  "configurations": [],
+  "policies": [],
+  "targets": {
+    "browsers": [
+      "defaults"
+    ],
+    "runtimes": [
+      "node>=24"
+    ]
+  },
+  "warnings": []
+}

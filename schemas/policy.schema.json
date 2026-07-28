@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/policy.schema.json",
+  "title": "Soren SDK Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contractKind",
+    "policyId",
+    "version",
+    "scope",
+    "rules"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0-draft.1"
+    },
+    "contractKind": {
+      "const": "policy"
+    },
+    "policyId": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "scope": {
+      "enum": [
+        "builtin",
+        "organization",
+        "workspace",
+        "project",
+        "run"
+      ]
+    },
+    "rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowedConnectors",
+        "deniedConnectors",
+        "allowExperimental",
+        "allowedLicenses",
+        "allowPaidServices",
+        "network",
+        "filesystem",
+        "allowRemoteProjectContent",
+        "requireReducedMotion",
+        "requiredApprovals"
+      ],
+      "properties": {
+        "allowedConnectors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "deniedConnectors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "allowExperimental": {
+          "type": "boolean"
+        },
+        "allowedLicenses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "allowPaidServices": {
+          "type": "boolean"
+        },
+        "network": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "allowedHosts"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "deny",
+                "allowlist",
+                "unrestricted"
+              ]
+            },
+            "allowedHosts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        "filesystem": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "read",
+            "write"
+          ],
+          "properties": {
+            "read": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            },
+            "write": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        "allowRemoteProjectContent": {
+          "type": "boolean"
+        },
+        "maxBundleKilobytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "requireReducedMotion": {
+          "type": "boolean"
+        },
+        "requiredApprovals": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "network",
+              "project-write",
+              "command-execution",
+              "remote-project-content",
+              "release"
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

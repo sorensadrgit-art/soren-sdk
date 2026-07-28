@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1.0.0-draft.1",
+  "contractKind": "evidence-envelope",
+  "runId": "run_1",
+  "startedAt": "2026-07-27T12:00:00Z",
+  "completedAt": "2026-07-27T12:00:01Z",
+  "principal": {
+    "id": "soren",
+    "type": "user"
+  },
+  "agent": {
+    "profile": "hermes",
+    "provider": "example",
+    "model": "example-model"
+  },
+  "projectSnapshotId": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "catalogSnapshotId": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "policySnapshotId": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "routePlanId": "plan_1",
+  "executionPlanId": "exec_1",
+  "checks": [
+    {
+      "id": "unit",
+      "status": "passed",
+      "command": [
+        "pnpm",
+        "test"
+      ],
+      "exitCode": 0,
+      "durationMs": 1000,
+      "artifacts": []
+    }
+  ],
+  "changes": [],
+  "unverified": [],
+  "resultingRevision": null,
+  "digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+}
