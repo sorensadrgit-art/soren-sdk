@@ -66,7 +66,10 @@ export function detectFrameworks(
     ["devDependency", 2],
     ["optionalDependency", 3]
   ]);
-  const records = new Map<string, ProjectSnapshot["frameworks"][number] & { priority: number }>();
+  const records = new Map<
+    string,
+    ProjectSnapshot["frameworks"][number] & { priority: number }
+  >();
   for (const dependency of dependencies) {
     const framework = FRAMEWORKS.get(dependency.name);
     if (framework === undefined) continue;
@@ -83,7 +86,11 @@ export function detectFrameworks(
     }
   }
   return [...records.values()]
-    .map(({ priority: _priority, ...record }) => record)
+    .map((record) => ({
+      name: record.name,
+      version: record.version,
+      workspace: record.workspace
+    }))
     .sort((left, right) =>
       [left.workspace, left.name].join("\0").localeCompare(
         [right.workspace, right.name].join("\0")
