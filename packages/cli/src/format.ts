@@ -1,6 +1,7 @@
 import {
   canonicalJson,
-  type JsonValue
+  type JsonValue,
+  type ProjectSnapshot
 } from "@soren-sdk/contracts";
 import type {
   ConnectorHealthReport,
@@ -37,5 +38,26 @@ export function formatHealth(report: ConnectorHealthReport): string {
   for (const blocker of report.blockers) lines.push(`blocker: ${blocker}`);
   for (const warning of report.warnings) lines.push(`warning: ${warning}`);
   for (const error of report.errors) lines.push(`error: ${error}`);
+  return `${lines.join("\n")}\n`;
+}
+
+export function formatProjectSnapshot(snapshot: ProjectSnapshot): string {
+  const frameworks = snapshot.frameworks
+    .map((item) => `${item.name}@${item.version ?? "unknown"} (${item.workspace})`)
+    .join(", ");
+  const lines = [
+    `Project snapshot: ${snapshot.snapshotId}`,
+    `root: ${snapshot.root}`,
+    `revision: ${snapshot.revision.vcs} ${snapshot.revision.commit ?? "unknown"}`,
+    `package manager: ${snapshot.packageManager.name}@${snapshot.packageManager.version ?? "unknown"}`,
+    `workspaces: ${snapshot.workspace.packages.length}`,
+    `frameworks: ${frameworks || "none"}`,
+    `dependencies: ${snapshot.dependencies.length}`,
+    `configurations: ${snapshot.configurations.length}`,
+    `policies: ${snapshot.policies.length}`,
+    `browser targets: ${snapshot.targets.browsers.join(", ") || "none"}`,
+    `runtime targets: ${snapshot.targets.runtimes.join(", ") || "none"}`
+  ];
+  for (const warning of snapshot.warnings) lines.push(`warning: ${warning}`);
   return `${lines.join("\n")}\n`;
 }

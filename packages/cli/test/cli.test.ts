@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,7 +33,63 @@ function captureIo(): {
   };
 }
 
-describe("catalog CLI", () => {
+describe("Soren SDK CLI", () => {
+  it("inspects the repository in human and stable JSON forms", () => {
+    const human = captureIo();
+    expect(
+      runCli({ argv: ["inspect"], cwd: repositoryRoot(), io: human.io })
+    ).toBe(0);
+    expect(human.stdout.join("")).toContain("Project snapshot:");
+    expect(human.stdout.join("")).toContain("package manager: pnpm@11.17.0");
+
+    const json = captureIo();
+    expect(
+      runCli({ argv: ["inspect", ".", "--json"], cwd: repositoryRoot(), io: json.io })
+    ).toBe(0);
+    expect(JSON.parse(json.stdout.join(""))).toMatchObject({
+      contractKind: "project-snapshot",
+      packageManager: { name: "pnpm" }
+    });
+  });
+
+  it("returns stable inspect usage and failure exit codes", async () => {
+    const invalid = captureIo();
+    expect(
+      runCli({
+        argv: ["inspect", ".", "another"],
+        cwd: repositoryRoot(),
+        io: invalid.io
+      })
+    ).toBe(2);
+    expect(invalid.stderr.join("")).toContain("at most one project path");
+
+    const empty = await mkdtemp(join(tmpdir(), "soren-sdk-empty-project-"));
+    try {
+      const failure = captureIo();
+      expect(
+        runCli({ argv: ["inspect", empty], cwd: repositoryRoot(), io: failure.io })
+      ).toBe(1);
+      expect(failure.stderr.join("")).toContain("PROJECT_ROOT_INVALID");
+    } finally {
+      await rm(empty, { recursive: true, force: true });
+    }
+  });
+
+  it("does not write while inspecting", async () => {
+    const root = await mkdtemp(join(tmpdir(), "soren-sdk-inspect-readonly-"));
+    try {
+      await writeFile(join(root, "package.json"), '{"name":"readonly"}', "utf8");
+      const before = await readdir(root);
+      const io = captureIo();
+      expect(runCli({ argv: ["inspect", root, "--json"], cwd: "/", io: io.io })).toBe(
+        0
+      );
+      expect(await readdir(root)).toEqual(before);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("lists connector IDs in human and stable JSON forms", () => {
     const human = captureIo();
     expect(
