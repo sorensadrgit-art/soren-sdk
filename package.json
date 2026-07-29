@@ -9,12 +9,14 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "build": "pnpm --filter @soren-sdk/contracts build",
+    "build": "pnpm -r --if-present build",
     "lint": "eslint .",
-    "typecheck": "pnpm --filter @soren-sdk/contracts typecheck",
-    "test": "pnpm --filter @soren-sdk/contracts test",
+    "typecheck": "pnpm -r --if-present build && pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present build && pnpm -r --if-present test",
     "validate:repository": "pnpm --filter @soren-sdk/contracts validate:repository",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm validate:repository"
+    "soren-sdk": "pnpm --filter @soren-sdk/cli start",
+    "smoke:cli": "node packages/cli/dist/bin.js catalog list && node packages/cli/dist/bin.js catalog get web-platform --json && node packages/cli/dist/bin.js connector health web-platform --json",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm validate:repository && pnpm smoke:cli"
   },
   "devDependencies": {
     "@types/node": "24.13.3",
