@@ -15,7 +15,7 @@
     "test": "pnpm -r --if-present build && pnpm -r --if-present test",
     "validate:repository": "pnpm --filter @soren-sdk/contracts validate:repository",
     "soren-sdk": "pnpm --filter @soren-sdk/cli start",
-    "smoke:cli": "node packages/cli/dist/bin.js catalog list && node packages/cli/dist/bin.js catalog get web-platform --json && node packages/cli/dist/bin.js connector health web-platform --json",
+    "smoke:cli": "node packages/cli/dist/bin.js catalog list && node packages/cli/dist/bin.js catalog get web-platform --json && node packages/cli/dist/bin.js connector health web-platform --json && node packages/cli/dist/bin.js inspect --json && node packages/cli/dist/bin.js inspect .",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm validate:repository && pnpm smoke:cli"
   },
   "devDependencies": {
