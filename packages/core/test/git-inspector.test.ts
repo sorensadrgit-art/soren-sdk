@@ -78,6 +78,22 @@ describe("static git revision detection", () => {
     }
   });
 
+  it("reports malformed gitdir files as unknown instead of non-git", async () => {
+    const project = await root();
+    try {
+      await writeFile(join(project.path, ".git"), "not a gitdir pointer\n");
+      const result = detectRevision(project.path);
+      expect(result.revision).toEqual({
+        vcs: "unknown",
+        commit: null,
+        dirty: true
+      });
+      expect(result.warnings[0]).toContain("invalid");
+    } finally {
+      await project.cleanup();
+    }
+  });
+
   it("reports non-git projects without warnings", async () => {
     const project = await root();
     try {

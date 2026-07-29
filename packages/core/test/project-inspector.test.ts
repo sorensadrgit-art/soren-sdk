@@ -54,6 +54,9 @@ describe("project inspector", () => {
       });
       expect(snapshot.packageManager.name).toBe("npm");
       expect(snapshot.packageManager.lockfile).toBe("package-lock.json");
+      expect(snapshot.packageManager.lockfileDigest).toMatch(
+        /^sha256:[0-9a-f]{64}$/
+      );
       expect(snapshot.frameworks.map((item) => item.name)).toEqual([
         "nextjs",
         "react"
@@ -116,6 +119,39 @@ describe("project inspector", () => {
     }
   });
 
+  it("supports package.json workspaces and policy/target files", async () => {
+    const project = await fixture({
+      "package.json": packageJson({
+        name: "yarn-root",
+        private: true,
+        packageManager: "yarn@4.9.2",
+        workspaces: ["packages/*"]
+      }),
+      "yarn.lock": "__metadata:\n  version: 8\n",
+      "packages/ui/package.json": packageJson({
+        name: "ui",
+        dependencies: { react: "19" }
+      }),
+      ".soren-sdk/policy.yaml": "schemaVersion: 1.0.0-draft.1\n",
+      ".browserslistrc": "last 2 Chrome versions\n# comment\nnot dead\n"
+    });
+    try {
+      const snapshot = inspectProject({ root: project.root });
+      expect(snapshot.packageManager.name).toBe("yarn");
+      expect(snapshot.workspace.packages.map((item) => item.path)).toEqual([
+        ".",
+        "packages/ui"
+      ]);
+      expect(snapshot.policies).toHaveLength(1);
+      expect(snapshot.targets.browsers).toEqual([
+        "last 2 Chrome versions",
+        "not dead"
+      ]);
+    } finally {
+      await project.cleanup();
+    }
+  });
+
   it("produces the same ID across clone paths and creation times", async () => {
     const files = {
       "package.json": packageJson({ name: "same", dependencies: { react: "19" } }),
@@ -139,16 +175,64 @@ describe("project inspector", () => {
     }
   });
 
-  it("changes the ID when configuration content changes", async () => {
+  it("changes the ID for package, lockfile, config, policy, target, and revision changes", async () => {
     const project = await fixture({
       "package.json": packageJson({ name: "change" }),
-      "tsconfig.json": "{}"
+      "package-lock.json": "lock-a",
+      "tsconfig.json": "{}",
+      ".soren-sdk/policy.yaml": "rule: a\n",
+      ".browserslistrc": "last 1 Chrome version\n"
     });
     try {
-      const first = inspectProject({ root: project.root });
-      await writeFile(join(project.root, "tsconfig.json"), "{\"strict\":true}");
-      const second = inspectProject({ root: project.root });
-      expect(first.snapshotId).not.toBe(second.snapshotId);
+      let previous = inspectProject({ root: project.root }).snapshotId;
+
+      await writeFile(join(project.root, "package-lock.json"), "lock-b");
+      let current = inspectProject({ root: project.root }).snapshotId;
+      expect(current).not.toBe(previous);
+      previous = current;
+
+      await writeFile(
+        join(project.root, "package.json"),
+        packageJson({ name: "change", dependencies: { react: "19" } })
+      );
+      current = inspectProject({ root: project.root }).snapshotId;
+      expect(current).not.toBe(previous);
+      previous = current;
+
+      await writeFile(join(project.root, "tsconfig.json"), '{"strict":true}');
+      current = inspectProject({ root: project.root }).snapshotId;
+      expect(current).not.toBe(previous);
+      previous = current;
+
+      await writeFile(join(project.root, ".soren-sdk/policy.yaml"), "rule: b\n");
+      current = inspectProject({ root: project.root }).snapshotId;
+      expect(current).not.toBe(previous);
+      previous = current;
+
+      await writeFile(
+        join(project.root, ".browserslistrc"),
+        "last 2 Chrome versions\n"
+      );
+      current = inspectProject({ root: project.root }).snapshotId;
+      expect(current).not.toBe(previous);
+      previous = current;
+
+      await mkdir(join(project.root, ".git", "refs", "heads"), { recursive: true });
+      await writeFile(join(project.root, ".git", "HEAD"), "ref: refs/heads/main\n");
+      await writeFile(
+        join(project.root, ".git", "refs", "heads", "main"),
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
+      );
+      current = inspectProject({ root: project.root }).snapshotId;
+      expect(current).not.toBe(previous);
+      previous = current;
+
+      await writeFile(
+        join(project.root, ".git", "refs", "heads", "main"),
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n"
+      );
+      current = inspectProject({ root: project.root }).snapshotId;
+      expect(current).not.toBe(previous);
     } finally {
       await project.cleanup();
     }

@@ -4,19 +4,69 @@ import { isAbsolute, join, resolve } from "node:path";
 import { isRegularFile, readText } from "./filesystem.js";
 import type { RevisionDetection } from "./types.js";
 
-function gitDirectory(root: string): string | null {
+interface GitMarkerNone {
+  kind: "none";
+}
+
+interface GitMarkerDirectory {
+  kind: "directory";
+  directory: string;
+}
+
+interface GitMarkerInvalid {
+  kind: "invalid";
+  message: string;
+}
+
+type GitMarker = GitMarkerNone | GitMarkerDirectory | GitMarkerInvalid;
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "unknown error";
+}
+
+function isMissing(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "ENOENT"
+  );
+}
+
+function gitDirectory(root: string): GitMarker {
   const marker = join(root, ".git");
+  let info;
   try {
-    const info = lstatSync(marker);
-    if (info.isDirectory()) return marker;
-    if (!info.isFile()) return null;
+    info = lstatSync(marker);
+  } catch (error) {
+    return isMissing(error)
+      ? { kind: "none" }
+      : { kind: "invalid", message: errorMessage(error) };
+  }
+
+  if (info.isDirectory()) {
+    return { kind: "directory", directory: marker };
+  }
+  if (!info.isFile()) {
+    return {
+      kind: "invalid",
+      message: ".git marker is neither a directory nor a regular gitdir file."
+    };
+  }
+
+  try {
     const source = readFileSync(marker, "utf8").trim();
     const match = /^gitdir:\s*(.+)$/i.exec(source);
-    if (match === null) return null;
+    if (match === null) {
+      return { kind: "invalid", message: ".git file has no valid gitdir entry." };
+    }
     const value = match[1] as string;
-    return isAbsolute(value) ? value : resolve(root, value);
-  } catch {
-    return null;
+    return {
+      kind: "directory",
+      directory: isAbsolute(value) ? value : resolve(root, value)
+    };
+  } catch (error) {
+    return { kind: "invalid", message: errorMessage(error) };
   }
 }
 
@@ -50,11 +100,17 @@ function resolveRef(gitDir: string, ref: string): string | null {
 }
 
 export function detectRevision(root: string): RevisionDetection {
-  const gitDir = gitDirectory(root);
-  if (gitDir === null) {
+  const marker = gitDirectory(root);
+  if (marker.kind === "none") {
     return {
       revision: { vcs: "none", commit: null, dirty: false },
       warnings: []
+    };
+  }
+  if (marker.kind === "invalid") {
+    return {
+      revision: { vcs: "unknown", commit: null, dirty: true },
+      warnings: [`Git metadata marker is invalid: ${marker.message}`]
     };
   }
 
@@ -62,21 +118,18 @@ export function detectRevision(root: string): RevisionDetection {
     "Git dirty state is conservatively true because the static inspector does not execute git status."
   ];
   try {
-    const headPath = join(gitDir, "HEAD");
+    const headPath = join(marker.directory, "HEAD");
     const head = readText(headPath).trim();
     const ref = /^ref:\s*(.+)$/.exec(head);
-    const commit = ref === null ? head || null : resolveRef(gitDir, ref[1] as string);
+    const commit =
+      ref === null ? head || null : resolveRef(marker.directory, ref[1] as string);
     if (commit === null) warnings.push("Git HEAD could not be resolved to a commit.");
     return {
       revision: { vcs: "git", commit, dirty: true },
       warnings
     };
   } catch (error) {
-    warnings.push(
-      `Git metadata could not be read: ${
-        error instanceof Error ? error.message : "unknown error"
-      }`
-    );
+    warnings.push(`Git metadata could not be read: ${errorMessage(error)}`);
     return {
       revision: { vcs: "unknown", commit: null, dirty: true },
       warnings
