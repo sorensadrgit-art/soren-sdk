@@ -44,7 +44,7 @@ export function inspectProject(options: InspectProjectOptions): ProjectSnapshot 
   const dependencies = collectDependencies(workspace.packages);
   const frameworks = detectFrameworks(dependencies);
   const runtimes = detectRuntimes(workspace.packages);
-  const configurations = detectConfigurations(root);
+  const configurations = detectConfigurations(root, workspace.packages);
   const policies = detectPolicies(root);
   const targets = detectTargets(root, workspace.packages, runtimes);
   const warnings = stableWarnings([

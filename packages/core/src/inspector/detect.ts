@@ -5,6 +5,7 @@ import type { ProjectSnapshot } from "@soren-sdk/contracts";
 import {
   digestFile,
   findProjectFiles,
+  isRegularFile,
   projectRelativePath,
   readText
 } from "./filesystem.js";
@@ -124,6 +125,7 @@ function configurationKind(projectPath: string): string | null {
   if (/^astro\.config\./.test(name)) return "astro";
   if (/^svelte\.config\./.test(name)) return "svelte";
   if (/^nuxt\.config\./.test(name)) return "nuxt";
+  if (name === "pnpm-workspace.yaml") return "workspace-pnpm";
   if (projectPath.includes("/.storybook/") || projectPath.startsWith(".storybook/")) {
     if (/^main\./.test(name)) return "storybook-main";
     if (/^preview\./.test(name)) return "storybook-preview";
@@ -139,9 +141,10 @@ function configurationKind(projectPath: string): string | null {
 }
 
 export function detectConfigurations(
-  root: string
+  root: string,
+  packages: readonly WorkspacePackageRecord[]
 ): ProjectSnapshot["configurations"] {
-  return findProjectFiles(root)
+  const configurations: ProjectSnapshot["configurations"] = findProjectFiles(root)
     .map((path) => {
       const projectPath = projectRelativePath(root, path);
       const kind = configurationKind(projectPath);
@@ -151,12 +154,22 @@ export function detectConfigurations(
     })
     .filter(
       (value): value is ProjectSnapshot["configurations"][number] => value !== null
-    )
-    .sort((left, right) =>
-      [left.path, left.kind].join("\0").localeCompare(
-        [right.path, right.kind].join("\0")
-      )
     );
+
+  for (const workspace of packages) {
+    if (!isRegularFile(workspace.manifestPath)) continue;
+    configurations.push({
+      kind: "package-manifest",
+      path: projectRelativePath(root, workspace.manifestPath),
+      digest: digestFile(workspace.manifestPath)
+    });
+  }
+
+  return configurations.sort((left, right) =>
+    [left.path, left.kind].join("\0").localeCompare(
+      [right.path, right.kind].join("\0")
+    )
+  );
 }
 
 export function detectPolicies(root: string): ProjectSnapshot["policies"] {

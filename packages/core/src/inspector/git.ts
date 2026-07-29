@@ -20,6 +20,9 @@ interface GitMarkerInvalid {
 
 type GitMarker = GitMarkerNone | GitMarkerDirectory | GitMarkerInvalid;
 
+const COMMIT_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
+const REF_PATTERN = /^refs\/[A-Za-z0-9._/-]+$/;
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "unknown error";
 }
@@ -31,6 +34,20 @@ function isMissing(error: unknown): boolean {
     "code" in error &&
     error.code === "ENOENT"
   );
+}
+
+function normalizedCommit(value: string): string | null {
+  const commit = value.trim();
+  return COMMIT_PATTERN.test(commit) ? commit.toLowerCase() : null;
+}
+
+function safeRef(value: string): string | null {
+  const ref = value.trim();
+  if (!REF_PATTERN.test(ref)) return null;
+  if (ref.split("/").some((segment) => segment === ".." || segment === "")) {
+    return null;
+  }
+  return ref;
 }
 
 function gitDirectory(root: string): GitMarker {
@@ -83,16 +100,18 @@ function packedRef(directory: string, ref: string): string | null {
   for (const line of readText(path).split(/\r?\n/)) {
     if (line === "" || line.startsWith("#") || line.startsWith("^")) continue;
     const [commit, name] = line.split(" ");
-    if (name === ref && commit !== undefined) return commit;
+    if (name === ref && commit !== undefined) return normalizedCommit(commit);
   }
   return null;
 }
 
-function resolveRef(gitDir: string, ref: string): string | null {
+function resolveRef(gitDir: string, refValue: string): string | null {
+  const ref = safeRef(refValue);
+  if (ref === null) return null;
   const common = commonDirectory(gitDir);
   for (const directory of [gitDir, common]) {
     const path = join(directory, ref);
-    if (isRegularFile(path)) return readText(path).trim() || null;
+    if (isRegularFile(path)) return normalizedCommit(readText(path));
     const packed = packedRef(directory, ref);
     if (packed !== null) return packed;
   }
@@ -120,10 +139,14 @@ export function detectRevision(root: string): RevisionDetection {
   try {
     const headPath = join(marker.directory, "HEAD");
     const head = readText(headPath).trim();
-    const ref = /^ref:\s*(.+)$/.exec(head);
+    const refMatch = /^ref:\s*(.+)$/.exec(head);
     const commit =
-      ref === null ? head || null : resolveRef(marker.directory, ref[1] as string);
-    if (commit === null) warnings.push("Git HEAD could not be resolved to a commit.");
+      refMatch === null
+        ? normalizedCommit(head)
+        : resolveRef(marker.directory, refMatch[1] as string);
+    if (commit === null) {
+      warnings.push("Git HEAD could not be resolved to a valid commit hash.");
+    }
     return {
       revision: { vcs: "git", commit, dirty: true },
       warnings

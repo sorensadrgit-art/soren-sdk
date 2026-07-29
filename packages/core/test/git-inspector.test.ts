@@ -78,6 +78,30 @@ describe("static git revision detection", () => {
     }
   });
 
+  it("does not expose arbitrary detached HEAD content", async () => {
+    const project = await root();
+    try {
+      await mkdir(join(project.path, ".git"), { recursive: true });
+      await writeFile(join(project.path, ".git", "HEAD"), "super-secret-value\n");
+      const result = detectRevision(project.path);
+      expect(result.revision.commit).toBeNull();
+      expect(JSON.stringify(result)).not.toContain("super-secret-value");
+    } finally {
+      await project.cleanup();
+    }
+  });
+
+  it("rejects unsafe ref paths", async () => {
+    const project = await root();
+    try {
+      await mkdir(join(project.path, ".git"), { recursive: true });
+      await writeFile(join(project.path, ".git", "HEAD"), "ref: refs/../../secret\n");
+      expect(detectRevision(project.path).revision.commit).toBeNull();
+    } finally {
+      await project.cleanup();
+    }
+  });
+
   it("reports malformed gitdir files as unknown instead of non-git", async () => {
     const project = await root();
     try {

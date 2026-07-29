@@ -18,13 +18,17 @@ const IGNORED_DIRECTORIES = new Set([
   ".cache",
   ".git",
   ".next",
+  ".output",
+  ".parcel-cache",
   ".svelte-kit",
   ".turbo",
+  ".vercel",
   ".vite",
   "build",
   "coverage",
   "dist",
-  "node_modules"
+  "node_modules",
+  "out"
 ]);
 
 function errorMessage(error: unknown): string {
@@ -129,32 +133,32 @@ export function isRegularFile(path: string): boolean {
   }
 }
 
-function walkDirectories(root: string, current: string, packages: string[]): void {
+function walkDirectories(current: string, packages: string[]): void {
   const manifest = join(current, "package.json");
   if (isRegularFile(manifest)) packages.push(current);
 
   for (const entry of readdirSync(current, { withFileTypes: true })) {
     if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
     if (IGNORED_DIRECTORIES.has(entry.name)) continue;
-    walkDirectories(root, join(current, entry.name), packages);
+    walkDirectories(join(current, entry.name), packages);
   }
 }
 
 export function findPackageDirectories(root: string): string[] {
   const packages: string[] = [];
-  walkDirectories(root, root, packages);
+  walkDirectories(root, packages);
   return packages.sort((left, right) =>
     projectRelativePath(root, left).localeCompare(projectRelativePath(root, right))
   );
 }
 
-function walkFiles(root: string, current: string, files: string[]): void {
+function walkFiles(current: string, files: string[]): void {
   for (const entry of readdirSync(current, { withFileTypes: true })) {
     if (entry.isSymbolicLink()) continue;
     const path = join(current, entry.name);
     if (entry.isDirectory()) {
       if (IGNORED_DIRECTORIES.has(entry.name)) continue;
-      walkFiles(root, path, files);
+      walkFiles(path, files);
       continue;
     }
     if (entry.isFile()) files.push(path);
@@ -163,7 +167,7 @@ function walkFiles(root: string, current: string, files: string[]): void {
 
 export function findProjectFiles(root: string): string[] {
   const files: string[] = [];
-  walkFiles(root, root, files);
+  walkFiles(root, files);
   return files.sort((left, right) =>
     projectRelativePath(root, left).localeCompare(projectRelativePath(root, right))
   );

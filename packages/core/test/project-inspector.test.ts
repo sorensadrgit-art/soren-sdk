@@ -64,6 +64,7 @@ describe("project inspector", () => {
       expect(snapshot.targets.browsers).toEqual(["> 0.5%", "not dead"]);
       expect(snapshot.configurations.map((item) => item.kind)).toEqual([
         "nextjs",
+        "package-manifest",
         "typescript"
       ]);
       expect(snapshot.snapshotId).toMatch(/^sha256:[0-9a-f]{64}$/);
@@ -110,10 +111,18 @@ describe("project inspector", () => {
         "packages/ui"
       ]);
       expect(snapshot.dependencies.some((item) => item.name === "gsap")).toBe(true);
-      expect(snapshot.configurations.map((item) => item.kind)).toEqual([
-        "storybook-main",
-        "shadcn"
-      ]);
+      expect(snapshot.configurations.some((item) => item.kind === "storybook-main")).toBe(
+        true
+      );
+      expect(snapshot.configurations.some((item) => item.kind === "shadcn")).toBe(
+        true
+      );
+      expect(
+        snapshot.configurations.filter((item) => item.kind === "package-manifest")
+      ).toHaveLength(3);
+      expect(snapshot.configurations.some((item) => item.kind === "workspace-pnpm")).toBe(
+        true
+      );
     } finally {
       await project.cleanup();
     }
@@ -193,7 +202,7 @@ describe("project inspector", () => {
 
       await writeFile(
         join(project.root, "package.json"),
-        packageJson({ name: "change", dependencies: { react: "19" } })
+        packageJson({ name: "change", scripts: { build: "example" } })
       );
       current = inspectProject({ root: project.root }).snapshotId;
       expect(current).not.toBe(previous);
