@@ -5,7 +5,7 @@ import {
   realpathSync,
   statSync
 } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { sha256Bytes, type Digest } from "@soren-sdk/contracts";
 
@@ -118,12 +118,6 @@ export function projectRelativePath(root: string, absolutePath: string): string 
   return result.split(sep).join("/");
 }
 
-export function resolveInsideProject(root: string, projectPath: string): string {
-  const candidate = resolve(root, projectPath);
-  projectRelativePath(root, candidate);
-  return candidate;
-}
-
 export function isRegularFile(path: string): boolean {
   try {
     const info = lstatSync(path);
@@ -171,8 +165,4 @@ export function findProjectFiles(root: string): string[] {
   return files.sort((left, right) =>
     projectRelativePath(root, left).localeCompare(projectRelativePath(root, right))
   );
-}
-
-export function directoryOf(path: string): string {
-  return dirname(path);
 }

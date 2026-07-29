@@ -9,7 +9,7 @@ import {
   projectRelativePath,
   readText
 } from "./filesystem.js";
-import type { PackageManifest, WorkspacePackageRecord } from "./types.js";
+import type { WorkspacePackageRecord } from "./types.js";
 
 const DEPENDENCY_GROUPS = [
   ["dependencies", "dependency"],
@@ -226,11 +226,4 @@ export function detectTargets(
       .map((runtime) => `${runtime.name}@${runtime.version ?? "unknown"}`)
       .sort()
   };
-}
-
-export function packageManifestForPath(
-  packages: readonly WorkspacePackageRecord[],
-  path: string
-): PackageManifest | undefined {
-  return packages.find((workspace) => workspace.path === path)?.manifest;
 }

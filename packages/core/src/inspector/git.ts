@@ -23,10 +23,6 @@ type GitMarker = GitMarkerNone | GitMarkerDirectory | GitMarkerInvalid;
 const COMMIT_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
 const REF_PATTERN = /^refs\/[A-Za-z0-9._/-]+$/;
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "unknown error";
-}
-
 function isMissing(error: unknown): boolean {
   return (
     typeof error === "object" &&
@@ -58,7 +54,7 @@ function gitDirectory(root: string): GitMarker {
   } catch (error) {
     return isMissing(error)
       ? { kind: "none" }
-      : { kind: "invalid", message: errorMessage(error) };
+      : { kind: "invalid", message: "Unable to inspect .git marker." };
   }
 
   if (info.isDirectory()) {
@@ -82,8 +78,8 @@ function gitDirectory(root: string): GitMarker {
       kind: "directory",
       directory: isAbsolute(value) ? value : resolve(root, value)
     };
-  } catch (error) {
-    return { kind: "invalid", message: errorMessage(error) };
+  } catch {
+    return { kind: "invalid", message: "Unable to read .git marker." };
   }
 }
 
@@ -151,8 +147,8 @@ export function detectRevision(root: string): RevisionDetection {
       revision: { vcs: "git", commit, dirty: true },
       warnings
     };
-  } catch (error) {
-    warnings.push(`Git metadata could not be read: ${errorMessage(error)}`);
+  } catch {
+    warnings.push("Git metadata could not be read.");
     return {
       revision: { vcs: "unknown", commit: null, dirty: true },
       warnings

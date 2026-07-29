@@ -6,9 +6,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   ProjectInspectionError,
-  inspectProject,
-  parsePnpmWorkspacePatterns
+  inspectProject
 } from "../src/index.js";
+import { parsePnpmWorkspacePatterns } from "../src/inspector/workspaces.js";
 
 async function fixture(files: Record<string, string>): Promise<{
   root: string;
@@ -295,11 +295,14 @@ describe("project inspector", () => {
     }
   });
 
-  it("parses pnpm workspace package patterns", () => {
+  it("parses block and inline pnpm workspace package patterns", () => {
     expect(
       parsePnpmWorkspacePatterns(
         "packages:\n  - 'apps/*'\n  - packages/**\n  - '!packages/old'\n"
       )
     ).toEqual(["apps/*", "packages/**", "!packages/old"]);
+    expect(
+      parsePnpmWorkspacePatterns("packages: ['apps/*', \"packages/**\"]\n")
+    ).toEqual(["apps/*", "packages/**"]);
   });
 });

@@ -1,4 +1,4 @@
-import { basename, join } from "node:path";
+import { join } from "node:path";
 
 import {
   findPackageDirectories,
@@ -43,6 +43,34 @@ function parseYamlScalar(value: string): string {
   return withoutComment;
 }
 
+function parseInlineList(source: string): string[] {
+  const values: string[] = [];
+  let current = "";
+  let quote: "'" | '"' | null = null;
+  for (const char of source) {
+    if ((char === "'" || char === '"') && quote === null) {
+      quote = char;
+      current += char;
+      continue;
+    }
+    if (char === quote) {
+      quote = null;
+      current += char;
+      continue;
+    }
+    if (char === "," && quote === null) {
+      const value = parseYamlScalar(current);
+      if (value !== "") values.push(value);
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  const value = parseYamlScalar(current);
+  if (value !== "") values.push(value);
+  return values;
+}
+
 export function parsePnpmWorkspacePatterns(source: string): string[] {
   const lines = source.split(/\r?\n/);
   const patterns: string[] = [];
@@ -50,6 +78,8 @@ export function parsePnpmWorkspacePatterns(source: string): string[] {
   let baseIndent = 0;
   for (const line of lines) {
     if (!inPackages) {
+      const inline = /^\s*packages\s*:\s*\[(.*)\]\s*$/.exec(line);
+      if (inline !== null) return parseInlineList(inline[1] ?? "");
       const match = /^(\s*)packages\s*:\s*$/.exec(line);
       if (match !== null) {
         inPackages = true;
@@ -62,8 +92,8 @@ export function parsePnpmWorkspacePatterns(source: string): string[] {
     if (indent <= baseIndent && !line.trimStart().startsWith("-")) break;
     const item = /^\s*-\s*(.+)$/.exec(line);
     if (item !== null) {
-      const value = parseYamlScalar(item[1] ?? "");
-      if (value !== "") patterns.push(value);
+      const itemValue = parseYamlScalar(item[1] ?? "");
+      if (itemValue !== "") patterns.push(itemValue);
     }
   }
   return patterns;
@@ -121,7 +151,8 @@ export function detectWorkspaces(
 ): WorkspaceDetection {
   const warnings: string[] = [];
   const pnpmWorkspacePath = join(root, "pnpm-workspace.yaml");
-  const pnpmPatterns = isRegularFile(pnpmWorkspacePath)
+  const hasPnpmWorkspace = isRegularFile(pnpmWorkspacePath);
+  const pnpmPatterns = hasPnpmWorkspace
     ? parsePnpmWorkspacePatterns(readText(pnpmWorkspacePath))
     : [];
   const packagePatterns = packageJsonWorkspacePatterns(rootManifest);
@@ -130,6 +161,10 @@ export function detectWorkspaces(
   const excludes = patterns
     .filter((pattern) => pattern.startsWith("!"))
     .map((pattern) => pattern.slice(1));
+
+  if (hasPnpmWorkspace && pnpmPatterns.length === 0) {
+    warnings.push("pnpm-workspace.yaml contains no readable package patterns.");
+  }
 
   const directories = findPackageDirectories(root);
   const selected = directories.filter((directory) => {
@@ -179,8 +214,4 @@ export function detectWorkspaces(
     packages,
     warnings: [...new Set(warnings)].sort()
   };
-}
-
-export function workspaceDisplayName(path: string): string {
-  return path === "." ? basename(process.cwd()) : path;
 }
