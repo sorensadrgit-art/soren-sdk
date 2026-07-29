@@ -1,5 +1,5 @@
 import { lstatSync, readFileSync } from "node:fs";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 
 import { isRegularFile, readText } from "./filesystem.js";
 import type { RevisionDetection } from "./types.js";
