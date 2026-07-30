@@ -8,7 +8,7 @@ import {
 } from "@soren-sdk/contracts";
 
 import { collectProviderCandidates } from "./candidates.js";
-import { assignCapabilities } from "./ownership.js";
+import { assignCapabilities, findOwnershipConflict } from "./ownership.js";
 import {
   getPhase4CompanionIntegrationIds,
   getRequiredCompanionIntegrationIds,
@@ -25,8 +25,24 @@ interface ProviderSetScore {
   confidence: number;
 }
 
+interface RankedProviderSet {
+  providerSet: ProviderCandidate[];
+  score: ProviderSetScore;
+  hasOwnershipConflict: boolean;
+}
+
 function json(value: unknown): JsonValue {
   return JSON.parse(JSON.stringify(value)) as JsonValue;
+}
+
+function requiredCapabilities(input: RouteInput): string[] {
+  return [
+    ...new Set(
+      input.request.capabilities
+        .filter((capability) => capability.required)
+        .map((capability) => capability.id)
+    )
+  ].sort();
 }
 
 function requiredSdkCapabilities(input: RouteInput): string[] {
@@ -36,13 +52,19 @@ function requiredSdkCapabilities(input: RouteInput): string[] {
       .filter((capability) => capability.native)
       .map((capability) => capability.id)
   );
-  return [
-    ...new Set(
-      input.request.capabilities
-        .filter((capability) => capability.required && !native.has(capability.id))
-        .map((capability) => capability.id)
-    )
-  ].sort();
+  return requiredCapabilities(input).filter(
+    (capabilityId) => !native.has(capabilityId)
+  );
+}
+
+function requiredNativeCapabilities(input: RouteInput): string[] {
+  const catalog = input.catalog.getCapabilityCatalog();
+  const native = new Set(
+    catalog.capabilities
+      .filter((capability) => capability.native)
+      .map((capability) => capability.id)
+  );
+  return requiredCapabilities(input).filter((capabilityId) => native.has(capabilityId));
 }
 
 function subsets(candidates: readonly ProviderCandidate[]): ProviderCandidate[][] {
@@ -136,31 +158,53 @@ function sameScore(left: ProviderSetScore, right: ProviderSetScore): boolean {
   return compareScore(left, right) === 0;
 }
 
-function topTiedProviderSets(input: RouteInput): ProviderCandidate[][] {
-  const capabilities = requiredSdkCapabilities(input);
-  if (capabilities.length === 0) return [];
+function rankedProviderSets(input: RouteInput): RankedProviderSet[] {
+  const sdkCapabilities = requiredSdkCapabilities(input);
+  if (sdkCapabilities.length === 0) return [];
+  const allCapabilities = requiredCapabilities(input);
+  const nativeCapabilities = requiredNativeCapabilities(input);
   const policy = input.policy ?? PHASE_4_POLICY;
   const collection = collectProviderCandidates({
     catalog: input.catalog,
     project: input.project,
     request: input.request,
     policy,
-    requiredCapabilityIds: new Set(capabilities)
+    requiredCapabilityIds: new Set(allCapabilities)
   });
-  const providerSets = subsets(
+  const webPlatform = collection.candidates.find(
+    (candidate) => candidate.providerId === "web-platform"
+  );
+  if (nativeCapabilities.length > 0 && webPlatform === undefined) return [];
+
+  return subsets(
     collection.candidates.filter(
       (candidate) => candidate.providerId !== "web-platform"
     )
   )
-    .filter((providerSet) => covers(providerSet, capabilities))
+    .filter((providerSet) => covers(providerSet, sdkCapabilities))
     .filter(
       (providerSet) =>
         providerSet.length <= input.request.preferences.maxProviders
     )
-    .map((providerSet) => ({
-      providerSet,
-      score: score(providerSet, capabilities)
-    }))
+    .map((providerSet) => {
+      const internallySelected = [
+        ...(nativeCapabilities.length > 0 && webPlatform !== undefined
+          ? [webPlatform]
+          : []),
+        ...providerSet
+      ];
+      const assignments = assignCapabilities(
+        internallySelected,
+        allCapabilities,
+        input.catalog.getCapabilityCatalog(),
+        input.request
+      );
+      return {
+        providerSet,
+        score: score(providerSet, sdkCapabilities),
+        hasOwnershipConflict: findOwnershipConflict(assignments) !== null
+      };
+    })
     .sort((left, right) => {
       const result = compareScore(left.score, right.score);
       if (result !== 0) return result;
@@ -171,11 +215,25 @@ function topTiedProviderSets(input: RouteInput): ProviderCandidate[][] {
           right.providerSet.map((provider) => provider.providerId).join("\u0000")
         );
     });
-  const best = providerSets[0];
+}
+
+function topTiedProviderSets(input: RouteInput): ProviderCandidate[][] {
+  const valid = rankedProviderSets(input).filter(
+    (candidate) => !candidate.hasOwnershipConflict
+  );
+  const best = valid[0];
   if (best === undefined) return [];
-  return providerSets
+  return valid
     .filter((candidate) => sameScore(candidate.score, best.score))
     .map((candidate) => candidate.providerSet);
+}
+
+function firstConflictingProviderSet(input: RouteInput): ProviderCandidate[] | null {
+  return (
+    rankedProviderSets(input).find(
+      (candidate) => candidate.hasOwnershipConflict
+    )?.providerSet ?? null
+  );
 }
 
 function selectedIntegrationIds(
@@ -245,7 +303,15 @@ function providerBehavior(
       limitations: [...claim.limitations].sort()
     }))
     .sort((left, right) => left.capability.localeCompare(right.capability));
-  return json({ assignments, claims, integrations });
+  return json({
+    assignments,
+    claims,
+    integrations,
+    verification: {
+      requiredChecks: [...candidate.manifest.verification.requiredChecks].sort(),
+      hardGates: [...candidate.manifest.verification.hardGates].sort()
+    }
+  });
 }
 
 function behaviorSignature(
@@ -273,8 +339,10 @@ function behaviorSignature(
   return canonicalJson(json(behaviors));
 }
 
-function equivalentWinner(input: RouteInput): string[] | null {
-  const tied = topTiedProviderSets(input);
+function equivalentWinner(
+  input: RouteInput,
+  tied: readonly ProviderCandidate[][]
+): string[] | null {
   if (tied.length < 2) return null;
   const signatures = new Set(
     tied.map((providerSet) => behaviorSignature(providerSet, input))
@@ -290,17 +358,13 @@ function equivalentWinner(input: RouteInput): string[] | null {
 }
 
 function candidateMap(input: RouteInput): Map<string, ProviderCandidate> {
-  const requiredCapabilityIds = new Set(
-    input.request.capabilities
-      .filter((capability) => capability.required)
-      .map((capability) => capability.id)
-  );
+  const allRequiredCapabilities = requiredCapabilities(input);
   const collection = collectProviderCandidates({
     catalog: input.catalog,
     project: input.project,
     request: input.request,
     policy: input.policy ?? PHASE_4_POLICY,
-    requiredCapabilityIds
+    requiredCapabilityIds: new Set(allRequiredCapabilities)
   });
   return new Map(
     collection.candidates.map((candidate) => [candidate.providerId, candidate])
@@ -366,6 +430,28 @@ function rebuildPlan(
   return rebuilt;
 }
 
+function resolveWithPreferredProviders(
+  input: RouteInput,
+  preferredProviderIds: readonly string[],
+  originalPreferredProviders: readonly string[]
+): RoutePlan {
+  const preferredProviders = [
+    ...preferredProviderIds,
+    ...originalPreferredProviders.filter(
+      (providerId) => !preferredProviderIds.includes(providerId)
+    )
+  ];
+  const request: RouteRequest = {
+    ...input.request,
+    preferences: {
+      ...input.request.preferences,
+      preferredProviders
+    }
+  };
+  const resolved = routeCapabilitiesBase({ ...input, request });
+  return rebuildPlan(resolved, input, originalPreferredProviders);
+}
+
 export function routeCapabilities(input: RouteInput): RoutePlan {
   const originalPreferredProviders = [
     ...input.request.preferences.preferredProviders
@@ -378,21 +464,29 @@ export function routeCapabilities(input: RouteInput): RoutePlan {
     return rebuildPlan(initial, input, originalPreferredProviders);
   }
 
-  const winner = equivalentWinner(input);
+  const tied = topTiedProviderSets(input);
+  if (tied.length === 1) {
+    return resolveWithPreferredProviders(
+      input,
+      tied[0]?.map((provider) => provider.providerId) ?? [],
+      originalPreferredProviders
+    );
+  }
+  if (tied.length === 0) {
+    const conflicting = firstConflictingProviderSet(input);
+    if (conflicting === null) return initial;
+    return resolveWithPreferredProviders(
+      input,
+      conflicting.map((provider) => provider.providerId),
+      originalPreferredProviders
+    );
+  }
+
+  const winner = equivalentWinner(input, tied);
   if (winner === null) return initial;
-  const preferredProviders = [
-    ...winner,
-    ...originalPreferredProviders.filter(
-      (providerId) => !winner.includes(providerId)
-    )
-  ];
-  const request: RouteRequest = {
-    ...input.request,
-    preferences: {
-      ...input.request.preferences,
-      preferredProviders
-    }
-  };
-  const resolved = routeCapabilitiesBase({ ...input, request });
-  return rebuildPlan(resolved, input, originalPreferredProviders);
+  return resolveWithPreferredProviders(
+    input,
+    winner,
+    originalPreferredProviders
+  );
 }
