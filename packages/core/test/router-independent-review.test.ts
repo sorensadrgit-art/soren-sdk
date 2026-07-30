@@ -36,6 +36,22 @@ describe("independent review: environment compatibility", () => {
     );
   });
 
+  it("does not treat Browserslist exclusions as positive WAAPI targets", () => {
+    const project = projectFixture();
+    project.targets.browsers = ["defaults", "not ie 11", "not op_mini all"];
+
+    const plan = routeCapabilities({
+      request: requestFixture({
+        required: ["platform.waapi-animation"],
+        projectSnapshotId: project.snapshotId
+      }),
+      project,
+      catalog: new MemoryCatalogFixture()
+    });
+
+    expect(plan.status).toBe("native");
+  });
+
   it("blocks Motion when the declared React range excludes React 18.2", () => {
     const project = projectFixture({ reactVersion: "<18.2.0" });
 
@@ -85,6 +101,37 @@ describe("independent review: integration policy", () => {
           }
         }
       }
+    });
+
+    expect(plan.status).toBe("blocked");
+    expect(plan.rejectedProviders).toContainEqual(
+      expect.objectContaining({
+        providerId: "motion",
+        reasonCode: "POLICY_DENIED"
+      })
+    );
+  });
+
+  it("rejects a runtime that requires an unavailable authorization grant", () => {
+    const motion = manifestFixture("motion", ["motion.spring"]);
+    const runtime = motion.integrations.find(
+      (integration) => integration.id === "motion-runtime"
+    );
+    if (runtime === undefined) throw new Error("Expected Motion runtime fixture.");
+    runtime.authorization = {
+      required: true,
+      method: "oauth",
+      paidPlan: false
+    };
+
+    const project = projectFixture();
+    const plan = routeCapabilities({
+      request: requestFixture({
+        required: ["motion.spring"],
+        projectSnapshotId: project.snapshotId
+      }),
+      project,
+      catalog: new MemoryCatalogFixture([schemaRecordFixture(motion)])
     });
 
     expect(plan.status).toBe("blocked");
