@@ -3,6 +3,9 @@ name: gsap
 description: Use when complex timelines, SVG choreography, FLIP, ScrollTrigger, or pinned storytelling require GSAP.
 license: MIT
 compatibility: Soren SDK Phase 4; JavaScript framework runtimes; no executable scripts
+metadata:
+  publisher: soren-sdk
+  version: 1.0.0
 source: ./docs.sources.json
 source-digest: sha256:0cb05d30bb647ff15b646a32bab5963f28cb0b5f67b4a56d8385f2bc7ef89dec
 ---
