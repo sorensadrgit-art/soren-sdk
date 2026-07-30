@@ -19,10 +19,6 @@ describe("Phase 4 companion runtime artifacts", () => {
     const gsapWithoutScrollTrigger = manifestFixture("gsap", [
       "scroll.triggered-animation"
     ]);
-    gsapWithoutScrollTrigger.integrations =
-      gsapWithoutScrollTrigger.integrations.filter(
-        (integration) => integration.id !== "gsap-scroll-trigger-runtime"
-      );
     const project = projectFixture();
     const plan = routeCapabilities({
       request: requestFixture({
@@ -67,5 +63,80 @@ describe("Phase 4 deterministic tie resolution", () => {
 
     expect(plan.status).toBe("selected");
     expect(providerIds(plan)).toEqual(["gsap"]);
+  });
+});
+
+describe("Phase 4 adversarial provider policy", () => {
+  it("does not leak a paid runtime integration into the final Route Plan", () => {
+    const motion = manifestFixture("motion", ["motion.spring"]);
+    const runtime = motion.integrations[0];
+    if (runtime === undefined) throw new Error("Expected Motion runtime fixture.");
+    motion.integrations.push({
+      ...structuredClone(runtime),
+      id: "motion-paid-runtime",
+      authorization: {
+        required: true,
+        method: "oauth",
+        paidPlan: true
+      }
+    });
+    const project = projectFixture();
+    const plan = routeCapabilities({
+      request: requestFixture({
+        required: ["motion.spring"],
+        projectSnapshotId: project.snapshotId
+      }),
+      project,
+      catalog: new MemoryCatalogFixture([schemaRecordFixture(motion)])
+    });
+
+    expect(plan.status).toBe("selected");
+    expect(plan.selectedProviders[0]?.integrationIds).toEqual(["motion-runtime"]);
+  });
+
+  it("blocks a provider that does not declare reduced-motion verification", () => {
+    const motion = manifestFixture("motion", ["motion.spring"]);
+    motion.verification.requiredChecks = motion.verification.requiredChecks.filter(
+      (check) => check !== "reduced-motion"
+    );
+    const project = projectFixture();
+    const plan = routeCapabilities({
+      request: requestFixture({
+        required: ["motion.spring"],
+        projectSnapshotId: project.snapshotId
+      }),
+      project,
+      catalog: new MemoryCatalogFixture([schemaRecordFixture(motion)])
+    });
+
+    expect(plan.status).toBe("blocked");
+    expect(plan.rejectedProviders).toContainEqual(
+      expect.objectContaining({
+        providerId: "motion",
+        reasonCode: "POLICY_DENIED"
+      })
+    );
+  });
+
+  it("blocks an unapproved manifest even when catalog health is inconsistent", () => {
+    const motion = manifestFixture("motion", ["motion.spring"]);
+    motion.connector.reviewStatus = "proposed";
+    const project = projectFixture();
+    const plan = routeCapabilities({
+      request: requestFixture({
+        required: ["motion.spring"],
+        projectSnapshotId: project.snapshotId
+      }),
+      project,
+      catalog: new MemoryCatalogFixture([schemaRecordFixture(motion)])
+    });
+
+    expect(plan.status).toBe("blocked");
+    expect(plan.rejectedProviders).toContainEqual(
+      expect.objectContaining({
+        providerId: "motion",
+        reasonCode: "CONNECTOR_UNHEALTHY"
+      })
+    );
   });
 });
