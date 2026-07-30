@@ -3,6 +3,9 @@ name: motion
 description: Use when React animation needs presence, layout projection, shared layout, springs, drag, or gestures.
 license: LicenseRef-Motion-AI-Kit
 compatibility: Soren SDK Phase 4; React 18.2 or newer; no executable scripts
+metadata:
+  publisher: soren-sdk
+  version: 1.0.0
 source: ./docs.sources.json
 source-digest: sha256:c2f71abd6582ca5bebff28a143cfe77d552a765570c43aa6f5a8b3b03532c4a0
 ---
