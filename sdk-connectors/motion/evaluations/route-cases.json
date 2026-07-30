@@ -1,0 +1,55 @@
+{
+  "providerId": "motion",
+  "version": "1.0.0",
+  "cases": [
+    {
+      "id": "presence",
+      "capabilities": ["motion.presence"],
+      "expectedProviders": ["motion"]
+    },
+    {
+      "id": "layout",
+      "capabilities": ["motion.layout"],
+      "expectedProviders": ["motion"]
+    },
+    {
+      "id": "shared-layout",
+      "capabilities": ["motion.shared-layout"],
+      "expectedProviders": ["motion"]
+    },
+    {
+      "id": "spring",
+      "capabilities": ["motion.spring"],
+      "expectedProviders": ["motion"]
+    },
+    {
+      "id": "drag",
+      "capabilities": ["interaction.drag"],
+      "expectedProviders": ["motion"]
+    },
+    {
+      "id": "gesture",
+      "capabilities": ["interaction.gesture"],
+      "expectedProviders": ["motion"]
+    },
+    {
+      "id": "installed-motion-reuse",
+      "capabilities": ["motion.layout"],
+      "dependencies": ["motion"],
+      "expectedReasonCode": "EXISTING_DEPENDENCY_REUSE"
+    },
+    {
+      "id": "framer-motion-alias-reuse",
+      "capabilities": ["motion.presence"],
+      "dependencies": ["framer-motion"],
+      "expectedReasonCode": "EXISTING_DEPENDENCY_REUSE"
+    },
+    {
+      "id": "unsupported-react",
+      "capabilities": ["motion.layout"],
+      "reactVersion": "17.0.2",
+      "expectedStatus": "blocked",
+      "expectedReasonCode": "ENVIRONMENT_UNSUPPORTED"
+    }
+  ]
+}
