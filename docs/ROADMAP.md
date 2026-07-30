@@ -2,9 +2,9 @@
 
 ## Strategy
 
-Build secure, inspectable, read-only vertical slices before enabling routing, external tools, or project mutation.
+Build secure, inspectable, read-only vertical slices before enabling external tools, package installation, code generation, or project mutation.
 
-Release `0.1` remains read-only. Package installation, command execution, and project writes are excluded until the apply sandbox receives an independent security review.
+Release `0.1` remains read-only. Package installation, command execution, and project writes are excluded until an apply sandbox receives an independent security review.
 
 ## Status
 
@@ -12,7 +12,8 @@ Release `0.1` remains read-only. Package installation, command execution, and pr
 - ✅ Phase 1 — Versioned contracts
 - ✅ Phase 2 — Connector catalog, health, snapshots, SQLite, and CLI
 - ✅ Phase 3 — Static content-addressed project inspector
-- ▶️ Phase 4 — Web Platform + Motion + GSAP routing vertical slice
+- ✅ Phase 4 — Web Platform + Motion + GSAP routing vertical slice
+- ▶️ Phase 5 — Policy, configuration, and lockfile enforcement
 
 ---
 
@@ -78,26 +79,26 @@ Known intentional limitation:
 
 - Git projects are conservatively reported dirty because the inspector does not execute `git status`.
 
----
+## Phase 4 — Native-first routing vertical slice ✅
 
-## Phase 4 — First routing vertical slice ▶️
+Delivered providers:
 
-Implement only:
+1. Web Platform
+2. Motion
+3. GSAP
 
-- Web Platform
-- Motion
-- GSAP
-
-Capabilities:
+Delivered capabilities:
 
 - CSS transitions and animations
 - Web Animations API
 - Presence and layout animation
+- Shared layout and springs
 - Gesture and drag
-- Timelines
+- Timelines and SVG choreography
+- FLIP
 - ScrollTrigger and pinned sequences
 
-Route outcomes:
+Delivered route outcomes:
 
 - `native`
 - `selected`
@@ -105,26 +106,32 @@ Route outcomes:
 - `needs-input`
 - `blocked`
 
-Required behavior:
+Delivered behavior:
 
 - Native Web Platform candidates are evaluated first.
 - Existing approved dependencies receive a reuse preference.
 - Hard policy and environment constraints run before scoring.
-- Provider sets are minimized.
-- Motion and GSAP cannot own the same property on the same scope.
+- Provider sets are minimized and provider limits are enforced.
+- Motion React claims require React 18.2 or newer.
+- Motion and GSAP cannot exclusively own the same property on the same scope.
 - Ambiguous material decisions return `needs-input`.
 - Impossible routes return `blocked`.
-- Explanations list selected and rejected providers without hidden reasoning.
+- Explanations list selected and rejected providers with stable reason codes.
+- Route identity is independent of creation time, clone path, request order, and catalog order.
+- The CLI accepts explicit capability flags and returns human or canonical JSON plans.
 
-Hard exit gates:
+Exit gates passed:
 
 - Zero hard-policy violations
 - Zero forbidden-provider selections
 - Zero unresolved ownership conflicts
 - Native provider wins simple cases
-- At least 30 positive, negative, and metamorphic fixtures pass
+- 34 positive, negative, composition, and metamorphic route fixtures pass
+- Full lint, typecheck, test, build, contract validation, and CLI smoke gates pass
 
-## Phase 5 — Policy, configuration, and lockfile
+Read [`PHASE-4-NATIVE-FIRST-ROUTER.md`](./PHASE-4-NATIVE-FIRST-ROUTER.md).
+
+## Phase 5 — Policy, configuration, and lockfile ▶️
 
 Add:
 
@@ -287,7 +294,7 @@ A connector is added only when it fills a defined capability gap.
 - [x] Deterministic catalog snapshots work
 - [x] SQLite persistence and integrity checks work
 - [x] Static project inspection works
-- [ ] Web Platform, Motion, and GSAP route correctly
+- [x] Web Platform, Motion, and GSAP route correctly
 - [ ] Policy and lockfile enforcement work
 - [ ] CLI, REST, MCP, and TypeScript SDK are contract-equivalent
 - [ ] Context is selective
