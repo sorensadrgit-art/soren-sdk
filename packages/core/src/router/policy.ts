@@ -42,11 +42,45 @@ export const PHASE_4_POLICY: PolicyDocument = {
   }
 };
 
+export const PHASE_4_COMPANION_REQUIREMENTS: Readonly<
+  Record<string, Readonly<Record<string, readonly string[]>>>
+> = {
+  gsap: {
+    "motion.flip": ["gsap-flip-runtime"],
+    "scroll.pinned-sequence": ["gsap-scroll-trigger-runtime"],
+    "scroll.triggered-animation": ["gsap-scroll-trigger-runtime"]
+  },
+  motion: {},
+  "web-platform": {}
+};
+
 assertContract<PolicyDocument>("policy", PHASE_4_POLICY);
+
+export function getRequiredCompanionIntegrationIds(
+  providerId: string,
+  capabilityId: string
+): string[] {
+  return [
+    ...(PHASE_4_COMPANION_REQUIREMENTS[providerId]?.[capabilityId] ?? [])
+  ].sort();
+}
+
+export function getPhase4CompanionIntegrationIds(
+  providerId: string
+): Set<string> {
+  return new Set(
+    Object.values(PHASE_4_COMPANION_REQUIREMENTS[providerId] ?? {}).flat()
+  );
+}
 
 export function getPolicySnapshotId(
   policy: PolicyDocument = PHASE_4_POLICY
 ): Digest {
   assertContract<PolicyDocument>("policy", policy);
-  return digestJson(json(policy));
+  return digestJson(
+    json({
+      policy,
+      companionRequirements: PHASE_4_COMPANION_REQUIREMENTS
+    })
+  );
 }
