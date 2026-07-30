@@ -1,9 +1,9 @@
 {
   "providerId": "motion",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "runtime": {
     "package": "motion",
-    "version": "12.42.1",
+    "version": "12.42.2",
     "imports": {
       "react": "motion/react",
       "javascript": "motion"
