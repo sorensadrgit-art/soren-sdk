@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/connector.schema.json",
   "schemaVersion": "2.0.0-draft.1",
-  "connectorVersion": "1.0.1",
+  "connectorVersion": "1.0.2",
   "connector": {
     "id": "motion",
     "name": "Motion connector",
@@ -144,7 +144,7 @@
       "id": "motion-ai-kit-mcp",
       "kind": "mcp-server",
       "mode": "tool",
-      "status": "available",
+      "status": "unverified",
       "source": "https://motion.dev/docs/ai-kit-install",
       "version": { "status": "resolved", "value": "6.2.0" },
       "protocol": {
@@ -168,6 +168,7 @@
       "fallback": "motion-documentation",
       "notes": [
         "Hosted MCP metadata only; never selectable by the Phase 4 runtime router.",
+        "The artifact remains unverified until a supported MCP protocol version is recorded.",
         "Documentation and CSS-generation tools can be used without authentication; signing in enables Motion+ features."
       ]
     }
