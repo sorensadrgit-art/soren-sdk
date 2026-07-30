@@ -1,7 +1,8 @@
 import {
   canonicalJson,
   type JsonValue,
-  type ProjectSnapshot
+  type ProjectSnapshot,
+  type RoutePlan
 } from "@soren-sdk/contracts";
 import type {
   ConnectorHealthReport,
@@ -59,5 +60,39 @@ export function formatProjectSnapshot(snapshot: ProjectSnapshot): string {
     `runtime targets: ${snapshot.targets.runtimes.join(", ") || "none"}`
   ];
   for (const warning of snapshot.warnings) lines.push(`warning: ${warning}`);
+  return `${lines.join("\n")}\n`;
+}
+
+export function formatRoutePlan(plan: RoutePlan): string {
+  const providers = plan.selectedProviders.map((item) => item.providerId);
+  const lines = [
+    `Route status: ${plan.status}`,
+    `providers: ${providers.join(", ") || "none"}`,
+    `plan: ${plan.planId}`,
+    `project snapshot: ${plan.projectSnapshotId}`,
+    `catalog snapshot: ${plan.catalogSnapshotId}`,
+    `policy snapshot: ${plan.policySnapshotId}`
+  ];
+  for (const provider of plan.selectedProviders) {
+    lines.push(
+      `selected: ${provider.providerId} [${provider.reasonCode}] ${provider.capabilities.join(", ")}`
+    );
+  }
+  for (const rejected of plan.rejectedProviders) {
+    lines.push(
+      `rejected: ${rejected.providerId} [${rejected.reasonCode}] ${rejected.reason}`
+    );
+  }
+  for (const ownership of plan.ownership) {
+    lines.push(
+      `ownership: ${ownership.providerId} ${ownership.scope} ${ownership.properties.join(", ")}`
+    );
+  }
+  for (const item of plan.constraints) {
+    lines.push(`constraint: ${item.code} ${item.status} ${item.message}`);
+  }
+  for (const requiredInput of plan.requiredInput) {
+    lines.push(`required input: ${requiredInput}`);
+  }
   return `${lines.join("\n")}\n`;
 }
