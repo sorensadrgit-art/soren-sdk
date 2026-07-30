@@ -1,0 +1,56 @@
+{
+  "providerId": "gsap",
+  "version": "1.0.0",
+  "cases": [
+    {
+      "id": "timeline",
+      "capabilities": ["motion.timeline"],
+      "expectedProviders": ["gsap"]
+    },
+    {
+      "id": "svg-choreography",
+      "capabilities": ["motion.svg"],
+      "expectedProviders": ["gsap"]
+    },
+    {
+      "id": "flip",
+      "capabilities": ["motion.flip"],
+      "expectedProviders": ["gsap"]
+    },
+    {
+      "id": "scroll-trigger",
+      "capabilities": ["scroll.triggered-animation"],
+      "expectedProviders": ["gsap"]
+    },
+    {
+      "id": "pinned-sequence",
+      "capabilities": ["scroll.pinned-sequence"],
+      "expectedProviders": ["gsap"]
+    },
+    {
+      "id": "installed-gsap-reuse",
+      "capabilities": ["motion.timeline"],
+      "dependencies": ["gsap"],
+      "expectedReasonCode": "EXISTING_DEPENDENCY_REUSE"
+    },
+    {
+      "id": "motion-composition-separate-scope",
+      "capabilities": ["motion.layout", "motion.timeline"],
+      "quality": {
+        "motion.layout": { "scope": "card-grid", "property": "layout" },
+        "motion.timeline": { "scope": "hero", "property": "transform" }
+      },
+      "expectedProviders": ["motion", "gsap"]
+    },
+    {
+      "id": "motion-composition-conflict",
+      "capabilities": ["motion.layout", "motion.timeline"],
+      "quality": {
+        "motion.layout": { "scope": "hero", "property": "transform" },
+        "motion.timeline": { "scope": "hero", "property": "transform" }
+      },
+      "expectedStatus": "blocked",
+      "expectedReasonCode": "OWNERSHIP_CONFLICT"
+    }
+  ]
+}
