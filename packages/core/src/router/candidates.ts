@@ -6,6 +6,7 @@ import type {
 } from "@soren-sdk/contracts";
 
 import type { CatalogReader, ConnectorRecord } from "../catalog/types.js";
+import { getRequiredCompanionIntegrationIds } from "./policy.js";
 import type {
   ProviderCandidate,
   ProviderRejection,
@@ -122,15 +123,6 @@ function integrationAllowed(
   return true;
 }
 
-function hasRelevantClaim(
-  record: Extract<ConnectorRecord, { kind: "schema-v2" }>,
-  requiredCapabilityIds: ReadonlySet<string>
-): boolean {
-  return record.manifest.capabilityClaims.some((claim) =>
-    requiredCapabilityIds.has(claim.capability)
-  );
-}
-
 function hasDependencyReuse(
   record: Extract<ConnectorRecord, { kind: "schema-v2" }>,
   project: ProjectSnapshot
@@ -182,34 +174,20 @@ function hardConstraintFailure(
     return reject(id, "POLICY_DENIED", `Experimental provider "${id}" is not allowed.`);
   }
 
-  if (!hasRelevantClaim(record, input.requiredCapabilityIds)) {
-    return reject(
-      id,
-      "CAPABILITY_NOT_SUPPORTED",
-      `Provider "${id}" does not claim a required capability.`
-    );
-  }
-
   if (id === "motion") {
-    const version = reactVersion(input.project);
-    if (version === null || !atLeast(version, [18, 2, 0])) {
-      return reject(
-        id,
-        "ENVIRONMENT_UNSUPPORTED",
-        "Motion React capabilities require React 18.2 or newer."
-      );
-    }
-  }
-
-  const runtimeIntegrations = record.manifest.integrations.filter((integration) =>
-    integrationAllowed(integration, request, policy)
-  );
-  if (runtimeIntegrations.length === 0) {
-    return reject(
-      id,
-      "POLICY_DENIED",
-      `Provider "${id}" has no policy-approved available runtime integration.`
+    const hasRequiredMotionClaim = record.manifest.capabilityClaims.some((claim) =>
+      input.requiredCapabilityIds.has(claim.capability)
     );
+    if (hasRequiredMotionClaim) {
+      const version = reactVersion(input.project);
+      if (version === null || !atLeast(version, [18, 2, 0])) {
+        return reject(
+          id,
+          "ENVIRONMENT_UNSUPPORTED",
+          "Motion React capabilities require React 18.2 or newer."
+        );
+      }
+    }
   }
 
   return null;
@@ -240,13 +218,61 @@ export function collectProviderCandidates(
       continue;
     }
 
-    const claims = new Map(
-      record.manifest.capabilityClaims.map((claim) => [claim.capability, claim])
+    const runtimeIntegrations = record.manifest.integrations.filter((integration) =>
+      integrationAllowed(integration, input.request, input.policy)
     );
-    const integrationIds = record.manifest.integrations
-      .filter((integration) =>
-        integrationAllowed(integration, input.request, input.policy)
+    if (runtimeIntegrations.length === 0) {
+      rejections.push(
+        reject(
+          id,
+          "POLICY_DENIED",
+          `Provider "${id}" has no policy-approved available runtime integration.`
+        )
+      );
+      continue;
+    }
+
+    const availableIntegrationIds = new Set(
+      runtimeIntegrations.map((integration) => integration.id)
+    );
+    const relevantClaims = record.manifest.capabilityClaims.filter((claim) =>
+      input.requiredCapabilityIds.has(claim.capability)
+    );
+    const eligibleClaims = record.manifest.capabilityClaims.filter((claim) =>
+      getRequiredCompanionIntegrationIds(id, claim.capability).every(
+        (integrationId) => availableIntegrationIds.has(integrationId)
       )
+    );
+    const eligibleRelevantClaims = eligibleClaims.filter((claim) =>
+      input.requiredCapabilityIds.has(claim.capability)
+    );
+
+    if (eligibleRelevantClaims.length === 0) {
+      const missingCompanions = relevantClaims.flatMap((claim) =>
+        getRequiredCompanionIntegrationIds(id, claim.capability).filter(
+          (integrationId) => !availableIntegrationIds.has(integrationId)
+        )
+      );
+      rejections.push(
+        reject(
+          id,
+          "CAPABILITY_NOT_SUPPORTED",
+          missingCompanions.length > 0
+            ? `Provider "${id}" is missing required companion runtime artifacts: ${[
+                ...new Set(missingCompanions)
+              ]
+                .sort()
+                .join(", ")}.`
+            : `Provider "${id}" does not claim a required capability.`
+        )
+      );
+      continue;
+    }
+
+    const claims = new Map(
+      eligibleClaims.map((claim) => [claim.capability, claim])
+    );
+    const integrationIds = runtimeIntegrations
       .map((integration) => integration.id)
       .sort();
     const rank = input.request.preferences.preferredProviders.indexOf(id);
