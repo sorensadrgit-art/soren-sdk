@@ -1,3 +1,12 @@
+---
+name: gsap
+description: Use when complex timelines, SVG choreography, FLIP, ScrollTrigger, or pinned storytelling require GSAP.
+license: MIT
+compatibility: Soren SDK Phase 4; JavaScript framework runtimes; no executable scripts
+source: ./docs.sources.json
+source-digest: sha256:0cb05d30bb647ff15b646a32bab5963f28cb0b5f67b4a56d8385f2bc7ef89dec
+---
+
 # GSAP Routing Skill
 
 Use GSAP for complex sequenced timelines, SVG choreography, FLIP transitions, ScrollTrigger-controlled animation, and pinned storytelling.
@@ -12,7 +21,7 @@ Use GSAP for complex sequenced timelines, SVG choreography, FLIP transitions, Sc
 
 ## Routing guidance
 
-Use the `gsap` runtime package. Reuse an installed approved GSAP dependency when available. Register required plugins explicitly and keep cleanup scoped to the owning component or lifecycle.
+Use the `gsap` runtime package. Reuse an installed approved GSAP dependency when its declared version includes the pinned runtime. Register required plugins explicitly and keep cleanup scoped to the owning component or lifecycle.
 
 Prefer browser-native CSS or WAAPI for simple effects and Motion for React presence, layout, spring, drag, or gesture requirements. Preserve reduced-motion behavior, responsive match-media cleanup, and explicit property ownership.
 
