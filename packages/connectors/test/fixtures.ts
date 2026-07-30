@@ -32,6 +32,10 @@ export async function validConnectorManifest(
   manifest.connector.id = connectorId;
   manifest.connector.name = `${connectorId} connector`;
   manifest.product.canonicalName = connectorId;
+  manifest.relatedFiles.skill.status = "not-applicable";
+  manifest.relatedFiles.sources.status = "not-applicable";
+  manifest.relatedFiles.compatibility.status = "not-applicable";
+  manifest.relatedFiles.evaluations.status = "not-applicable";
   return manifest;
 }
 
