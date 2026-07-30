@@ -7,6 +7,9 @@ import { describe, expect, it } from "vitest";
 
 import { validateRepository } from "../../src/cli/validate-repository.js";
 
+const WEB_PLATFORM_SOURCE_DIGEST =
+  "sha256:8a1f03a2689222031b57186f7172ccae7697037462f688c6576f3a50241016d7";
+
 function repositoryRoot(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 }
@@ -55,12 +58,64 @@ describe("connector Agent Skill validation", () => {
     }
   });
 
+  it("accepts valid YAML with nested publisher and version metadata", async () => {
+    const root = await createSkillFixture(`---
+name: web-platform
+description: "Use when browser-native animation fully satisfies the request."
+license: LicenseRef-Soren-SDK-Internal
+compatibility: Soren SDK Phase 4; browser-native runtime; no executable scripts
+metadata:
+  publisher: soren-sdk
+  version: 1.0.0
+source: ./docs.sources.json
+source-digest: ${WEB_PLATFORM_SOURCE_DIGEST}
+---
+
+# Web Platform Routing Skill
+`);
+    try {
+      const report = validateRepository(root);
+      expect(report.errors).toEqual([]);
+      expect(report.validatedConnectors).toEqual(["web-platform"]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects malformed YAML such as an unterminated quoted scalar", async () => {
+    const root = await createSkillFixture(`---
+name: web-platform
+description: Use when browser-native animation fully satisfies the request.
+license: "unterminated
+compatibility: Soren SDK Phase 4; browser-native runtime; no executable scripts
+metadata:
+  publisher: soren-sdk
+  version: 1.0.0
+source: ./docs.sources.json
+source-digest: ${WEB_PLATFORM_SOURCE_DIGEST}
+---
+
+# Web Platform Routing Skill
+`);
+    try {
+      const report = validateRepository(root);
+      expect(report.errors.flatMap((failure) => failure.issues)).toContainEqual(
+        expect.objectContaining({ keyword: "skill-frontmatter" })
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("rejects a skill whose source registry digest does not match", async () => {
     const root = await createSkillFixture(`---
 name: web-platform
 description: Use when browser-native animation fully satisfies the request.
 license: LicenseRef-Soren-SDK-Internal
 compatibility: Soren SDK Phase 4; browser-native runtime; no executable scripts
+metadata:
+  publisher: soren-sdk
+  version: 1.0.0
 source: ./docs.sources.json
 source-digest: sha256:${"0".repeat(64)}
 ---
