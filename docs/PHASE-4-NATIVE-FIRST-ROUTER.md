@@ -11,12 +11,12 @@ The router is deterministic, provider-neutral at the contract boundary, read-onl
 ## Public API
 
 ```ts
+import type { RouteRequest } from "@soren-sdk/contracts";
 import {
-  FileSystemConnectorCatalog,
   inspectProject,
-  routeCapabilities,
-  type RouteRequest
+  routeCapabilities
 } from "@soren-sdk/core";
+import { FileSystemConnectorCatalog } from "@soren-sdk/connectors";
 
 const createdAt = new Date().toISOString();
 const project = inspectProject({
@@ -94,11 +94,9 @@ const plan = routeCapabilities({
 - `scroll.triggered-animation`
 - `scroll.pinned-sequence`
 
-Every other connector remains non-selectable by this router even when it is visible in the catalog.
+Every other connector remains non-selectable by this router even when visible in the catalog.
 
 ## Resolution order
-
-The router applies the following sequence:
 
 1. Validate the Route Request, Project Snapshot, Policy, Capability Catalog, Catalog Snapshot, and final Route Plan.
 2. Verify the request references the supplied Project Snapshot.
@@ -106,12 +104,12 @@ The router applies the following sequence:
 4. Reject unknown required capabilities.
 5. Identify native capability coverage.
 6. Apply hard provider constraints before scoring.
-7. Enumerate provider sets that cover every remaining required capability.
+7. Enumerate provider sets covering every remaining required capability.
 8. Minimize provider count.
 9. Prefer existing approved dependencies.
 10. Apply explicit preferred-provider order.
 11. Rank support level and confidence.
-12. Require user input for materially different tied architectures.
+12. Require input for materially different tied architectures.
 13. Assign ownership and block exclusive same-scope/same-property conflicts.
 14. Produce stable selected and rejected explanations.
 15. Compute content-addressed route identity.
@@ -140,26 +138,19 @@ Documentation, Agent Skills, and MCP metadata are cataloged separately from runt
 
 When Web Platform fully covers all required capabilities, the plan status is `native` and `selectedProviders` is empty. Optional SDK capabilities never force a dependency.
 
-Examples:
-
 ```text
-platform.css-transition                     → native
-platform.waapi-animation                    → native
-motion.presence                             → selected: motion
-motion.timeline                             → selected: gsap
-motion.layout + motion.timeline             → selected: motion + gsap
-unknown optional capability only            → no-sdk
-unknown required capability                 → blocked
+platform.css-transition          → native
+platform.waapi-animation         → native
+motion.presence                  → selected: motion
+motion.timeline                  → selected: gsap
+motion.layout + motion.timeline  → selected: motion + gsap
+unknown optional only            → no-sdk
+unknown required                 → blocked
 ```
 
 ## Ownership
 
-Each capability receives an ownership assignment containing:
-
-- Provider
-- Capability domain
-- Scope
-- Properties
+Each capability receives an ownership assignment containing provider, domain, scope, and properties.
 
 A request may provide explicit ownership quality:
 
@@ -174,7 +165,7 @@ When no explicit quality is provided, the router uses a capability-specific fall
 
 ## Stable reason codes
 
-Selected-provider reason codes:
+Selected-provider codes:
 
 - `NATIVE_CAPABILITY_MATCH`
 - `CAPABILITY_MATCH`
@@ -182,7 +173,7 @@ Selected-provider reason codes:
 - `PREFERRED_PROVIDER`
 - `MINIMAL_PROVIDER_SET`
 
-Rejection, blocking, and ambiguity reason codes:
+Rejection, blocking, and ambiguity codes:
 
 - `FORBIDDEN_PROVIDER`
 - `POLICY_DENIED`
@@ -204,7 +195,7 @@ The route digest and plan ID exclude:
 - Request capability ordering
 - Catalog enumeration ordering
 
-Identical content therefore produces the same route identity across clones and times. Adding an unrelated dependency does not change provider choice. Adding an installed approved provider may change the explanation to `EXISTING_DEPENDENCY_REUSE` without changing capability coverage.
+Identical content produces the same route identity across clones and times. Adding an unrelated dependency does not change provider choice. Adding an installed approved provider may change the explanation to `EXISTING_DEPENDENCY_REUSE` without changing coverage.
 
 ## CLI
 
