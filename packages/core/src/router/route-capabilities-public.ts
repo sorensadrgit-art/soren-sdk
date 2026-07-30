@@ -202,7 +202,13 @@ function providerBehavior(
     capabilities,
     input.catalog.getCapabilityCatalog(),
     input.request
-  ).map(({ providerId: _providerId, ...assignment }) => assignment);
+  ).map((assignment) => ({
+    capabilityId: assignment.capabilityId,
+    domain: assignment.domain,
+    scope: assignment.scope,
+    property: assignment.property,
+    exclusive: assignment.exclusive
+  }));
   const selectedIds = new Set(
     selectedIntegrationIds(candidate, capabilities)
   );
