@@ -2,10 +2,91 @@
 
 Provider-neutral application services for Soren SDK.
 
-The current package exposes two stable service areas:
+The package exposes three stable service areas:
 
 - Connector catalog service interfaces
 - Static read-only project inspection
+- Deterministic native-first capability routing
+
+## Public router API
+
+```ts
+import {
+  inspectProject,
+  routeCapabilities,
+  type RouteRequest
+} from "@soren-sdk/core";
+import { FileSystemConnectorCatalog } from "@soren-sdk/connectors";
+
+const createdAt = new Date().toISOString();
+const project = inspectProject({
+  root: "/path/to/project",
+  createdAt
+});
+const catalog = new FileSystemConnectorCatalog({
+  root: "/path/to/soren-sdk"
+});
+
+const request: RouteRequest = {
+  schemaVersion: "1.0.0-draft.1",
+  contractKind: "route-request",
+  requestId: "request_example",
+  createdAt,
+  projectSnapshotId: project.snapshotId,
+  summary: "Explicit GSAP timeline route",
+  capabilities: [
+    {
+      id: "motion.timeline",
+      required: true,
+      quality: {
+        scope: "hero",
+        property: "transform"
+      }
+    }
+  ],
+  preferences: {
+    preferredProviders: ["gsap"],
+    forbiddenProviders: [],
+    maxProviders: 1,
+    allowPaidServices: false,
+    allowExperimental: false
+  }
+};
+
+const plan = routeCapabilities({
+  request,
+  project,
+  catalog,
+  createdAt
+});
+```
+
+The router accepts only explicit capability IDs. It does not infer intent from natural language.
+
+Phase 4 may select only:
+
+- `web-platform`
+- `motion`
+- `gsap`
+
+Possible plan statuses are `native`, `selected`, `no-sdk`, `needs-input`, and `blocked`.
+
+### Routing order
+
+1. Validate all input contracts and the final Route Plan.
+2. Apply hard constraints before scoring.
+3. Prefer complete Web Platform coverage.
+4. Minimize the third-party provider set.
+5. Reuse approved installed dependencies.
+6. Apply explicit preferred-provider order.
+7. Compare support and confidence.
+8. Require input for materially different tied architectures.
+9. Block exclusive same-scope/same-property ownership conflicts.
+10. Produce a content-addressed plan ID and digest.
+
+The route identity excludes creation time, project absolute root, capability ordering, and catalog enumeration ordering.
+
+Full details: [`../../docs/PHASE-4-NATIVE-FIRST-ROUTER.md`](../../docs/PHASE-4-NATIVE-FIRST-ROUTER.md).
 
 ## Public project-inspector API
 
@@ -50,7 +131,7 @@ Configuration and policy contents are represented by SHA-256 digests. Their raw 
 
 ## Determinism
 
-The snapshot ID excludes:
+The project snapshot ID excludes:
 
 - Absolute project root
 - Snapshot creation time
@@ -58,49 +139,25 @@ The snapshot ID excludes:
 
 It includes all other normalized project-state fields. Identical clones inspected at different paths and times produce the same ID.
 
-Meaningful changes to package manifests, lockfiles, workspace declarations, configurations, policies, targets, or Git revision change the ID.
-
 ## Static Git limitation
 
-The inspector does not execute `git status`. It can resolve Git HEAD from directories, worktree pointers, loose refs, and packed refs, but it cannot prove that the worktree is clean.
-
-For Git projects it therefore records:
-
-```json
-{
-  "dirty": true
-}
-```
-
-and emits an explicit warning. Only valid 40- or 64-character hexadecimal commit hashes are accepted. Arbitrary HEAD content and unsafe ref paths are rejected.
+The inspector does not execute `git status`. It resolves Git HEAD from directories, worktree pointers, loose refs, and packed refs, but cannot prove that a worktree is clean. It records `dirty: true` with an explicit warning.
 
 ## Filesystem and security boundaries
 
-The inspector:
+The inspector and router:
 
-- Resolves the project root with `realpath`
-- Requires a regular root `package.json`
-- Does not follow symlinks during discovery
-- Ignores dependency, cache, coverage, and build-output directories
-- Uses normalized root-relative POSIX paths inside snapshot collections
-- Does not execute subprocesses or shell commands
-- Does not access the network
-- Does not install dependencies
-- Does not write to the inspected project
+- Resolve project roots with `realpath`
+- Do not follow symlinks during project discovery
+- Do not execute subprocesses or shell commands
+- Do not access the network
+- Do not install dependencies
+- Do not invoke tools, skills, or MCP servers
+- Do not write to the inspected project
 
-Internal filesystem, Git, and glob helpers are not part of the public package API.
+Internal filesystem, Git, glob, candidate-ranking, and ownership helpers are not part of the public package API.
 
-## Errors
-
-```ts
-try {
-  inspectProject({ root: "./project" });
-} catch (error) {
-  if (error instanceof ProjectInspectionError) {
-    console.error(error.code, error.message);
-  }
-}
-```
+## Inspector errors
 
 Stable error codes:
 
