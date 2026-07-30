@@ -23,6 +23,23 @@ const DENIED_EXECUTION_RISKS = new Set([
   "project-write"
 ]);
 
+type Version = [number, number, number];
+
+interface VersionBound {
+  version: Version;
+  inclusive: boolean;
+}
+
+interface VersionInterval {
+  lower: VersionBound | null;
+  upper: VersionBound | null;
+}
+
+interface ParsedVersion {
+  version: Version;
+  parts: number;
+}
+
 interface CandidateCollectionInput {
   catalog: CatalogReader;
   project: ProjectSnapshot;
@@ -50,38 +67,273 @@ function reject(
   return { providerId: providerIdValue, reasonCode, reason };
 }
 
-function parseSemver(value: string | null | undefined): [number, number, number] | null {
-  if (value === null || value === undefined) return null;
-  const match = /(?:^|[^0-9])(\d+)\.(\d+)(?:\.(\d+))?/.exec(value);
-  if (match === null) return null;
-  return [
-    Number.parseInt(match[1] ?? "0", 10),
-    Number.parseInt(match[2] ?? "0", 10),
-    Number.parseInt(match[3] ?? "0", 10)
-  ];
+function compareVersions(left: Version, right: Version): number {
+  for (let index = 0; index < left.length; index += 1) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
 }
 
-function atLeast(
-  actual: [number, number, number],
-  minimum: [number, number, number]
+function parseVersion(value: string): ParsedVersion | null {
+  const match = /^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:[-+].*)?$/.exec(
+    value.trim()
+  );
+  if (match === null) return null;
+  const parts = match[3] !== undefined ? 3 : match[2] !== undefined ? 2 : 1;
+  return {
+    version: [
+      Number.parseInt(match[1] ?? "0", 10),
+      Number.parseInt(match[2] ?? "0", 10),
+      Number.parseInt(match[3] ?? "0", 10)
+    ],
+    parts
+  };
+}
+
+function normalizeRange(value: string): string {
+  let result = value.trim();
+  if (result.startsWith("workspace:")) {
+    result = result.slice("workspace:".length).trim();
+  }
+  if (result.startsWith("npm:")) {
+    const separator = result.lastIndexOf("@");
+    result = separator > "npm:".length ? result.slice(separator + 1) : result;
+  }
+  return result;
+}
+
+function strongerLower(
+  current: VersionBound | null,
+  candidate: VersionBound
+): VersionBound {
+  if (current === null) return candidate;
+  const comparison = compareVersions(candidate.version, current.version);
+  if (comparison > 0) return candidate;
+  if (comparison < 0) return current;
+  return {
+    version: current.version,
+    inclusive: current.inclusive && candidate.inclusive
+  };
+}
+
+function strongerUpper(
+  current: VersionBound | null,
+  candidate: VersionBound
+): VersionBound {
+  if (current === null) return candidate;
+  const comparison = compareVersions(candidate.version, current.version);
+  if (comparison < 0) return candidate;
+  if (comparison > 0) return current;
+  return {
+    version: current.version,
+    inclusive: current.inclusive && candidate.inclusive
+  };
+}
+
+function intersectIntervals(
+  base: VersionInterval,
+  additional: VersionInterval
+): VersionInterval {
+  return {
+    lower:
+      additional.lower === null
+        ? base.lower
+        : strongerLower(base.lower, additional.lower),
+    upper:
+      additional.upper === null
+        ? base.upper
+        : strongerUpper(base.upper, additional.upper)
+  };
+}
+
+function intervalIsValid(interval: VersionInterval): boolean {
+  if (interval.lower === null || interval.upper === null) return true;
+  const comparison = compareVersions(
+    interval.lower.version,
+    interval.upper.version
+  );
+  return (
+    comparison < 0 ||
+    (comparison === 0 && interval.lower.inclusive && interval.upper.inclusive)
+  );
+}
+
+function partialInterval(parsed: ParsedVersion): VersionInterval {
+  const [major, minor] = parsed.version;
+  if (parsed.parts === 1) {
+    return {
+      lower: { version: parsed.version, inclusive: true },
+      upper: { version: [major + 1, 0, 0], inclusive: false }
+    };
+  }
+  return {
+    lower: { version: parsed.version, inclusive: true },
+    upper: { version: [major, minor + 1, 0], inclusive: false }
+  };
+}
+
+function caretInterval(parsed: ParsedVersion): VersionInterval {
+  const [major, minor, patch] = parsed.version;
+  const upper: Version =
+    major > 0
+      ? [major + 1, 0, 0]
+      : minor > 0
+        ? [0, minor + 1, 0]
+        : [0, 0, patch + 1];
+  return {
+    lower: { version: parsed.version, inclusive: true },
+    upper: { version: upper, inclusive: false }
+  };
+}
+
+function tildeInterval(parsed: ParsedVersion): VersionInterval {
+  const [major, minor] = parsed.version;
+  const upper: Version =
+    parsed.parts === 1 ? [major + 1, 0, 0] : [major, minor + 1, 0];
+  return {
+    lower: { version: parsed.version, inclusive: true },
+    upper: { version: upper, inclusive: false }
+  };
+}
+
+function parseComparator(token: string): VersionInterval | null {
+  const match = /^(>=|<=|>|<|=)?\s*(v?\d+(?:\.\d+){0,2})$/.exec(token);
+  if (match === null) return null;
+  const parsed = parseVersion(match[2] ?? "");
+  if (parsed === null) return null;
+  const operator = match[1];
+  if (operator === undefined && parsed.parts < 3) return partialInterval(parsed);
+  if (operator === undefined || operator === "=") {
+    return {
+      lower: { version: parsed.version, inclusive: true },
+      upper: { version: parsed.version, inclusive: true }
+    };
+  }
+  if (operator === ">" || operator === ">=") {
+    return {
+      lower: {
+        version: parsed.version,
+        inclusive: operator === ">="
+      },
+      upper: null
+    };
+  }
+  return {
+    lower: null,
+    upper: {
+      version: parsed.version,
+      inclusive: operator === "<="
+    }
+  };
+}
+
+function parseRangeClause(value: string): VersionInterval | null {
+  const clause = value.trim();
+  if (clause === "" || clause === "*" || clause.toLowerCase() === "latest") {
+    return { lower: null, upper: null };
+  }
+
+  const hyphen = /^(v?\d+(?:\.\d+){0,2})\s+-\s+(v?\d+(?:\.\d+){0,2})$/.exec(
+    clause
+  );
+  if (hyphen !== null) {
+    const lower = parseVersion(hyphen[1] ?? "");
+    const upper = parseVersion(hyphen[2] ?? "");
+    if (lower === null || upper === null) return null;
+    const interval: VersionInterval = {
+      lower: { version: lower.version, inclusive: true },
+      upper: { version: upper.version, inclusive: true }
+    };
+    return intervalIsValid(interval) ? interval : null;
+  }
+
+  if (clause.startsWith("^")) {
+    const parsed = parseVersion(clause.slice(1));
+    return parsed === null ? null : caretInterval(parsed);
+  }
+  if (clause.startsWith("~")) {
+    const parsed = parseVersion(clause.slice(1));
+    return parsed === null ? null : tildeInterval(parsed);
+  }
+
+  const wildcard = /^(\d+)(?:\.(\d+))?(?:\.(?:x|X|\*))?$/.exec(clause);
+  if (wildcard !== null && /(?:x|X|\*)/.test(clause)) {
+    const parsed = parseVersion(
+      wildcard[2] === undefined
+        ? wildcard[1] ?? ""
+        : `${wildcard[1]}.${wildcard[2]}`
+    );
+    return parsed === null ? null : partialInterval(parsed);
+  }
+
+  const tokens = clause.replaceAll(",", " ").split(/\s+/).filter(Boolean);
+  let interval: VersionInterval = { lower: null, upper: null };
+  for (const token of tokens) {
+    const parsed = parseComparator(token);
+    if (parsed === null) return null;
+    interval = intersectIntervals(interval, parsed);
+  }
+  return intervalIsValid(interval) ? interval : null;
+}
+
+function rangeIntervals(value: string): VersionInterval[] {
+  return normalizeRange(value)
+    .split("||")
+    .map((clause) => parseRangeClause(clause))
+    .filter((interval): interval is VersionInterval => interval !== null);
+}
+
+function intervalContains(
+  interval: VersionInterval,
+  version: Version
 ): boolean {
-  for (let index = 0; index < actual.length; index += 1) {
-    const actualPart = actual[index] ?? 0;
-    const minimumPart = minimum[index] ?? 0;
-    if (actualPart > minimumPart) return true;
-    if (actualPart < minimumPart) return false;
+  if (interval.lower !== null) {
+    const lower = compareVersions(version, interval.lower.version);
+    if (lower < 0 || (lower === 0 && !interval.lower.inclusive)) return false;
+  }
+  if (interval.upper !== null) {
+    const upper = compareVersions(version, interval.upper.version);
+    if (upper > 0 || (upper === 0 && !interval.upper.inclusive)) return false;
   }
   return true;
 }
 
-function reactVersion(project: ProjectSnapshot): [number, number, number] | null {
+function versionSatisfiesRange(version: Version, range: string): boolean {
+  return rangeIntervals(range).some((interval) =>
+    intervalContains(interval, version)
+  );
+}
+
+function rangeCanReachMinimum(range: string, minimum: Version): boolean {
+  return rangeIntervals(range).some((interval) => {
+    if (!intervalIsValid(interval)) return false;
+    if (interval.upper === null) return true;
+    const comparison = compareVersions(interval.upper.version, minimum);
+    return comparison > 0 || (comparison === 0 && interval.upper.inclusive);
+  });
+}
+
+function reactRange(project: ProjectSnapshot): string | null {
   const dependency = project.dependencies.find(
     (item) => item.name === "react"
   )?.version;
   const framework = project.frameworks.find(
     (item) => item.name === "react"
   )?.version;
-  return parseSemver(dependency ?? framework);
+  return dependency ?? framework ?? null;
+}
+
+function normalizedHost(value: string): string {
+  const trimmed = value.trim().toLowerCase();
+  if (trimmed.includes("://")) {
+    try {
+      return new URL(trimmed).hostname.replace(/\.$/, "");
+    } catch {
+      return trimmed;
+    }
+  }
+  return trimmed.replace(/\.$/, "");
 }
 
 function integrationAllowed(
@@ -115,6 +367,18 @@ function integrationAllowed(
   ) {
     return false;
   }
+  if (policy.rules.network.mode === "allowlist") {
+    const allowedHosts = new Set(
+      policy.rules.network.allowedHosts.map(normalizedHost)
+    );
+    if (
+      integration.permissions.network.some(
+        (host) => !allowedHosts.has(normalizedHost(host))
+      )
+    ) {
+      return false;
+    }
+  }
   if (
     integration.dataExposure === "remote-project-content" &&
     !policy.rules.allowRemoteProjectContent
@@ -125,16 +389,37 @@ function integrationAllowed(
 }
 
 function hasDependencyReuse(
-  record: Extract<ConnectorRecord, { kind: "schema-v2" }>,
-  project: ProjectSnapshot
+  project: ProjectSnapshot,
+  runtimeIntegrations: readonly IntegrationArtifact[]
 ): boolean {
-  const installed = new Set(project.dependencies.map((item) => item.name));
-  const packageNames = record.manifest.integrations
-    .map((integration) => integration.packageName)
-    .filter((name): name is string => name !== undefined);
-  return [...packageNames, ...record.manifest.product.aliases].some((name) =>
-    installed.has(name)
-  );
+  return runtimeIntegrations.some((integration) => {
+    if (
+      integration.kind !== "runtime-package" ||
+      integration.packageName === undefined ||
+      integration.version.status !== "resolved" ||
+      integration.version.value === undefined
+    ) {
+      return false;
+    }
+    const resolvedVersion = parseVersion(integration.version.value);
+    if (resolvedVersion === null) return false;
+    return project.dependencies.some(
+      (dependency) =>
+        dependency.name === integration.packageName &&
+        versionSatisfiesRange(resolvedVersion.version, dependency.version)
+    );
+  });
+}
+
+function supportsWaapiTargets(project: ProjectSnapshot): boolean {
+  return !project.targets.browsers.some((target) => {
+    const normalized = target.toLowerCase();
+    return (
+      /(^|[\s,])(ie|ie_mob)(?=\s|$)/.test(normalized) ||
+      normalized.includes("internet explorer") ||
+      normalized.includes("op_mini")
+    );
+  });
 }
 
 function hardConstraintFailure(
@@ -181,17 +466,29 @@ function hardConstraintFailure(
     );
   }
 
+  if (
+    id === "web-platform" &&
+    input.requiredCapabilityIds.has("platform.waapi-animation") &&
+    !supportsWaapiTargets(input.project)
+  ) {
+    return reject(
+      id,
+      "ENVIRONMENT_UNSUPPORTED",
+      "Web Animations API is unavailable for one or more inspected browser targets."
+    );
+  }
+
   if (id === "motion") {
     const hasRequiredMotionClaim = record.manifest.capabilityClaims.some((claim) =>
       input.requiredCapabilityIds.has(claim.capability)
     );
     if (hasRequiredMotionClaim) {
-      const version = reactVersion(input.project);
-      if (version === null || !atLeast(version, [18, 2, 0])) {
+      const range = reactRange(input.project);
+      if (range === null || !rangeCanReachMinimum(range, [18, 2, 0])) {
         return reject(
           id,
           "ENVIRONMENT_UNSUPPORTED",
-          "Motion React capabilities require React 18.2 or newer."
+          "Motion React capabilities require a React range that includes 18.2 or newer."
         );
       }
     }
@@ -288,7 +585,7 @@ export function collectProviderCandidates(
       manifest: record.manifest,
       integrationIds,
       claims,
-      dependencyReuse: hasDependencyReuse(record, input.project),
+      dependencyReuse: hasDependencyReuse(input.project, runtimeIntegrations),
       preferredRank: rank < 0 ? null : rank
     });
   }
