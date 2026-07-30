@@ -3,9 +3,15 @@ import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
 import {
+  digestJson,
+  type JsonValue,
+  type RouteRequest
+} from "@soren-sdk/contracts";
+import {
   CatalogService,
   ProjectInspectionError,
-  inspectProject
+  inspectProject,
+  routeCapabilities
 } from "@soren-sdk/core";
 import {
   ConnectorCatalogError,
@@ -18,7 +24,8 @@ import {
   formatConnectorLine,
   formatHealth,
   formatJson,
-  formatProjectSnapshot
+  formatProjectSnapshot,
+  formatRoutePlan
 } from "./format.js";
 
 export interface CliIo {
@@ -34,6 +41,14 @@ export interface RunCliOptions {
 
 class CliUsageError extends Error {
   override readonly name = "CliUsageError";
+}
+
+function asJsonValue(value: unknown): JsonValue {
+  return JSON.parse(JSON.stringify(value)) as JsonValue;
+}
+
+function unique(values: readonly string[]): string[] {
+  return [...new Set(values)];
 }
 
 function parseJsonOption(args: string[]): { json: boolean } {
@@ -88,10 +103,126 @@ function parseSnapshotOptions(args: string[]): {
     : { json: parsed.values.json ?? false, database };
 }
 
+interface RouteCliOptions {
+  project: string;
+  required: string[];
+  optional: string[];
+  preferred: string[];
+  forbidden: string[];
+  maxProviders: number;
+  json: boolean;
+  scope?: string;
+  property?: string;
+}
+
+function parseRouteOptions(args: string[]): RouteCliOptions {
+  const parsed = parseArgs({
+    args,
+    allowPositionals: false,
+    strict: true,
+    options: {
+      project: { type: "string", default: "." },
+      capability: { type: "string", multiple: true },
+      optional: { type: "string", multiple: true },
+      preferred: { type: "string", multiple: true },
+      forbidden: { type: "string", multiple: true },
+      "max-providers": { type: "string", default: "3" },
+      scope: { type: "string" },
+      property: { type: "string" },
+      json: { type: "boolean", default: false }
+    }
+  });
+
+  const required = unique(parsed.values.capability ?? []);
+  if (required.length === 0) {
+    throw new CliUsageError("route requires at least one --capability value.");
+  }
+  const maxProvidersText = parsed.values["max-providers"] ?? "3";
+  if (!/^\d+$/.test(maxProvidersText)) {
+    throw new CliUsageError("--max-providers must be a non-negative integer.");
+  }
+  const maxProviders = Number.parseInt(maxProvidersText, 10);
+  if (!Number.isSafeInteger(maxProviders)) {
+    throw new CliUsageError("--max-providers must be a non-negative integer.");
+  }
+
+  const requiredSet = new Set(required);
+  const optional = unique(parsed.values.optional ?? []).filter(
+    (capability) => !requiredSet.has(capability)
+  );
+  const result: RouteCliOptions = {
+    project: parsed.values.project ?? ".",
+    required,
+    optional,
+    preferred: unique(parsed.values.preferred ?? []),
+    forbidden: unique(parsed.values.forbidden ?? []).sort(),
+    maxProviders,
+    json: parsed.values.json ?? false
+  };
+  if (parsed.values.scope !== undefined) result.scope = parsed.values.scope;
+  if (parsed.values.property !== undefined) {
+    result.property = parsed.values.property;
+  }
+  return result;
+}
+
+function buildRouteRequest(
+  parsed: RouteCliOptions,
+  projectSnapshotId: RouteRequest["projectSnapshotId"],
+  createdAt: string
+): RouteRequest {
+  const quality = {
+    ...(parsed.scope === undefined ? {} : { scope: parsed.scope }),
+    ...(parsed.property === undefined ? {} : { property: parsed.property })
+  };
+  const hasQuality = Object.keys(quality).length > 0;
+  const capabilities: RouteRequest["capabilities"] = [
+    ...parsed.required.map((id) => ({
+      id,
+      required: true,
+      ...(hasQuality ? { quality } : {})
+    })),
+    ...parsed.optional.map((id) => ({
+      id,
+      required: false,
+      ...(hasQuality ? { quality } : {})
+    }))
+  ];
+  const preferences: RouteRequest["preferences"] = {
+    preferredProviders: parsed.preferred,
+    forbiddenProviders: parsed.forbidden,
+    maxProviders: parsed.maxProviders,
+    allowPaidServices: false,
+    allowExperimental: false
+  };
+  const identity = digestJson(
+    asJsonValue({
+      projectSnapshotId,
+      capabilities: [...capabilities].sort(
+        (left, right) =>
+          left.id.localeCompare(right.id) ||
+          Number(right.required) - Number(left.required)
+      ),
+      preferences
+    })
+  );
+  return {
+    schemaVersion: "1.0.0-draft.1",
+    contractKind: "route-request",
+    requestId: `request_${identity.slice("sha256:".length, "sha256:".length + 24)}`,
+    createdAt,
+    projectSnapshotId,
+    summary: `Explicit route for ${parsed.required.join(", ")}`,
+    capabilities,
+    preferences
+  };
+}
+
 function usage(): string {
   return [
     "Usage:",
     "  soren-sdk inspect [path] [--json]",
+    "  soren-sdk route --capability <id> [--capability <id> ...] [--optional <id> ...] [--project <path>] [--preferred <provider>] [--forbidden <provider>] [--max-providers <n>] [--scope <scope>] [--property <property>] [--json]",
     "  soren-sdk catalog list [--json]",
     "  soren-sdk catalog get <connector-id> [--json]",
     "  soren-sdk connector health <connector-id> [--json]",
@@ -117,6 +248,24 @@ export function runCli(options: RunCliOptions): number {
 
     const catalog = new FileSystemConnectorCatalog({ root: options.cwd });
     const service = new CatalogService(catalog);
+
+    if (domain === "route") {
+      const parsed = parseRouteOptions(options.argv.slice(1));
+      const createdAt = new Date().toISOString();
+      const project = inspectProject({
+        root: resolve(options.cwd, parsed.project),
+        createdAt
+      });
+      const request = buildRouteRequest(parsed, project.snapshotId, createdAt);
+      const plan = routeCapabilities({
+        request,
+        project,
+        catalog,
+        createdAt
+      });
+      options.io.stdout(parsed.json ? formatJson(plan) : formatRoutePlan(plan));
+      return 0;
+    }
 
     if (domain === "catalog" && action === "list") {
       const optionArgs = identifier === undefined ? rest : [identifier, ...rest];
