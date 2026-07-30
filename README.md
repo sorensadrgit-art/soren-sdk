@@ -86,6 +86,7 @@ The router provides:
 - Required and optional capability handling
 - Provider allowlists, forbids, preference order, and provider limits
 - Motion React 18.2+ compatibility enforcement
+- Reduced-motion verification enforcement
 - Existing approved dependency reuse
 - Minimal sufficient provider-set selection
 - Material-tie detection with `needs-input`
@@ -237,10 +238,10 @@ The route identity excludes creation time, project absolute root, request capabi
 ## Connector status
 
 - Web Platform, Motion, and GSAP are approved Connector Manifest v2 records and are selectable by the Phase 4 router.
-- Motion runtime is pinned to `motion@12.42.1` with `motion/react` and `motion` import paths.
+- Motion runtime is pinned to `motion@12.42.2` with `motion/react` and `motion` import paths.
 - GSAP runtime is pinned to `gsap@3.15.0` under `LicenseRef-GSAP-Standard`.
-- Documentation, official Agent Skills, and remote MCP metadata are distinct integration artifacts.
-- The unverified paid Motion MCP metadata is cataloged but never selectable by Phase 4.
+- Documentation, official Agent Skills, and hosted MCP metadata are distinct integration artifacts.
+- Motion AI Kit 6.2.0 is cataloged as a knowledge/tool surface and is never selectable by the Phase 4 runtime router.
 - Lenis, React Three Fiber, Storybook, shadcn, and other planning connectors remain legacy and non-selectable.
 - Connector documents are parsed as untrusted data and never executed by the catalog or router.
 
