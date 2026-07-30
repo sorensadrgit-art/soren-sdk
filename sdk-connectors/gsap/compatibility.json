@@ -1,0 +1,41 @@
+{
+  "providerId": "gsap",
+  "version": "1.0.0",
+  "runtime": {
+    "package": "gsap",
+    "version": "3.15.0",
+    "imports": {
+      "javascript": "gsap"
+    }
+  },
+  "rules": [
+    {
+      "id": "plugin-availability",
+      "appliesTo": [
+        "motion.flip",
+        "scroll.triggered-animation",
+        "scroll.pinned-sequence"
+      ],
+      "requirements": [
+        "The required public GSAP plugin must be present in the approved runtime artifact",
+        "Plugins must be registered explicitly"
+      ]
+    },
+    {
+      "id": "responsive-cleanup",
+      "appliesTo": [
+        "scroll.triggered-animation",
+        "scroll.pinned-sequence"
+      ],
+      "requirements": [
+        "Responsive contexts and ScrollTrigger instances must be reverted or killed during cleanup"
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "id": "exclusive-property-owner",
+      "description": "GSAP cannot exclusively own the same explicit scope and property as another provider."
+    }
+  ]
+}
