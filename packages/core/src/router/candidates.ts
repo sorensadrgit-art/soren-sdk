@@ -15,6 +15,7 @@ import type {
 
 const PHASE_PROVIDER_IDS = new Set(["gsap", "motion", "web-platform"]);
 const RUNTIME_KINDS = new Set(["built-in", "runtime-package"]);
+const APPROVED_REVIEW_STATUSES = new Set(["approved", "stable"]);
 const DENIED_EXECUTION_RISKS = new Set([
   "command-execution",
   "network-and-command",
@@ -158,20 +159,26 @@ function hardConstraintFailure(
     health.state !== "healthy" ||
     !health.selectable ||
     !record.selectable ||
-    !record.manifest.connector.selectable
+    !record.manifest.connector.selectable ||
+    !APPROVED_REVIEW_STATUSES.has(record.manifest.connector.reviewStatus) ||
+    record.manifest.connector.blockers.length > 0
   ) {
     return reject(
       id,
       "CONNECTOR_UNHEALTHY",
-      `Provider "${id}" is not a healthy selectable Connector Manifest v2 record.`
+      `Provider "${id}" is not an approved, healthy, selectable Connector Manifest v2 record.`
     );
   }
 
   if (
-    record.manifest.connector.reviewStatus === "experimental" &&
-    !(policy.rules.allowExperimental && request.preferences.allowExperimental)
+    policy.rules.requireReducedMotion &&
+    !record.manifest.verification.requiredChecks.includes("reduced-motion")
   ) {
-    return reject(id, "POLICY_DENIED", `Experimental provider "${id}" is not allowed.`);
+    return reject(
+      id,
+      "POLICY_DENIED",
+      `Provider "${id}" does not declare the required reduced-motion verification.`
+    );
   }
 
   if (id === "motion") {
