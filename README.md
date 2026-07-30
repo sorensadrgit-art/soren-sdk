@@ -3,7 +3,7 @@
 > Agent-native SDK intelligence, project inspection, cataloging, policy, routing, tool brokering, execution planning, and verification for premium frontend development.
 
 **Repository:** `sorensadrgit-art/soren-sdk`  
-**Status:** Phase 3 read-only intelligence foundation complete  
+**Status:** Phase 4 native-first capability routing complete  
 **Runtime:** Node.js 24, pnpm 11.17.0, TypeScript 6  
 **Primary owner:** Soren
 
@@ -14,7 +14,7 @@ Soren SDK is the intelligence and governance layer between a user request and th
 It is not an animation library, a package installer, or one giant prompt containing every SDK. It gives coding agents structured contracts, current connector knowledge, deterministic project context, policy boundaries, compatibility rules, verification requirements, and evidence.
 
 ```text
-User request
+Explicit capability request
     ↓
 Project snapshot
     ↓
@@ -26,14 +26,10 @@ Policy and ownership checks
     ↓
 Smallest safe provider set
     ↓
-Selective context and tools
-    ↓
-Reviewable plan
-    ↓
-Verification and evidence
+Contract-valid RoutePlan
 ```
 
-Only the first three layers are executable today. Routing, external tool access, and project mutation remain disabled.
+Contracts, cataloging, project inspection, and the first deterministic routing vertical slice are executable today. External tool access, package installation, code generation, and project mutation remain disabled.
 
 ## Completed executable phases
 
@@ -80,6 +76,29 @@ The project inspector provides:
 
 The inspector never executes Git or a package manager. Git projects are conservatively marked dirty because static inspection cannot prove worktree cleanliness.
 
+### Phase 4 — Native-first capability router
+
+The router provides:
+
+- Explicit `RouteRequest` input and contract-valid `RoutePlan` output
+- Native-first Web Platform routing
+- Approved Motion and GSAP routing
+- Required and optional capability handling
+- Provider allowlists, forbids, preference order, and provider limits
+- Motion React 18.2+ compatibility enforcement
+- Existing approved dependency reuse
+- Minimal sufficient provider-set selection
+- Material-tie detection with `needs-input`
+- Explicit scope/property ownership planning
+- Exclusive same-scope/same-property conflict blocking
+- Stable reason codes, constraints, route digests, and plan IDs
+- Determinism across creation time, clone path, request order, and catalog order
+- 34 golden positive, negative, composition, and metamorphic route cases
+
+The router reads local project and connector data only. It never installs packages, invokes tools or MCP servers, executes commands, accesses the network, generates code, or writes to the project.
+
+Read [`docs/PHASE-4-NATIVE-FIRST-ROUTER.md`](./docs/PHASE-4-NATIVE-FIRST-ROUTER.md).
+
 ## Quick start
 
 ```bash
@@ -99,6 +118,42 @@ Inspect this repository:
 ```bash
 node packages/cli/dist/bin.js inspect --json
 ```
+
+### Route explicit capabilities
+
+Native CSS route:
+
+```bash
+node packages/cli/dist/bin.js route \
+  --project ../my-project \
+  --capability platform.css-transition
+```
+
+GSAP timeline route:
+
+```bash
+node packages/cli/dist/bin.js route \
+  --project ../my-project \
+  --capability motion.timeline \
+  --preferred gsap \
+  --max-providers 1 \
+  --scope hero \
+  --property transform \
+  --json
+```
+
+Motion and GSAP composition:
+
+```bash
+node packages/cli/dist/bin.js route \
+  --project ../my-project \
+  --capability motion.layout \
+  --capability motion.timeline \
+  --max-providers 2 \
+  --json
+```
+
+The CLI accepts explicit capability IDs only. It does not infer capabilities from prose.
 
 ### Explore the SDK catalog
 
@@ -131,6 +186,7 @@ node packages/cli/dist/bin.js \
 These commands are read-only:
 
 - `inspect`
+- `route`
 - `catalog list`
 - `catalog get`
 - `connector health`
@@ -138,7 +194,7 @@ These commands are read-only:
 
 Only `catalog snapshot --database <path>` creates or updates a file, and it writes only to the explicitly requested SQLite database.
 
-There is currently no package installation, shell execution, project-source mutation, remote MCP invocation, or network access.
+There is currently no package installation, shell execution, project-source mutation, remote MCP invocation, code generation, or network access.
 
 ## ProjectSnapshot behavior
 
@@ -158,13 +214,35 @@ The snapshot ID excludes the absolute root and creation time, so identical clone
 
 Raw configuration and policy file contents are not copied into the snapshot. Only paths and SHA-256 digests are retained.
 
+## Router behavior
+
+Phase 4 may select only:
+
+- `web-platform`
+- `motion`
+- `gsap`
+
+Possible plan statuses:
+
+- `native`
+- `selected`
+- `no-sdk`
+- `needs-input`
+- `blocked`
+
+Web Platform is preferred whenever it fully covers every required capability. Optional capabilities never force an SDK dependency. Third-party provider sets are minimized and must remain within `maxProviders`.
+
+The route identity excludes creation time, project absolute root, request capability order, and catalog enumeration order.
+
 ## Connector status
 
-- `web-platform` is the first Connector Schema v2 record.
-- Motion, GSAP, Lenis, React Three Fiber, Storybook, and shadcn remain legacy planning manifests.
-- Legacy records are visible but never selectable.
-- Health is diagnostic and does not authorize routing.
-- Connector documents are parsed as untrusted data and never executed by the catalog.
+- Web Platform, Motion, and GSAP are approved Connector Manifest v2 records and are selectable by the Phase 4 router.
+- Motion runtime is pinned to `motion@12.42.1` with `motion/react` and `motion` import paths.
+- GSAP runtime is pinned to `gsap@3.15.0` under `LicenseRef-GSAP-Standard`.
+- Documentation, official Agent Skills, and remote MCP metadata are distinct integration artifacts.
+- The unverified paid Motion MCP metadata is cataloged but never selectable by Phase 4.
+- Lenis, React Three Fiber, Storybook, shadcn, and other planning connectors remain legacy and non-selectable.
+- Connector documents are parsed as untrusted data and never executed by the catalog or router.
 
 Standards:
 
@@ -176,10 +254,10 @@ Standards:
 
 ```text
 packages/
-├── contracts/      # schemas, validation, canonical JSON, digests
-├── core/           # catalog service and static project inspector
-├── connectors/     # connector loading, health, snapshots, storage
-├── cli/            # read-only CLI
+├── contracts/       # schemas, validation, canonical JSON, digests
+├── core/            # catalog service, project inspector, deterministic router
+├── connectors/      # connector loading, health, snapshots, storage
+├── cli/             # read-only inspect, route, and catalog CLI
 ├── protocol-server/ # planned
 └── testing/         # planned
 ```
@@ -188,21 +266,21 @@ Applications such as the Control Center remain planned clients of the core. They
 
 ## Next milestone
 
-Phase 4 is the first capability router vertical slice:
+Phase 5 will expand governance around the Route Plan without crossing the write boundary:
 
-1. Web Platform
-2. Motion
-3. GSAP
+1. Project and organization policy composition
+2. Configuration and lockfile enforcement
+3. Broader connector compatibility evaluation
+4. Read-only context packaging for selected providers
+5. Evidence-backed route and verification reporting
 
-It must determine when CSS or Web Animations API is sufficient, when Motion or GSAP is appropriate, when they may coexist, when user input is required, and when policy blocks a route.
-
-Hard gates include zero forbidden selections, zero ownership conflicts, native-first behavior, and positive, negative, and metamorphic route fixtures.
+External execution, package installation, and project mutation remain out of scope until separately approved and sandboxed.
 
 ## Security position
 
 - Retrieved documentation and tool metadata are untrusted input.
 - Connector files are data, not executable instructions.
-- Project inspection is static and read-only.
+- Project inspection and routing are static and read-only.
 - Symlinks are not followed during project discovery.
 - Git commit values are accepted only when they match valid hash formats.
 - Runtime dependencies belong only in target workspaces.
@@ -232,6 +310,12 @@ pnpm validate:repository
 pnpm smoke:cli
 ```
 
+Or run the complete gate:
+
+```bash
+pnpm check
+```
+
 ## Roadmap
 
 Completed:
@@ -240,10 +324,10 @@ Completed:
 - Phase 1 contracts
 - Phase 2 catalog and SQLite snapshots
 - Phase 3 project inspector
+- Phase 4 Web Platform + Motion + GSAP routing
 
 Next:
 
-- Phase 4 Web Platform + Motion + GSAP routing
 - Policy, configuration, and lockfile enforcement
 - Universal CLI/REST/MCP/TypeScript surfaces
 - Context broker and read-only tool gateway
