@@ -65,22 +65,15 @@ function stripYamlComment(value: string, line: number): string {
   for (let index = 0; index < value.length; index += 1) {
     const character = value[index];
     if (doubleQuoted) {
-      if (escaped) {
-        escaped = false;
-      } else if (character === "\\") {
-        escaped = true;
-      } else if (character === '"') {
-        doubleQuoted = false;
-      }
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') doubleQuoted = false;
       continue;
     }
     if (singleQuoted) {
       if (character === "'") {
-        if (value[index + 1] === "'") {
-          index += 1;
-        } else {
-          singleQuoted = false;
-        }
+        if (value[index + 1] === "'") index += 1;
+        else singleQuoted = false;
       }
       continue;
     }
@@ -144,8 +137,16 @@ function parseYamlScalar(value: string, line: number): YamlValue {
       line
     );
   }
+  if (/:\s/.test(trimmed)) {
+    throw new SkillYamlError(
+      "Unquoted YAML plain scalars cannot contain a colon followed by whitespace.",
+      line
+    );
+  }
   if (/^(?:null|~)$/i.test(trimmed)) return null;
-  if (/^(?:true|false)$/i.test(trimmed)) return trimmed.toLowerCase() === "true";
+  if (/^(?:true|false)$/i.test(trimmed)) {
+    return trimmed.toLowerCase() === "true";
+  }
   if (/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(trimmed)) {
     return Number(trimmed);
   }
@@ -190,10 +191,7 @@ function parseYamlMapping(source: string): YamlRecord {
     }
     const parent = stack[stack.length - 1];
     if (parent === undefined || indentation !== parent.indent + 2) {
-      throw new SkillYamlError(
-        "Invalid YAML mapping indentation.",
-        lineNumber
-      );
+      throw new SkillYamlError("Invalid YAML mapping indentation.", lineNumber);
     }
 
     const key = match[1] ?? "";
@@ -324,8 +322,7 @@ function validateSkill(
       )
     );
   } else {
-    const publisher = metadata.publisher;
-    if (publisher !== "soren-sdk") {
+    if (metadata.publisher !== "soren-sdk") {
       issues.push(
         repositoryIssue(
           "skill-metadata-publisher",
@@ -334,11 +331,10 @@ function validateSkill(
         )
       );
     }
-    const version = metadata.version;
     if (
-      typeof version !== "string" ||
+      typeof metadata.version !== "string" ||
       !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(
-        version
+        metadata.version
       )
     ) {
       issues.push(
@@ -401,8 +397,7 @@ function validateSkill(
     } else {
       try {
         const sourceRegistry = readJson(sourcePath) as JsonValue;
-        const actualDigest = digestJson(sourceRegistry);
-        if (actualDigest !== sourceDigest) {
+        if (digestJson(sourceRegistry) !== sourceDigest) {
           issues.push(
             repositoryIssue(
               "skill-source-digest",
@@ -436,8 +431,7 @@ export function validateRepository(root: string): RepositoryValidationReport {
   new ContractValidator();
 
   const capabilityPath = join(root, "capabilities", "catalog.json");
-  const capabilityValue = readJson(capabilityPath);
-  const capabilityResult = validateCapabilityCatalog(capabilityValue);
+  const capabilityResult = validateCapabilityCatalog(readJson(capabilityPath));
   if (!capabilityResult.ok) {
     report.errors.push({
       path: capabilityPath,
@@ -531,10 +525,7 @@ async function main(): Promise<void> {
   const root = resolve(process.cwd(), "../..");
   const report = validateRepository(root);
 
-  for (const warning of report.warnings) {
-    console.warn(`warning: ${warning}`);
-  }
-
+  for (const warning of report.warnings) console.warn(`warning: ${warning}`);
   for (const failure of report.errors) {
     console.error(`error: ${failure.path}`);
     for (const issue of failure.issues) {
@@ -546,16 +537,11 @@ async function main(): Promise<void> {
     `Validated ${report.validatedConnectors.length} Schema v2 connector(s); ` +
       `${report.warnings.length} warning(s); ${report.errors.length} error(s).`
   );
-
-  if (report.errors.length > 0) {
-    process.exitCode = 1;
-  }
+  if (report.errors.length > 0) process.exitCode = 1;
 }
 
 const isEntryPoint =
   process.argv[1] !== undefined &&
   import.meta.url === pathToFileURL(process.argv[1]).href;
 
-if (isEntryPoint) {
-  await main();
-}
+if (isEntryPoint) await main();
