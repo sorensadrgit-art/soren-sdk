@@ -90,6 +90,17 @@ function runtimeIntegration(
   };
 }
 
+function gsapCompanionIntegration(
+  id: "gsap-flip-runtime" | "gsap-scroll-trigger-runtime",
+  importPath: "gsap/Flip" | "gsap/ScrollTrigger"
+): ConnectorManifest["integrations"][number] {
+  return {
+    ...runtimeIntegration("gsap", "gsap"),
+    id,
+    importPaths: { javascript: importPath }
+  };
+}
+
 export function manifestFixture(
   providerId: "gsap" | "motion" | "web-platform",
   claims: string[]
@@ -103,6 +114,18 @@ export function manifestFixture(
             ?.ownershipDomain ?? claim
       )
     )
+  ];
+  const integrations: ConnectorManifest["integrations"] = [
+    runtimeIntegration(providerId, packageName),
+    ...(providerId === "gsap"
+      ? [
+          gsapCompanionIntegration("gsap-flip-runtime", "gsap/Flip"),
+          gsapCompanionIntegration(
+            "gsap-scroll-trigger-runtime",
+            "gsap/ScrollTrigger"
+          )
+        ]
+      : [])
   ];
   return {
     schemaVersion: "2.0.0-draft.1",
@@ -134,7 +157,7 @@ export function manifestFixture(
       conditions: [],
       limitations: []
     })),
-    integrations: [runtimeIntegration(providerId, packageName)],
+    integrations,
     ownershipClaims: domains.map((domain) => ({
       domain,
       scope: "requested-scope",
