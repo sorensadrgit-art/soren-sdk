@@ -1,0 +1,32 @@
+{
+  "providerId": "web-platform",
+  "version": "1.0.0",
+  "cases": [
+    {
+      "id": "css-transition-native",
+      "capabilities": ["platform.css-transition"],
+      "expectedStatus": "native"
+    },
+    {
+      "id": "css-animation-native",
+      "capabilities": ["platform.css-animation"],
+      "expectedStatus": "native"
+    },
+    {
+      "id": "waapi-native",
+      "capabilities": ["platform.waapi-animation"],
+      "expectedStatus": "native"
+    },
+    {
+      "id": "third-party-forbidden-native-remains",
+      "capabilities": ["platform.css-transition"],
+      "forbiddenProviders": ["motion", "gsap"],
+      "expectedStatus": "native"
+    },
+    {
+      "id": "timeline-not-claimed",
+      "capabilities": ["motion.timeline"],
+      "expectedProvider": "gsap"
+    }
+  ]
+}
