@@ -156,6 +156,21 @@ export function validateConnectorSemantics(
     }
 
     if (
+      integration.kind === "mcp-server" &&
+      integration.status === "available" &&
+      (integration.protocol?.name !== "mcp" ||
+        integration.protocol.supportedVersions.length === 0)
+    ) {
+      issues.push(
+        issue(
+          `${base}/protocol/supportedVersions`,
+          "available-mcp-protocol-version",
+          "Available MCP integrations must declare at least one verified supported protocol version."
+        )
+      );
+    }
+
+    if (
       manifest.connector.selectable &&
       integration.status === "available" &&
       integration.version.status === "unresolved"
