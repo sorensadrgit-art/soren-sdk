@@ -90,12 +90,14 @@ describe("Soren SDK CLI", () => {
     }
   });
 
-  it("lists connector IDs in human and stable JSON forms", () => {
+  it("lists approved connector IDs in human and stable JSON forms", () => {
     const human = captureIo();
     expect(
       runCli({ argv: ["catalog", "list"], cwd: repositoryRoot(), io: human.io })
     ).toBe(0);
-    expect(human.stdout.join("")).toContain("web-platform\tschema-v2\tfalse");
+    expect(human.stdout.join("")).toContain("web-platform\tschema-v2\ttrue");
+    expect(human.stdout.join("")).toContain("motion\tschema-v2\ttrue");
+    expect(human.stdout.join("")).toContain("gsap\tschema-v2\ttrue");
 
     const json = captureIo();
     expect(
@@ -109,7 +111,7 @@ describe("Soren SDK CLI", () => {
     expect(parsed.length).toBeGreaterThan(1);
   });
 
-  it("gets a connector and returns health JSON", () => {
+  it("gets a connector and returns healthy status JSON", () => {
     const get = captureIo();
     expect(
       runCli({
@@ -133,8 +135,181 @@ describe("Soren SDK CLI", () => {
     ).toBe(0);
     expect(JSON.parse(health.stdout.join(""))).toMatchObject({
       connectorId: "web-platform",
-      state: "blocked"
+      state: "healthy",
+      selectable: true
     });
+  });
+
+  it("routes a native capability in human and canonical JSON forms", () => {
+    const human = captureIo();
+    expect(
+      runCli({
+        argv: [
+          "route",
+          "--project",
+          ".",
+          "--capability",
+          "platform.css-transition"
+        ],
+        cwd: repositoryRoot(),
+        io: human.io
+      })
+    ).toBe(0);
+    expect(human.stdout.join("")).toContain("Route status: native");
+    expect(human.stdout.join("")).toContain("providers: none");
+
+    const json = captureIo();
+    expect(
+      runCli({
+        argv: [
+          "route",
+          "--project",
+          ".",
+          "--capability",
+          "platform.css-transition",
+          "--json"
+        ],
+        cwd: repositoryRoot(),
+        io: json.io
+      })
+    ).toBe(0);
+    expect(JSON.parse(json.stdout.join(""))).toMatchObject({
+      contractKind: "route-plan",
+      status: "native",
+      selectedProviders: []
+    });
+  });
+
+  it("parses repeated capabilities and provider constraints", () => {
+    const json = captureIo();
+    expect(
+      runCli({
+        argv: [
+          "route",
+          "--project",
+          ".",
+          "--capability",
+          "motion.timeline",
+          "--optional",
+          "motion.svg",
+          "--preferred",
+          "gsap",
+          "--forbidden",
+          "motion",
+          "--max-providers",
+          "1",
+          "--scope",
+          "hero",
+          "--property",
+          "transform",
+          "--json"
+        ],
+        cwd: repositoryRoot(),
+        io: json.io
+      })
+    ).toBe(0);
+    expect(JSON.parse(json.stdout.join(""))).toMatchObject({
+      status: "selected",
+      selectedProviders: [
+        {
+          providerId: "gsap",
+          reasonCode: "PREFERRED_PROVIDER"
+        }
+      ]
+    });
+  });
+
+  it("routes Motion only when the inspected project supports React", async () => {
+    const project = await mkdtemp(join(tmpdir(), "soren-sdk-route-react-"));
+    try {
+      await writeFile(
+        join(project, "package.json"),
+        JSON.stringify({
+          name: "react-route-fixture",
+          dependencies: { react: "18.2.0" }
+        }),
+        "utf8"
+      );
+      const json = captureIo();
+      expect(
+        runCli({
+          argv: [
+            "route",
+            "--project",
+            project,
+            "--capability",
+            "motion.layout",
+            "--json"
+          ],
+          cwd: repositoryRoot(),
+          io: json.io
+        })
+      ).toBe(0);
+      expect(JSON.parse(json.stdout.join(""))).toMatchObject({
+        status: "selected",
+        selectedProviders: [{ providerId: "motion" }]
+      });
+    } finally {
+      await rm(project, { recursive: true, force: true });
+    }
+  });
+
+  it("returns usage errors for missing capabilities and invalid provider limits", () => {
+    const missing = captureIo();
+    expect(
+      runCli({
+        argv: ["route", "--project", "."],
+        cwd: repositoryRoot(),
+        io: missing.io
+      })
+    ).toBe(2);
+    expect(missing.stderr.join("")).toContain("at least one --capability");
+
+    const invalid = captureIo();
+    expect(
+      runCli({
+        argv: [
+          "route",
+          "--capability",
+          "motion.timeline",
+          "--max-providers",
+          "not-a-number"
+        ],
+        cwd: repositoryRoot(),
+        io: invalid.io
+      })
+    ).toBe(2);
+    expect(invalid.stderr.join("")).toContain("non-negative integer");
+  });
+
+  it("does not write to an inspected project while routing", async () => {
+    const project = await mkdtemp(join(tmpdir(), "soren-sdk-route-readonly-"));
+    try {
+      await writeFile(
+        join(project, "package.json"),
+        '{"name":"route-readonly"}',
+        "utf8"
+      );
+      const before = await readdir(project);
+      const io = captureIo();
+      expect(
+        runCli({
+          argv: [
+            "route",
+            "--project",
+            project,
+            "--capability",
+            "platform.css-transition",
+            "--json"
+          ],
+          cwd: repositoryRoot(),
+          io: io.io
+        })
+      ).toBe(0);
+      expect(await readdir(project)).toEqual(before);
+    } finally {
+      await rm(project, { recursive: true, force: true });
+    }
   });
 
   it("returns exit code 2 for unknown connectors and invalid arguments", () => {
