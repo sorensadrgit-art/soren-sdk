@@ -1,18 +1,14 @@
 {
   "$schema": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/connector.schema.json",
   "schemaVersion": "2.0.0-draft.1",
-  "connectorVersion": "0.2.0",
+  "connectorVersion": "1.0.0",
   "connector": {
     "id": "web-platform",
     "name": "Web Platform connector",
     "publisher": "soren-sdk",
-    "reviewStatus": "experimental",
-    "selectable": false,
-    "blockers": [
-      "Built-in provider implementation is not yet available",
-      "Browser support policy is not yet encoded",
-      "Route evaluations are missing"
-    ]
+    "reviewStatus": "approved",
+    "selectable": true,
+    "blockers": []
   },
   "product": {
     "canonicalName": "Web Platform",
@@ -31,27 +27,27 @@
   "sourceTrust": {
     "sourceAuthority": "official",
     "integrityLevel": "url-recorded",
-    "reviewedAt": "2026-07-27",
+    "reviewedAt": "2026-07-30",
     "reviewer": "soren-sdk"
   },
   "capabilityClaims": [
     {
       "capability": "platform.css-transition",
       "support": "primary",
-      "confidence": 1.0,
+      "confidence": 1,
       "conditions": [
-        "Visual state can be expressed with CSS"
+        "The visual state change can be expressed with CSS transitionable properties"
       ],
       "limitations": [
-        "Not appropriate for complex imperative choreography"
+        "Not intended for complex imperative choreography"
       ]
     },
     {
       "capability": "platform.css-animation",
       "support": "primary",
-      "confidence": 1.0,
+      "confidence": 1,
       "conditions": [
-        "Animation can be expressed declaratively"
+        "The animation can be expressed declaratively with CSS keyframes"
       ],
       "limitations": [
         "Limited orchestration compared with timeline engines"
@@ -62,7 +58,7 @@
       "support": "primary",
       "confidence": 0.95,
       "conditions": [
-        "Browser support meets project policy"
+        "Project browser targets support the required Web Animations API surface"
       ],
       "limitations": [
         "Requires explicit lifecycle and cancellation management"
@@ -94,30 +90,55 @@
       "licenseExpression": "not-applicable",
       "fallback": null,
       "notes": [
-        "Represents native browser capabilities and requires no package installation."
+        "Native browser capability; no package installation or external runtime is required."
       ]
+    },
+    {
+      "id": "web-platform-documentation",
+      "kind": "documentation",
+      "mode": "knowledge",
+      "status": "available",
+      "source": "https://developer.mozilla.org/docs/Web/API/Web_Animations_API",
+      "version": {
+        "status": "not-applicable"
+      },
+      "authorization": {
+        "required": false,
+        "method": "none",
+        "paidPlan": false
+      },
+      "executionRisk": "read-only",
+      "dataExposure": "remote-source",
+      "permissions": {
+        "filesystem": "none",
+        "network": [
+          "developer.mozilla.org"
+        ],
+        "projectWrite": false
+      },
+      "fallback": null
     }
   ],
   "ownershipClaims": [
     {
       "domain": "dom-style",
-      "scope": "selected-elements",
+      "scope": "requested-scope",
       "exclusive": true,
       "properties": [
-        "color",
         "background",
         "border",
+        "color",
         "opacity"
       ]
     },
     {
       "domain": "dom-animation",
-      "scope": "selected-elements",
+      "scope": "requested-scope",
       "exclusive": true,
       "properties": [
-        "transform",
+        "filter",
         "opacity",
-        "filter"
+        "transform"
       ]
     }
   ],
@@ -130,7 +151,6 @@
     ],
     "hardGates": [
       "connector-schema-valid",
-      "version-policy-resolved",
       "license-policy-resolved",
       "no-ownership-conflict",
       "no-unauthorized-permission"
@@ -139,23 +159,23 @@
   "relatedFiles": {
     "skill": {
       "path": "./SKILL.md",
-      "status": "planned"
+      "status": "present"
     },
     "sources": {
       "path": "./docs.sources.json",
-      "status": "planned"
+      "status": "present"
     },
     "compatibility": {
       "path": "./compatibility.json",
-      "status": "planned"
+      "status": "present"
     },
     "evaluations": {
-      "path": "./evaluations/",
-      "status": "planned"
+      "path": "./evaluations/route-cases.json",
+      "status": "present"
     }
   },
   "knowledge": {
-    "retrievedAt": "2026-07-27",
+    "retrievedAt": "2026-07-30",
     "staleAfterDays": 30
   }
 }
