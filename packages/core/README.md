@@ -11,10 +11,10 @@ The package exposes three stable service areas:
 ## Public router API
 
 ```ts
+import type { RouteRequest } from "@soren-sdk/contracts";
 import {
   inspectProject,
-  routeCapabilities,
-  type RouteRequest
+  routeCapabilities
 } from "@soren-sdk/core";
 import { FileSystemConnectorCatalog } from "@soren-sdk/connectors";
 
@@ -93,8 +93,7 @@ Full details: [`../../docs/PHASE-4-NATIVE-FIRST-ROUTER.md`](../../docs/PHASE-4-N
 ```ts
 import {
   inspectProject,
-  ProjectInspectionError,
-  type InspectProjectOptions
+  ProjectInspectionError
 } from "@soren-sdk/core";
 
 const snapshot = inspectProject({
@@ -103,7 +102,7 @@ const snapshot = inspectProject({
 });
 ```
 
-`inspectProject()` returns a contract-valid `ProjectSnapshot` from `@soren-sdk/contracts`.
+`inspectProject()` returns a contract-valid `ProjectSnapshot`.
 
 ## What the inspector reads
 
@@ -112,38 +111,20 @@ const snapshot = inspectProject({
 - `pnpm-workspace.yaml` or `package.json` workspace declarations
 - Selected framework, TypeScript, Storybook, shadcn, testing, lint, and Soren configuration files
 - Soren policy files
-- `.browserslistrc` and `browserslist` package metadata
+- Browser target metadata
 - Static `.git` metadata needed to resolve the current commit
 
 Configuration and policy contents are represented by SHA-256 digests. Their raw contents are not copied into the snapshot.
 
-## What the inspector records
-
-- Git revision metadata
-- Package manager, declared version, lockfile path, and lockfile digest
-- Stable workspace package list
-- Runtime and framework versions
-- Dependency inventory across all workspace package manifests
-- Configuration and policy file paths and digests
-- Browser and runtime targets
-- Deterministic warnings
-- A content-addressed snapshot ID
-
 ## Determinism
 
-The project snapshot ID excludes:
-
-- Absolute project root
-- Snapshot creation time
-- The snapshot ID field itself
-
-It includes all other normalized project-state fields. Identical clones inspected at different paths and times produce the same ID.
+The project snapshot ID excludes the absolute project root, snapshot creation time, and the snapshot ID field itself. Identical clones inspected at different paths and times produce the same ID.
 
 ## Static Git limitation
 
 The inspector does not execute `git status`. It resolves Git HEAD from directories, worktree pointers, loose refs, and packed refs, but cannot prove that a worktree is clean. It records `dirty: true` with an explicit warning.
 
-## Filesystem and security boundaries
+## Security boundaries
 
 The inspector and router:
 
