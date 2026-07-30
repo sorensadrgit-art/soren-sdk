@@ -1,6 +1,7 @@
 import type {
   Capability,
   CapabilityCatalog,
+  OwnershipClaim,
   RoutePlan,
   RouteRequest
 } from "@soren-sdk/contracts";
@@ -76,6 +77,14 @@ function capabilityById(
   return capability;
 }
 
+function claimOwnsProperty(claim: OwnershipClaim, property: string): boolean {
+  return (
+    claim.properties === undefined ||
+    claim.properties.length === 0 ||
+    claim.properties.includes(property)
+  );
+}
+
 export function assignCapabilities(
   providerSet: readonly ProviderCandidate[],
   capabilityIds: readonly string[],
@@ -101,7 +110,10 @@ export function assignCapabilities(
     const property =
       stringQuality(quality, "property") ?? capability.ownershipDomain;
     const exclusive = provider.manifest.ownershipClaims.some(
-      (claim) => claim.domain === capability.ownershipDomain && claim.exclusive
+      (claim) =>
+        claim.domain === capability.ownershipDomain &&
+        claim.exclusive &&
+        claimOwnsProperty(claim, property)
     );
 
     assignments.push({
