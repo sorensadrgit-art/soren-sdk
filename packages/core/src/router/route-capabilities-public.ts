@@ -289,34 +289,38 @@ function equivalentWinner(input: RouteInput): string[] | null {
     )[0] ?? null;
 }
 
+function candidateMap(input: RouteInput): Map<string, ProviderCandidate> {
+  const requiredCapabilityIds = new Set(
+    input.request.capabilities
+      .filter((capability) => capability.required)
+      .map((capability) => capability.id)
+  );
+  const collection = collectProviderCandidates({
+    catalog: input.catalog,
+    project: input.project,
+    request: input.request,
+    policy: input.policy ?? PHASE_4_POLICY,
+    requiredCapabilityIds
+  });
+  return new Map(
+    collection.candidates.map((candidate) => [candidate.providerId, candidate])
+  );
+}
+
 function rebuildPlan(
   plan: RoutePlan,
   input: RouteInput,
   originalPreferredProviders: readonly string[]
 ): RoutePlan {
+  const candidates = candidateMap(input);
   const selectedProviders = plan.selectedProviders
     .map((selected) => {
-      const record = input.catalog.get(selected.providerId);
-      if (record === undefined || record.kind !== "schema-v2") return selected;
-      const candidate: ProviderCandidate = {
-        providerId: selected.providerId,
-        manifest: record.manifest,
-        integrationIds: record.manifest.integrations
-          .filter(
-            (integration) =>
-              integration.status === "available" && integration.mode === "runtime"
-          )
-          .map((integration) => integration.id)
-          .sort(),
-        claims: new Map(
-          record.manifest.capabilityClaims.map((claim) => [
-            claim.capability,
-            claim
-          ])
-        ),
-        dependencyReuse: false,
-        preferredRank: null
-      };
+      const candidate = candidates.get(selected.providerId);
+      if (candidate === undefined) {
+        throw new Error(
+          `Selected provider "${selected.providerId}" is no longer policy-eligible during final Route Plan construction.`
+        );
+      }
       const injectedPreference =
         selected.reasonCode === "PREFERRED_PROVIDER" &&
         !originalPreferredProviders.includes(selected.providerId);
