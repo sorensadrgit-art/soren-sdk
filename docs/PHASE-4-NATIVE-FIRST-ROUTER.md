@@ -96,6 +96,16 @@ const plan = routeCapabilities({
 
 Every other connector remains non-selectable by this router even when visible in the catalog.
 
+## Reviewed connector versions
+
+- Motion runtime: `motion@12.42.2`
+- Motion React import: `motion/react`
+- Motion AI Kit knowledge/tool metadata: `6.2.0`
+- GSAP runtime: `gsap@3.15.0`
+- GSAP runtime license: `LicenseRef-GSAP-Standard`
+
+Documentation, Agent Skills, and hosted MCP metadata are modeled as separate integration artifacts. Only policy-approved runtime artifacts can appear in `selectedProviders.integrationIds`.
+
 ## Resolution order
 
 1. Validate the Route Request, Project Snapshot, Policy, Capability Catalog, Catalog Snapshot, and final Route Plan.
@@ -120,19 +130,20 @@ A provider is never scored when any of these gates fail:
 
 - Outside the Phase 4 allowlist
 - Explicitly forbidden by the request or policy
-- Legacy, unhealthy, unapproved, or non-selectable connector
-- Experimental when experimental providers are disallowed
+- Legacy, unhealthy, unapproved, blocked, or non-selectable connector
 - Missing a required capability claim
 - Missing a policy-approved available runtime integration
+- Missing a required companion runtime integration
 - Unresolved runtime version
-- Disallowed license
+- Disallowed runtime license
 - Paid runtime service when paid services are disallowed
 - Runtime network, filesystem, command, remote-project-content, or project-write exposure
+- Missing reduced-motion verification when the policy requires it
 - Motion React capability with React below 18.2 or absent
 - Provider set exceeding `maxProviders`
 - Exclusive ownership conflict
 
-Documentation, Agent Skills, and MCP metadata are cataloged separately from runtime artifacts. The Phase 4 router selects runtime integrations only. The unverified paid Motion MCP metadata is never a routing candidate.
+The Phase 4 router selects runtime integrations only. Motion AI Kit skills and hosted MCP tools are cataloged for later read-only tool-gateway phases but are never runtime routing candidates.
 
 ## Native-first behavior
 
@@ -197,6 +208,8 @@ The route digest and plan ID exclude:
 
 Identical content produces the same route identity across clones and times. Adding an unrelated dependency does not change provider choice. Adding an installed approved provider may change the explanation to `EXISTING_DEPENDENCY_REUSE` without changing coverage.
 
+Materially different tied architectures return `needs-input`. A stable provider ID is used only after the router proves tied routes have equivalent capability assignments, claims, ownership behavior, and policy-approved runtime artifacts.
+
 ## CLI
 
 Native route:
@@ -245,7 +258,11 @@ Permanent checks include:
 
 - 34 positive, negative, composition, and constraint golden route cases
 - Metamorphic determinism tests
-- Material-tie tests
+- Material and behaviorally equivalent tie tests
+- Required companion-runtime tests
+- Reduced-motion policy regressions
+- Policy-denied runtime leakage regressions
+- Inconsistent catalog-health and unapproved-manifest regressions
 - Ownership conflict tests
 - Connector health and repository validation
 - Human and JSON CLI route tests
