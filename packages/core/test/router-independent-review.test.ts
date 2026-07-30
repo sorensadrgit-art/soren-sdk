@@ -36,9 +36,47 @@ describe("independent review: environment compatibility", () => {
     );
   });
 
+  it("blocks environment-prefixed IE targets emitted by the inspector", () => {
+    const project = projectFixture();
+    project.targets.browsers = ["production:ie 11"];
+
+    const plan = routeCapabilities({
+      request: requestFixture({
+        required: ["platform.waapi-animation"],
+        projectSnapshotId: project.snapshotId
+      }),
+      project,
+      catalog: new MemoryCatalogFixture()
+    });
+
+    expect(plan.status).toBe("blocked");
+    expect(plan.constraints).toContainEqual(
+      expect.objectContaining({
+        code: "ENVIRONMENT_UNSUPPORTED",
+        status: "failed"
+      })
+    );
+  });
+
   it("does not treat Browserslist exclusions as positive WAAPI targets", () => {
     const project = projectFixture();
     project.targets.browsers = ["defaults", "not ie 11", "not op_mini all"];
+
+    const plan = routeCapabilities({
+      request: requestFixture({
+        required: ["platform.waapi-animation"],
+        projectSnapshotId: project.snapshotId
+      }),
+      project,
+      catalog: new MemoryCatalogFixture()
+    });
+
+    expect(plan.status).toBe("native");
+  });
+
+  it("does not treat environment-prefixed exclusions as positive targets", () => {
+    const project = projectFixture();
+    project.targets.browsers = ["production:not ie 11", "production:defaults"];
 
     const plan = routeCapabilities({
       request: requestFixture({
