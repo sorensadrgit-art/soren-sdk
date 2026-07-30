@@ -19,6 +19,10 @@ describe("Phase 4 companion runtime artifacts", () => {
     const gsapWithoutScrollTrigger = manifestFixture("gsap", [
       "scroll.triggered-animation"
     ]);
+    gsapWithoutScrollTrigger.integrations =
+      gsapWithoutScrollTrigger.integrations.filter(
+        (integration) => integration.id !== "gsap-scroll-trigger-runtime"
+      );
     const project = projectFixture();
     const plan = routeCapabilities({
       request: requestFixture({
