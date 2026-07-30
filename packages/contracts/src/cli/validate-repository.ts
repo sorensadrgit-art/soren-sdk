@@ -17,7 +17,7 @@ export interface RepositoryValidationReport {
   validatedConnectors: string[];
 }
 
-type YamlValue = boolean | null | number | string | YamlRecord;
+type YamlValue = boolean | null | number | string | Record<string, unknown>;
 type YamlRecord = Record<string, YamlValue>;
 
 class SkillYamlError extends Error {
