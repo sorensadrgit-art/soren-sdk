@@ -88,12 +88,12 @@ export const goldenRouteCases: GoldenRouteCase[] = [
     expectedReasonCode: "EXISTING_DEPENDENCY_REUSE"
   },
   {
-    name: "framer-motion alias still routes to Motion",
+    name: "framer-motion alias routes to Motion as a migration signal",
     required: ["motion.presence"],
     dependencies: ["framer-motion"],
     expectedStatus: "selected",
     expectedProviders: ["motion"],
-    expectedReasonCode: "EXISTING_DEPENDENCY_REUSE"
+    expectedReasonCode: "CAPABILITY_MATCH"
   },
   {
     name: "React below 18.2 blocks Motion React claims",
