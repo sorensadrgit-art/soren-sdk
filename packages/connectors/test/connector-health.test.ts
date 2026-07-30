@@ -29,6 +29,7 @@ describe("connector health", () => {
 
   it("reports connector blockers as blocked", async () => {
     const manifest = await validConnectorManifest("blocked");
+    manifest.connector.selectable = false;
     manifest.connector.blockers = ["Needs approval"];
     const fixture = await createCatalogFixture({ blocked: manifest });
     try {
