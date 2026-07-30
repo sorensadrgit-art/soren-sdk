@@ -13,15 +13,8 @@
   "product": {
     "canonicalName": "Motion",
     "homepage": "https://motion.dev/",
-    "aliases": [
-      "framer-motion",
-      "motion-one"
-    ],
-    "categories": [
-      "motion",
-      "interaction",
-      "react"
-    ]
+    "aliases": ["framer-motion", "motion-one"],
+    "categories": ["motion", "interaction", "react"]
   },
   "sourceTrust": {
     "sourceAuthority": "official",
@@ -34,71 +27,43 @@
       "capability": "motion.presence",
       "support": "primary",
       "confidence": 1,
-      "conditions": [
-        "React 18.2 or newer",
-        "Component mount or unmount state owns the animation lifecycle"
-      ],
-      "limitations": [
-        "Not intended for framework-independent timeline choreography"
-      ]
+      "conditions": ["React 18.2 or newer"],
+      "limitations": ["Not framework-independent timeline choreography"]
     },
     {
       "capability": "motion.layout",
       "support": "primary",
       "confidence": 1,
-      "conditions": [
-        "React 18.2 or newer",
-        "Layout projection is appropriate for the requested transition"
-      ],
-      "limitations": [
-        "Explicit property ownership is required when combined with another animation provider"
-      ]
+      "conditions": ["React 18.2 or newer"],
+      "limitations": ["Requires explicit property ownership when composed"]
     },
     {
       "capability": "motion.shared-layout",
       "support": "primary",
       "confidence": 1,
-      "conditions": [
-        "React 18.2 or newer",
-        "Shared layout identity is stable across the transition"
-      ],
-      "limitations": [
-        "Requires coordinated React layout identity"
-      ]
+      "conditions": ["React 18.2 or newer"],
+      "limitations": ["Requires stable shared layout identity"]
     },
     {
       "capability": "motion.spring",
       "support": "primary",
       "confidence": 0.98,
-      "conditions": [
-        "React 18.2 or newer"
-      ],
-      "limitations": [
-        "Simple self-contained transitions should remain native when a spring is not required"
-      ]
+      "conditions": ["React 18.2 or newer"],
+      "limitations": ["Native remains preferred when a spring is not required"]
     },
     {
       "capability": "interaction.drag",
       "support": "primary",
       "confidence": 1,
-      "conditions": [
-        "React 18.2 or newer",
-        "Pointer-driven direct manipulation is required"
-      ],
-      "limitations": [
-        "Advanced non-React drag systems are outside this claim"
-      ]
+      "conditions": ["React 18.2 or newer"],
+      "limitations": ["Advanced non-React drag systems are outside this claim"]
     },
     {
       "capability": "interaction.gesture",
       "support": "primary",
       "confidence": 0.98,
-      "conditions": [
-        "React 18.2 or newer"
-      ],
-      "limitations": [
-        "Does not claim complex scroll choreography"
-      ]
+      "conditions": ["React 18.2 or newer"],
+      "limitations": ["Does not claim complex scroll choreography"]
     }
   ],
   "integrations": [
@@ -130,10 +95,7 @@
       "importPaths": {
         "javascript": "motion",
         "react": "motion/react"
-      },
-      "notes": [
-        "Runtime selection never installs or executes the package; it only records the approved provider choice."
-      ]
+      }
     },
     {
       "id": "motion-documentation",
@@ -153,9 +115,7 @@
       "dataExposure": "remote-source",
       "permissions": {
         "filesystem": "none",
-        "network": [
-          "motion.dev"
-        ],
+        "network": ["motion.dev"],
         "projectWrite": false
       },
       "fallback": null
@@ -178,9 +138,7 @@
       "dataExposure": "remote-source",
       "permissions": {
         "filesystem": "none",
-        "network": [
-          "motion.dev"
-        ],
+        "network": ["motion.dev"],
         "projectWrite": false
       },
       "licenseExpression": "MIT",
@@ -209,15 +167,12 @@
       "dataExposure": "remote-project-content",
       "permissions": {
         "filesystem": "none",
-        "network": [
-          "motion.dev"
-        ],
+        "network": ["motion.dev"],
         "projectWrite": false
       },
+      "licenseExpression": "NOASSERTION",
       "fallback": "motion-documentation",
-      "notes": [
-        "Recorded for catalog completeness only. It is not selectable by the Phase 4 router."
-      ]
+      "notes": ["Catalog metadata only; never selectable by the Phase 4 router."]
     }
   ],
   "ownershipClaims": [
@@ -225,35 +180,25 @@
       "domain": "presence",
       "scope": "requested-scope",
       "exclusive": true,
-      "properties": [
-        "opacity",
-        "transform"
-      ]
+      "properties": ["opacity", "transform"]
     },
     {
       "domain": "layout",
       "scope": "requested-scope",
       "exclusive": true,
-      "properties": [
-        "layout",
-        "transform"
-      ]
+      "properties": ["layout", "transform"]
     },
     {
       "domain": "timing",
       "scope": "requested-scope",
       "exclusive": false,
-      "properties": [
-        "transition"
-      ]
+      "properties": ["transition"]
     },
     {
       "domain": "gesture",
       "scope": "requested-scope",
       "exclusive": true,
-      "properties": [
-        "transform"
-      ]
+      "properties": ["transform"]
     }
   ],
   "verification": {
