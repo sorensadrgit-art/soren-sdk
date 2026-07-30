@@ -1,0 +1,44 @@
+{
+  "providerId": "motion",
+  "version": "1.0.0",
+  "runtime": {
+    "package": "motion",
+    "version": "12.42.1",
+    "imports": {
+      "react": "motion/react",
+      "javascript": "motion"
+    }
+  },
+  "rules": [
+    {
+      "id": "react-minimum",
+      "appliesTo": [
+        "motion.presence",
+        "motion.layout",
+        "motion.shared-layout",
+        "motion.spring",
+        "interaction.drag",
+        "interaction.gesture"
+      ],
+      "requirements": ["React 18.2 or newer"]
+    },
+    {
+      "id": "native-first",
+      "requirements": [
+        "Use CSS or WAAPI instead when a simple native capability fully satisfies the request"
+      ]
+    }
+  ],
+  "aliases": [
+    {
+      "package": "framer-motion",
+      "meaning": "Existing dependency reuse and migration signal for provider motion"
+    }
+  ],
+  "conflicts": [
+    {
+      "id": "exclusive-property-owner",
+      "description": "Motion cannot exclusively own the same explicit scope and property as another provider."
+    }
+  ]
+}
