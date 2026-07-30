@@ -3,6 +3,9 @@ name: web-platform
 description: Use when browser-native CSS or Web Animations API capabilities fully satisfy the requested behavior.
 license: LicenseRef-Soren-SDK-Internal
 compatibility: Soren SDK Phase 4; browser-native runtime; no executable scripts
+metadata:
+  publisher: soren-sdk
+  version: 1.0.0
 source: ./docs.sources.json
 source-digest: sha256:8a1f03a2689222031b57186f7172ccae7697037462f688c6576f3a50241016d7
 ---
