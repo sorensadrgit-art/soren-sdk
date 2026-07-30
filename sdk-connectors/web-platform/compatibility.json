@@ -1,0 +1,31 @@
+{
+  "providerId": "web-platform",
+  "version": "1.0.0",
+  "rules": [
+    {
+      "id": "browser-native-runtime",
+      "appliesTo": [
+        "platform.css-transition",
+        "platform.css-animation",
+        "platform.waapi-animation"
+      ],
+      "requirements": [
+        "Project browser targets must support the selected native feature",
+        "Reduced-motion behavior is required"
+      ]
+    },
+    {
+      "id": "waapi-lifecycle",
+      "appliesTo": ["platform.waapi-animation"],
+      "requirements": [
+        "Animations must be cancelled or released when their owning lifecycle ends"
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "id": "exclusive-property-owner",
+      "description": "No other provider may exclusively own the same explicit scope and property."
+    }
+  ]
+}
