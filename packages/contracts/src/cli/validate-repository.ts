@@ -17,6 +17,20 @@ export interface RepositoryValidationReport {
   validatedConnectors: string[];
 }
 
+type YamlValue = boolean | null | number | string | YamlRecord;
+type YamlRecord = Record<string, YamlValue>;
+
+class SkillYamlError extends Error {
+  override readonly name = "SkillYamlError";
+
+  constructor(
+    message: string,
+    readonly line: number
+  ) {
+    super(message);
+  }
+}
+
 function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8")) as unknown;
 }
@@ -39,26 +53,174 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown repository read error.";
 }
 
-function stripYamlString(value: string): string {
-  const trimmed = value.trim();
-  if (
-    trimmed.length >= 2 &&
-    ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-      (trimmed.startsWith("'") && trimmed.endsWith("'")))
-  ) {
-    return trimmed.slice(1, -1);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stripYamlComment(value: string, line: number): string {
+  let singleQuoted = false;
+  let doubleQuoted = false;
+  let escaped = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (doubleQuoted) {
+      if (escaped) {
+        escaped = false;
+      } else if (character === "\\") {
+        escaped = true;
+      } else if (character === '"') {
+        doubleQuoted = false;
+      }
+      continue;
+    }
+    if (singleQuoted) {
+      if (character === "'") {
+        if (value[index + 1] === "'") {
+          index += 1;
+        } else {
+          singleQuoted = false;
+        }
+      }
+      continue;
+    }
+    if (character === '"') {
+      doubleQuoted = true;
+      continue;
+    }
+    if (character === "'") {
+      singleQuoted = true;
+      continue;
+    }
+    if (
+      character === "#" &&
+      (index === 0 || /\s/.test(value[index - 1] ?? ""))
+    ) {
+      return value.slice(0, index).trimEnd();
+    }
+  }
+
+  if (singleQuoted || doubleQuoted || escaped) {
+    throw new SkillYamlError("Unterminated quoted YAML scalar.", line);
+  }
+  return value;
+}
+
+function parseYamlScalar(value: string, line: number): YamlValue {
+  const trimmed = stripYamlComment(value, line).trim();
+  if (trimmed === "") {
+    throw new SkillYamlError("Expected a YAML scalar value.", line);
+  }
+
+  if (trimmed.startsWith('"')) {
+    if (!trimmed.endsWith('"') || trimmed.length < 2) {
+      throw new SkillYamlError("Unterminated double-quoted YAML scalar.", line);
+    }
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      if (typeof parsed !== "string") {
+        throw new SkillYamlError("Quoted YAML scalar must be a string.", line);
+      }
+      return parsed;
+    } catch (error) {
+      if (error instanceof SkillYamlError) throw error;
+      throw new SkillYamlError(
+        `Invalid double-quoted YAML scalar: ${errorMessage(error)}`,
+        line
+      );
+    }
+  }
+
+  if (trimmed.startsWith("'")) {
+    if (!trimmed.endsWith("'") || trimmed.length < 2) {
+      throw new SkillYamlError("Unterminated single-quoted YAML scalar.", line);
+    }
+    return trimmed.slice(1, -1).replaceAll("''", "'");
+  }
+
+  if (/^[\[{&*!|>@`]/.test(trimmed)) {
+    throw new SkillYamlError(
+      "Unsupported YAML collection, tag, anchor, alias, or block scalar.",
+      line
+    );
+  }
+  if (/^(?:null|~)$/i.test(trimmed)) return null;
+  if (/^(?:true|false)$/i.test(trimmed)) return trimmed.toLowerCase() === "true";
+  if (/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(trimmed)) {
+    return Number(trimmed);
   }
   return trimmed;
 }
 
+function parseYamlMapping(source: string): YamlRecord {
+  const root: YamlRecord = {};
+  const stack: Array<{ indent: number; record: YamlRecord }> = [
+    { indent: -2, record: root }
+  ];
+
+  for (const [index, originalLine] of source.split("\n").entries()) {
+    const lineNumber = index + 1;
+    if (originalLine.includes("\t")) {
+      throw new SkillYamlError("Tabs are not allowed in YAML indentation.", lineNumber);
+    }
+    const withoutComment = stripYamlComment(originalLine, lineNumber);
+    if (withoutComment.trim() === "") continue;
+
+    const indentation = /^ */.exec(withoutComment)?.[0].length ?? 0;
+    if (indentation % 2 !== 0) {
+      throw new SkillYamlError(
+        "YAML mappings must use two-space indentation.",
+        lineNumber
+      );
+    }
+    const content = withoutComment.slice(indentation);
+    const match = /^([A-Za-z][A-Za-z0-9_-]*):(?:\s+(.*))?$/.exec(content);
+    if (match === null) {
+      throw new SkillYamlError(
+        "Expected a YAML mapping entry in key: value form.",
+        lineNumber
+      );
+    }
+
+    while (
+      stack.length > 1 &&
+      indentation <= (stack[stack.length - 1]?.indent ?? -2)
+    ) {
+      stack.pop();
+    }
+    const parent = stack[stack.length - 1];
+    if (parent === undefined || indentation !== parent.indent + 2) {
+      throw new SkillYamlError(
+        "Invalid YAML mapping indentation.",
+        lineNumber
+      );
+    }
+
+    const key = match[1] ?? "";
+    if (Object.hasOwn(parent.record, key)) {
+      throw new SkillYamlError(`Duplicate YAML key "${key}".`, lineNumber);
+    }
+    const rawValue = match[2];
+    if (rawValue === undefined || rawValue.trim() === "") {
+      const nested: YamlRecord = {};
+      parent.record[key] = nested;
+      stack.push({ indent: indentation, record: nested });
+    } else {
+      parent.record[key] = parseYamlScalar(rawValue, lineNumber);
+    }
+  }
+
+  return root;
+}
+
 function parseSkillFrontmatter(source: string): {
-  fields: Map<string, string>;
+  value: YamlRecord | null;
   issues: ContractIssue[];
 } {
   const normalized = source.replaceAll("\r\n", "\n");
   if (!normalized.startsWith("---\n")) {
     return {
-      fields: new Map(),
+      value: null,
       issues: [
         repositoryIssue(
           "skill-frontmatter",
@@ -71,7 +233,7 @@ function parseSkillFrontmatter(source: string): {
   const closing = normalized.indexOf("\n---\n", 4);
   if (closing < 0) {
     return {
-      fields: new Map(),
+      value: null,
       issues: [
         repositoryIssue(
           "skill-frontmatter",
@@ -81,39 +243,47 @@ function parseSkillFrontmatter(source: string): {
     };
   }
 
-  const fields = new Map<string, string>();
-  const issues: ContractIssue[] = [];
-  for (const [index, line] of normalized.slice(4, closing).split("\n").entries()) {
-    const trimmed = line.trim();
-    if (trimmed === "" || trimmed.startsWith("#")) continue;
-    const match = /^([a-z][a-z0-9-]*):\s*(.+)$/.exec(trimmed);
-    if (match === null) {
-      issues.push(
+  try {
+    return {
+      value: parseYamlMapping(normalized.slice(4, closing)),
+      issues: []
+    };
+  } catch (error) {
+    const line = error instanceof SkillYamlError ? error.line : 0;
+    return {
+      value: null,
+      issues: [
         repositoryIssue(
           "skill-frontmatter",
-          `Unsupported YAML frontmatter syntax on line ${index + 2}.`
+          `${errorMessage(error)}${line > 0 ? ` Frontmatter line ${line}.` : ""}`
         )
-      );
-      continue;
-    }
-    const key = match[1] ?? "";
-    if (fields.has(key)) {
-      issues.push(
-        repositoryIssue(
-          "skill-frontmatter",
-          `Duplicate Agent Skill frontmatter field "${key}".`
-        )
-      );
-      continue;
-    }
-    fields.set(key, stripYamlString(match[2] ?? ""));
+      ]
+    };
   }
-  return { fields, issues };
 }
 
 function isPathInside(root: string, candidate: string): boolean {
   const path = relative(root, candidate);
   return path === "" || (!path.startsWith("..") && !isAbsolute(path));
+}
+
+function yamlString(
+  value: YamlRecord,
+  field: string,
+  issues: ContractIssue[]
+): string | null {
+  const candidate = value[field];
+  if (typeof candidate !== "string" || candidate.trim() === "") {
+    issues.push(
+      repositoryIssue(
+        `skill-${field}`,
+        `Agent Skill frontmatter requires a non-empty string "${field}" field.`,
+        `/${field}`
+      )
+    );
+    return null;
+  }
+  return candidate.trim();
 }
 
 function validateSkill(
@@ -135,33 +305,54 @@ function validateSkill(
 
   const parsed = parseSkillFrontmatter(source);
   const issues = [...parsed.issues];
-  if (parsed.issues.some((issue) => issue.keyword === "skill-frontmatter")) {
-    return issues;
-  }
+  if (parsed.value === null) return issues;
 
-  const required = [
-    "name",
-    "description",
-    "license",
-    "compatibility",
-    "source",
-    "source-digest"
-  ] as const;
-  for (const field of required) {
-    if ((parsed.fields.get(field) ?? "").trim() === "") {
+  const name = yamlString(parsed.value, "name", issues);
+  const description = yamlString(parsed.value, "description", issues);
+  yamlString(parsed.value, "license", issues);
+  yamlString(parsed.value, "compatibility", issues);
+  const sourcePathValue = yamlString(parsed.value, "source", issues);
+  const sourceDigest = yamlString(parsed.value, "source-digest", issues);
+
+  const metadata = parsed.value.metadata;
+  if (!isRecord(metadata)) {
+    issues.push(
+      repositoryIssue(
+        "skill-metadata",
+        "Agent Skill frontmatter requires a nested metadata mapping.",
+        "/metadata"
+      )
+    );
+  } else {
+    const publisher = metadata.publisher;
+    if (publisher !== "soren-sdk") {
       issues.push(
         repositoryIssue(
-          `skill-${field}`,
-          `Agent Skill frontmatter requires a non-empty "${field}" field.`,
-          `/${field}`
+          "skill-metadata-publisher",
+          'Agent Skill metadata.publisher must be "soren-sdk".',
+          "/metadata/publisher"
+        )
+      );
+    }
+    const version = metadata.version;
+    if (
+      typeof version !== "string" ||
+      !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(
+        version
+      )
+    ) {
+      issues.push(
+        repositoryIssue(
+          "skill-metadata-version",
+          "Agent Skill metadata.version must be a semantic version string.",
+          "/metadata/version"
         )
       );
     }
   }
 
-  const name = parsed.fields.get("name");
   if (
-    name !== undefined &&
+    name !== null &&
     (name !== connectorId || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name))
   ) {
     issues.push(
@@ -173,9 +364,8 @@ function validateSkill(
     );
   }
 
-  const description = parsed.fields.get("description");
   if (
-    description !== undefined &&
+    description !== null &&
     (description.length < 20 || !/\bwhen\b/i.test(description))
   ) {
     issues.push(
@@ -187,11 +377,12 @@ function validateSkill(
     );
   }
 
-  const sourcePathValue = parsed.fields.get("source");
-  const sourceDigest = parsed.fields.get("source-digest");
-  if (sourcePathValue !== undefined && sourceDigest !== undefined) {
+  if (sourcePathValue !== null && sourceDigest !== null) {
     const sourcePath = resolve(dirname(skillPath), sourcePathValue);
-    if (!sourcePathValue.startsWith("./") || !isPathInside(connectorDirectory, sourcePath)) {
+    if (
+      !sourcePathValue.startsWith("./") ||
+      !isPathInside(connectorDirectory, sourcePath)
+    ) {
       issues.push(
         repositoryIssue(
           "skill-source",
@@ -242,7 +433,6 @@ export function validateRepository(root: string): RepositoryValidationReport {
     validatedConnectors: []
   };
 
-  // Construction validates every registered schema.
   new ContractValidator();
 
   const capabilityPath = join(root, "capabilities", "catalog.json");
@@ -258,9 +448,7 @@ export function validateRepository(root: string): RepositoryValidationReport {
 
   const connectorRoot = join(root, "sdk-connectors");
   for (const directoryName of readdirSync(connectorRoot).sort()) {
-    if (directoryName.startsWith("_")) {
-      continue;
-    }
+    if (directoryName.startsWith("_")) continue;
 
     const connectorDirectory = join(connectorRoot, directoryName);
     const manifestPath = join(connectorDirectory, "sdk.manifest.json");
