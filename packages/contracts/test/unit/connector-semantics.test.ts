@@ -38,6 +38,42 @@ function validateInvalid(name: string) {
   });
 }
 
+function connectorWithMcpProtocolVersions(
+  supportedVersions: string[]
+): ConnectorManifest {
+  const connector = structuredClone(
+    fixture("valid", "connector.json")
+  ) as ConnectorManifest;
+  connector.integrations.push({
+    id: "fixture-mcp",
+    kind: "mcp-server",
+    mode: "tool",
+    status: "available",
+    source: "https://example.test/mcp",
+    version: { status: "resolved", value: "1.0.0" },
+    protocol: {
+      name: "mcp",
+      supportedVersions,
+      extensions: []
+    },
+    authorization: {
+      required: false,
+      method: "none",
+      paidPlan: false
+    },
+    executionRisk: "read-only",
+    dataExposure: "remote-metadata",
+    permissions: {
+      filesystem: "none",
+      network: ["example.test"],
+      projectWrite: false
+    },
+    licenseExpression: "MIT",
+    fallback: null
+  });
+  return connector;
+}
+
 describe("connector semantic validation", () => {
   it.each([
     ["prose-version-placeholder.json", "version-placeholder"],
@@ -54,42 +90,19 @@ describe("connector semantic validation", () => {
     }
   });
 
-  it("rejects an available MCP artifact without a negotiable protocol version", () => {
-    const connector = structuredClone(
-      fixture("valid", "connector.json")
-    ) as ConnectorManifest;
-    connector.integrations.push({
-      id: "fixture-mcp",
-      kind: "mcp-server",
-      mode: "tool",
-      status: "available",
-      source: "https://example.test/mcp",
-      version: { status: "resolved", value: "1.0.0" },
-      protocol: {
-        name: "mcp",
-        supportedVersions: [],
-        extensions: []
-      },
-      authorization: {
-        required: false,
-        method: "none",
-        paidPlan: false
-      },
-      executionRisk: "read-only",
-      dataExposure: "remote-metadata",
-      permissions: {
-        filesystem: "none",
-        network: ["example.test"],
-        projectWrite: false
-      },
-      licenseExpression: "MIT",
-      fallback: null
-    });
-
-    const result = validateConnectorManifest(connector, {
-      expectedPublisher: "soren-sdk",
-      capabilityCatalog: capabilityCatalog()
-    });
+  it.each([
+    ["an empty version list", []],
+    ["a blank version", [""]],
+    ["a planning placeholder", ["TBD"]],
+    ["a non-version token", ["latest"]]
+  ])("rejects an available MCP artifact with %s", (_name, versions) => {
+    const result = validateConnectorManifest(
+      connectorWithMcpProtocolVersions(versions),
+      {
+        expectedPublisher: "soren-sdk",
+        capabilityCatalog: capabilityCatalog()
+      }
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(
@@ -98,6 +111,18 @@ describe("connector semantic validation", () => {
         )
       ).toBe(true);
     }
+  });
+
+  it("accepts an available MCP artifact with a machine-valid protocol version", () => {
+    expect(
+      validateConnectorManifest(
+        connectorWithMcpProtocolVersions(["2025-06-18"]),
+        {
+          expectedPublisher: "soren-sdk",
+          capabilityCatalog: capabilityCatalog()
+        }
+      ).ok
+    ).toBe(true);
   });
 
   it("accepts the valid Web Platform connector", () => {
