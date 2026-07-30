@@ -1,7 +1,8 @@
 {
   "providerId": "motion",
   "retrievedAt": "2026-07-30",
-  "runtimeVersion": "12.42.1",
+  "runtimeVersion": "12.42.2",
+  "aiKitVersion": "6.2.0",
   "sources": [
     {
       "authority": "official",
@@ -20,8 +21,18 @@
     },
     {
       "authority": "official",
+      "title": "Motion npm package",
+      "url": "https://www.npmjs.com/package/motion"
+    },
+    {
+      "authority": "official",
       "title": "Motion AI Kit installation",
       "url": "https://motion.dev/docs/ai-kit-install"
+    },
+    {
+      "authority": "official",
+      "title": "Motion AI Kit changelog",
+      "url": "https://motion.dev/changelog?lib=ai-kit"
     },
     {
       "authority": "official",
