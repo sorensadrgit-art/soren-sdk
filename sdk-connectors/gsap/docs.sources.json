@@ -1,0 +1,27 @@
+{
+  "providerId": "gsap",
+  "retrievedAt": "2026-07-30",
+  "runtimeVersion": "3.15.0",
+  "sources": [
+    {
+      "authority": "official",
+      "title": "GSAP installation",
+      "url": "https://gsap.com/docs/v3/Installation/"
+    },
+    {
+      "authority": "official",
+      "title": "GSAP core documentation",
+      "url": "https://gsap.com/docs/v3/GSAP/"
+    },
+    {
+      "authority": "official",
+      "title": "GSAP source repository",
+      "url": "https://github.com/greensock/GSAP"
+    },
+    {
+      "authority": "official",
+      "title": "GSAP Agent Skills",
+      "url": "https://github.com/greensock/gsap-skills"
+    }
+  ]
+}
