@@ -27,6 +27,20 @@ function hasRemoteExposure(integration: IntegrationArtifact): boolean {
   return integration.dataExposure.startsWith("remote-");
 }
 
+function isValidMcpProtocolVersion(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (match === null) return false;
+  const year = Number.parseInt(match[1] ?? "0", 10);
+  const month = Number.parseInt(match[2] ?? "0", 10);
+  const day = Number.parseInt(match[3] ?? "0", 10);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return (
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day
+  );
+}
+
 function ownershipProperties(claim: OwnershipClaim): null | Set<string> {
   if (claim.properties === undefined || claim.properties.length === 0) {
     return null;
@@ -159,13 +173,16 @@ export function validateConnectorSemantics(
       integration.kind === "mcp-server" &&
       integration.status === "available" &&
       (integration.protocol?.name !== "mcp" ||
-        integration.protocol.supportedVersions.length === 0)
+        integration.protocol.supportedVersions.length === 0 ||
+        integration.protocol.supportedVersions.some(
+          (version) => !isValidMcpProtocolVersion(version)
+        ))
     ) {
       issues.push(
         issue(
           `${base}/protocol/supportedVersions`,
           "available-mcp-protocol-version",
-          "Available MCP integrations must declare at least one verified supported protocol version."
+          "Available MCP integrations must declare one or more verified YYYY-MM-DD protocol versions."
         )
       );
     }
