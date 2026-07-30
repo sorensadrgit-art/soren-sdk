@@ -11,11 +11,7 @@ import type {
   SchemaV2ConnectorRecord
 } from "../catalog/types.js";
 import type { ActiveRoutingPolicy } from "./types.js";
-import {
-  isAtLeast,
-  minimumDeclaredVersion,
-  type VersionTuple
-} from "./semver.js";
+import { isAtLeast, type VersionTuple } from "./semver.js";
 
 export { isAtLeast, minimumDeclaredVersion } from "./semver.js";
 
