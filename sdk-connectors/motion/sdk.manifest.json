@@ -1,98 +1,298 @@
 {
-  "schemaVersion": "1.0.0",
-  "connectorVersion": "0.1.0",
-  "id": "motion",
-  "name": "Motion",
-  "status": "experimental",
-  "trust": "official",
-  "categories": [
-    "motion",
-    "interaction",
-    "react"
-  ],
-  "aliases": [
-    "motion-one",
-    "framer-motion"
-  ],
-  "capabilities": [
-    "motion.presence",
-    "motion.layout",
-    "motion.shared-layout",
-    "motion.spring",
-    "interaction.drag",
-    "interaction.gesture",
-    "motion.component-scroll"
-  ],
-  "connectionMethods": [
+  "$schema": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/connector.schema.json",
+  "schemaVersion": "2.0.0-draft.1",
+  "connectorVersion": "1.0.0",
+  "connector": {
+    "id": "motion",
+    "name": "Motion connector",
+    "publisher": "soren-sdk",
+    "reviewStatus": "approved",
+    "selectable": true,
+    "blockers": []
+  },
+  "product": {
+    "canonicalName": "Motion",
+    "homepage": "https://motion.dev/",
+    "aliases": [
+      "framer-motion",
+      "motion-one"
+    ],
+    "categories": [
+      "motion",
+      "interaction",
+      "react"
+    ]
+  },
+  "sourceTrust": {
+    "sourceAuthority": "official",
+    "integrityLevel": "version-pinned",
+    "reviewedAt": "2026-07-30",
+    "reviewer": "soren-sdk"
+  },
+  "capabilityClaims": [
     {
-      "type": "official-mcp",
-      "status": "available",
-      "requiresAuth": true,
-      "requiresPaidPlan": true,
-      "fallback": "official-docs"
+      "capability": "motion.presence",
+      "support": "primary",
+      "confidence": 1,
+      "conditions": [
+        "React 18.2 or newer",
+        "Component mount or unmount state owns the animation lifecycle"
+      ],
+      "limitations": [
+        "Not intended for framework-independent timeline choreography"
+      ]
     },
     {
-      "type": "official-skill",
-      "status": "available"
+      "capability": "motion.layout",
+      "support": "primary",
+      "confidence": 1,
+      "conditions": [
+        "React 18.2 or newer",
+        "Layout projection is appropriate for the requested transition"
+      ],
+      "limitations": [
+        "Explicit property ownership is required when combined with another animation provider"
+      ]
     },
     {
-      "type": "official-docs",
-      "status": "available"
+      "capability": "motion.shared-layout",
+      "support": "primary",
+      "confidence": 1,
+      "conditions": [
+        "React 18.2 or newer",
+        "Shared layout identity is stable across the transition"
+      ],
+      "limitations": [
+        "Requires coordinated React layout identity"
+      ]
+    },
+    {
+      "capability": "motion.spring",
+      "support": "primary",
+      "confidence": 0.98,
+      "conditions": [
+        "React 18.2 or newer"
+      ],
+      "limitations": [
+        "Simple self-contained transitions should remain native when a spring is not required"
+      ]
+    },
+    {
+      "capability": "interaction.drag",
+      "support": "primary",
+      "confidence": 1,
+      "conditions": [
+        "React 18.2 or newer",
+        "Pointer-driven direct manipulation is required"
+      ],
+      "limitations": [
+        "Advanced non-React drag systems are outside this claim"
+      ]
+    },
+    {
+      "capability": "interaction.gesture",
+      "support": "primary",
+      "confidence": 0.98,
+      "conditions": [
+        "React 18.2 or newer"
+      ],
+      "limitations": [
+        "Does not claim complex scroll choreography"
+      ]
     }
   ],
-  "runtime": {
-    "packages": [
-      "motion"
-    ],
-    "imports": {
-      "react": "motion/react",
-      "javascript": "motion"
+  "integrations": [
+    {
+      "id": "motion-runtime",
+      "kind": "runtime-package",
+      "mode": "runtime",
+      "status": "available",
+      "source": "https://www.npmjs.com/package/motion",
+      "version": {
+        "status": "resolved",
+        "value": "12.42.1"
+      },
+      "authorization": {
+        "required": false,
+        "method": "none",
+        "paidPlan": false
+      },
+      "executionRisk": "none",
+      "dataExposure": "none",
+      "permissions": {
+        "filesystem": "none",
+        "network": [],
+        "projectWrite": false
+      },
+      "licenseExpression": "MIT",
+      "fallback": "web-platform-built-in",
+      "packageName": "motion",
+      "importPaths": {
+        "javascript": "motion",
+        "react": "motion/react"
+      },
+      "notes": [
+        "Runtime selection never installs or executes the package; it only records the approved provider choice."
+      ]
     },
-    "supportedVersions": [
-      "define during implementation"
+    {
+      "id": "motion-documentation",
+      "kind": "documentation",
+      "mode": "knowledge",
+      "status": "available",
+      "source": "https://motion.dev/docs",
+      "version": {
+        "status": "not-applicable"
+      },
+      "authorization": {
+        "required": false,
+        "method": "none",
+        "paidPlan": false
+      },
+      "executionRisk": "read-only",
+      "dataExposure": "remote-source",
+      "permissions": {
+        "filesystem": "none",
+        "network": [
+          "motion.dev"
+        ],
+        "projectWrite": false
+      },
+      "fallback": null
+    },
+    {
+      "id": "motion-official-skill",
+      "kind": "agent-skill",
+      "mode": "knowledge",
+      "status": "available",
+      "source": "https://motion.dev/docs/ai-kit-install",
+      "version": {
+        "status": "not-applicable"
+      },
+      "authorization": {
+        "required": false,
+        "method": "none",
+        "paidPlan": false
+      },
+      "executionRisk": "read-only",
+      "dataExposure": "remote-source",
+      "permissions": {
+        "filesystem": "none",
+        "network": [
+          "motion.dev"
+        ],
+        "projectWrite": false
+      },
+      "licenseExpression": "MIT",
+      "fallback": "motion-documentation"
+    },
+    {
+      "id": "motion-ai-kit-mcp",
+      "kind": "mcp-server",
+      "mode": "tool",
+      "status": "unverified",
+      "source": "https://motion.dev/docs/ai-kit-install",
+      "version": {
+        "status": "unresolved"
+      },
+      "protocol": {
+        "name": "mcp",
+        "supportedVersions": [],
+        "extensions": []
+      },
+      "authorization": {
+        "required": true,
+        "method": "oauth",
+        "paidPlan": true
+      },
+      "executionRisk": "read-only",
+      "dataExposure": "remote-project-content",
+      "permissions": {
+        "filesystem": "none",
+        "network": [
+          "motion.dev"
+        ],
+        "projectWrite": false
+      },
+      "fallback": "motion-documentation",
+      "notes": [
+        "Recorded for catalog completeness only. It is not selectable by the Phase 4 router."
+      ]
+    }
+  ],
+  "ownershipClaims": [
+    {
+      "domain": "presence",
+      "scope": "requested-scope",
+      "exclusive": true,
+      "properties": [
+        "opacity",
+        "transform"
+      ]
+    },
+    {
+      "domain": "layout",
+      "scope": "requested-scope",
+      "exclusive": true,
+      "properties": [
+        "layout",
+        "transform"
+      ]
+    },
+    {
+      "domain": "timing",
+      "scope": "requested-scope",
+      "exclusive": false,
+      "properties": [
+        "transition"
+      ]
+    },
+    {
+      "domain": "gesture",
+      "scope": "requested-scope",
+      "exclusive": true,
+      "properties": [
+        "transform"
+      ]
+    }
+  ],
+  "verification": {
+    "requiredChecks": [
+      "reduced-motion",
+      "react-version",
+      "cleanup",
+      "property-ownership",
+      "animation-performance"
+    ],
+    "hardGates": [
+      "connector-schema-valid",
+      "runtime-version-resolved",
+      "license-policy-resolved",
+      "environment-supported",
+      "no-ownership-conflict",
+      "no-unauthorized-permission"
     ]
   },
-  "frameworks": [
-    "react",
-    "javascript",
-    "vue"
-  ],
-  "bestFor": [
-    "React state-driven animation",
-    "Presence and exit animation",
-    "Layout transitions",
-    "Drag and gesture interactions",
-    "Spring-based UI motion"
-  ],
-  "avoidFor": [
-    "Smooth-scroll transport",
-    "WebGL rendering",
-    "A property on an element already owned by GSAP"
-  ],
-  "owns": [
-    "component-state",
-    "presence",
-    "layout",
-    "gesture",
-    "selected-dom-properties"
-  ],
-  "requiredChecks": [
-    "reduced-motion",
-    "cleanup",
-    "property-ownership",
-    "animation-performance"
-  ],
-  "security": {
-    "requiresAuth": true,
-    "requiresPaidPlan": true,
-    "remoteData": true
+  "relatedFiles": {
+    "skill": {
+      "path": "./SKILL.md",
+      "status": "present"
+    },
+    "sources": {
+      "path": "./docs.sources.json",
+      "status": "present"
+    },
+    "compatibility": {
+      "path": "./compatibility.json",
+      "status": "present"
+    },
+    "evaluations": {
+      "path": "./evaluations/route-cases.json",
+      "status": "present"
+    }
   },
   "knowledge": {
-    "retrievedAt": "2026-07-27",
-    "officialSources": [
-      "https://motion.dev/docs/ai-kit-context",
-      "https://motion.dev/docs/ai-kit-install",
-      "https://motion.dev/docs/react"
-    ]
+    "retrievedAt": "2026-07-30",
+    "staleAfterDays": 30
   }
 }
