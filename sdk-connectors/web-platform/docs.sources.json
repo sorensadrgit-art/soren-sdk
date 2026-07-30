@@ -1,0 +1,26 @@
+{
+  "providerId": "web-platform",
+  "retrievedAt": "2026-07-30",
+  "sources": [
+    {
+      "authority": "official",
+      "title": "Web Animations Level 1",
+      "url": "https://www.w3.org/TR/web-animations-1/"
+    },
+    {
+      "authority": "official",
+      "title": "CSS Transitions Level 2",
+      "url": "https://www.w3.org/TR/css-transitions-2/"
+    },
+    {
+      "authority": "official",
+      "title": "CSS Animations Level 2",
+      "url": "https://www.w3.org/TR/css-animations-2/"
+    },
+    {
+      "authority": "maintainer",
+      "title": "MDN Web Animations API",
+      "url": "https://developer.mozilla.org/docs/Web/API/Web_Animations_API"
+    }
+  ]
+}
