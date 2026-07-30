@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.0.0",
+  "providerId": "web-platform",
+  "retrievedAt": "2026-07-30",
+  "sources": [
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_transitions/Using_CSS_transitions",
+      "type": "documentation",
+      "authority": "official",
+      "allowedUse": ["link", "summarize"],
+      "license": "CC-BY-SA-2.5"
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_animations/Using_CSS_animations",
+      "type": "documentation",
+      "authority": "official",
+      "allowedUse": ["link", "summarize"],
+      "license": "CC-BY-SA-2.5"
+    },
+    {
+      "url": "https://www.w3.org/TR/web-animations-1/",
+      "type": "specification",
+      "authority": "official",
+      "allowedUse": ["link", "summarize"],
+      "license": "W3C-20150513"
+    }
+  ]
+}
