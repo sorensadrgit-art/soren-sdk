@@ -7,7 +7,8 @@ import { describe, expect, it } from "vitest";
 import {
   validateCapabilityCatalog,
   validateConnectorManifest,
-  type ConnectorManifest
+  type ConnectorManifest,
+  type IntegrationArtifact
 } from "../../src/index.js";
 
 const fixtureRoot = join(
@@ -29,9 +30,11 @@ function capabilityCatalog() {
   return result.value;
 }
 
-function connectorWithRemoteSkill(
+function connectorWithSkill(
   source: string,
-  version: ConnectorManifest["integrations"][number]["version"]
+  version: ConnectorManifest["integrations"][number]["version"],
+  dataExposure: IntegrationArtifact["dataExposure"] = "remote-source",
+  network: string[] = ["example.com"]
 ): ConnectorManifest {
   const connector = structuredClone(
     fixture("valid", "connector.json")
@@ -49,10 +52,10 @@ function connectorWithRemoteSkill(
       paidPlan: false
     },
     executionRisk: "read-only",
-    dataExposure: "remote-source",
+    dataExposure,
     permissions: {
       filesystem: "none",
-      network: ["example.com"],
+      network,
       projectWrite: false
     },
     licenseExpression: "MIT",
@@ -68,10 +71,10 @@ function validate(connector: ConnectorManifest) {
   });
 }
 
-describe("remote Agent Skill pin regressions", () => {
+describe("Agent Skill pin regressions", () => {
   it("rejects an arbitrary hash-shaped URL component without explicit pin metadata", () => {
     const result = validate(
-      connectorWithRemoteSkill(
+      connectorWithSkill(
         `https://example.com/skills/${"a".repeat(40)}/latest`,
         { status: "resolved", value: "1.2.3" }
       )
@@ -98,9 +101,44 @@ describe("remote Agent Skill pin regressions", () => {
   ])("accepts an explicit immutable %s pin on a mutable source URL", (_name, version) => {
     expect(
       validate(
-        connectorWithRemoteSkill(
+        connectorWithSkill(
           "https://example.com/skills/latest",
           version
+        )
+      ).ok
+    ).toBe(true);
+  });
+
+  it("requires an immutable pin for an available local file-backed skill", () => {
+    const result = validate(
+      connectorWithSkill(
+        "file:///opt/soren/skills/example/SKILL.md",
+        { status: "resolved", value: "1.2.3" },
+        "local-only",
+        []
+      )
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({ keyword: "available-agent-skill-pin" })
+      );
+    }
+  });
+
+  it("accepts a local file-backed skill with an explicit digest pin", () => {
+    expect(
+      validate(
+        connectorWithSkill(
+          "file:///opt/soren/skills/example/SKILL.md",
+          {
+            status: "resolved",
+            value: "1.2.3",
+            digest: `sha256:${"c".repeat(64)}` as `sha256:${string}`
+          },
+          "local-only",
+          []
         )
       ).ok
     ).toBe(true);
