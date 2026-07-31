@@ -57,6 +57,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function startsQuotedScalar(value: string, index: number): boolean {
+  const prefix = value.slice(0, index).trimEnd();
+  if (prefix === "") return true;
+  const separator = prefix.lastIndexOf(":");
+  return separator >= 0 && prefix.slice(separator + 1).trim() === "";
+}
+
 function stripYamlComment(value: string, line: number): string {
   let singleQuoted = false;
   let doubleQuoted = false;
@@ -77,11 +84,11 @@ function stripYamlComment(value: string, line: number): string {
       }
       continue;
     }
-    if (character === '"') {
+    if (character === '"' && startsQuotedScalar(value, index)) {
       doubleQuoted = true;
       continue;
     }
-    if (character === "'") {
+    if (character === "'" && startsQuotedScalar(value, index)) {
       singleQuoted = true;
       continue;
     }
