@@ -7,7 +7,8 @@ import { describe, expect, it } from "vitest";
 import {
   validateCapabilityCatalog,
   validateConnectorManifest,
-  type ConnectorManifest
+  type ConnectorManifest,
+  type IntegrationArtifact
 } from "../../src/index.js";
 
 const fixtureRoot = join(
@@ -76,7 +77,8 @@ function connectorWithMcpProtocolVersions(
 
 function connectorWithRemoteAgentSkill(
   version: ConnectorManifest["integrations"][number]["version"],
-  source = "https://github.com/example/skill"
+  source = "https://github.com/example/skill",
+  dataExposure: IntegrationArtifact["dataExposure"] = "remote-source"
 ): ConnectorManifest {
   const connector = structuredClone(
     fixture("valid", "connector.json")
@@ -94,7 +96,7 @@ function connectorWithRemoteAgentSkill(
       paidPlan: false
     },
     executionRisk: "read-only",
-    dataExposure: "remote-source",
+    dataExposure,
     permissions: {
       filesystem: "none",
       network: ["github.com"],
@@ -183,6 +185,28 @@ describe("connector semantic validation", () => {
       }
     }
   );
+
+  it("detects a remote Agent Skill from its HTTPS source despite local exposure metadata", () => {
+    const result = validateConnectorManifest(
+      connectorWithRemoteAgentSkill(
+        { status: "resolved", value: "1.2.3" },
+        "https://github.com/example/skill",
+        "none"
+      ),
+      {
+        expectedPublisher: "soren-sdk",
+        capabilityCatalog: capabilityCatalog()
+      }
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(
+        result.issues.some(
+          (issue) => issue.keyword === "available-agent-skill-pin"
+        )
+      ).toBe(true);
+    }
+  });
 
   it("accepts an available remote Agent Skill pinned to an immutable commit", () => {
     expect(
