@@ -10,6 +10,11 @@ import {
   type RouteRequest
 } from "@soren-sdk/contracts";
 
+import type {
+  CatalogReader,
+  ConnectorHealthReport,
+  ConnectorRecord
+} from "../catalog/types.js";
 import { collectProviderCandidates } from "./candidates.js";
 import {
   assignCapabilities,
@@ -41,6 +46,87 @@ interface ProviderSetScore {
 
 function json(value: unknown): JsonValue {
   return JSON.parse(JSON.stringify(value)) as JsonValue;
+}
+
+function catalogRecordId(record: ConnectorRecord): string {
+  return record.kind === "schema-v2"
+    ? record.manifest.connector.id
+    : record.directoryId;
+}
+
+function missingHealth(connectorId: string): ConnectorHealthReport {
+  return {
+    connectorId,
+    state: "missing",
+    selectable: false,
+    reviewStatus: null,
+    blockers: [],
+    warnings: [],
+    errors: ["missing"]
+  };
+}
+
+function materializeCatalog(
+  catalog: CatalogReader,
+  createdAt: string
+): {
+  capabilities: CapabilityCatalog;
+  catalog: CatalogReader;
+  snapshot: CatalogSnapshot;
+} {
+  const capabilities = structuredClone(catalog.getCapabilityCatalog());
+  assertContract<CapabilityCatalog>("capability-catalog", capabilities);
+  const records = catalog.list().map((record) => structuredClone(record));
+  const healthReports = new Map<string, ConnectorHealthReport>();
+  for (const record of records) {
+    const connectorId = catalogRecordId(record);
+    if (!healthReports.has(connectorId)) {
+      healthReports.set(connectorId, structuredClone(catalog.health(connectorId)));
+    }
+  }
+
+  const capabilityCatalogDigest = digestJson(json(capabilities));
+  const connectors = records
+    .filter(
+      (record): record is Extract<ConnectorRecord, { kind: "schema-v2" }> =>
+        record.kind === "schema-v2"
+    )
+    .map((record) => ({
+      id: record.manifest.connector.id,
+      connectorVersion: record.manifest.connectorVersion,
+      digest: digestJson(json(record.manifest)),
+      reviewStatus: record.manifest.connector.reviewStatus,
+      selectable: record.manifest.connector.selectable
+    }))
+    .sort((left, right) => left.id.localeCompare(right.id));
+  const snapshot: CatalogSnapshot = {
+    schemaVersion: "1.0.0-draft.1",
+    contractKind: "catalog-snapshot",
+    snapshotId: digestJson(json({ capabilityCatalogDigest, connectors })),
+    createdAt,
+    capabilityCatalogDigest,
+    connectors
+  };
+  assertContract<CatalogSnapshot>("catalog-snapshot", snapshot);
+
+  const recordsById = new Map<string, ConnectorRecord>();
+  for (const record of records) {
+    recordsById.set(record.directoryId, record);
+    recordsById.set(catalogRecordId(record), record);
+  }
+  const frozenCatalog: CatalogReader = {
+    getCapabilityCatalog: () => capabilities,
+    list: () => [...records],
+    get: (connectorId) => recordsById.get(connectorId),
+    health: (connectorId) =>
+      healthReports.get(connectorId) ?? missingHealth(connectorId),
+    snapshot: (nextCreatedAt = createdAt) => ({
+      ...snapshot,
+      createdAt: nextCreatedAt,
+      connectors: snapshot.connectors.map((connector) => ({ ...connector }))
+    })
+  };
+  return { capabilities, catalog: frozenCatalog, snapshot };
 }
 
 function supportRank(value: "fallback" | "primary" | "secondary"): number {
@@ -646,25 +732,22 @@ export function routeCapabilities(input: RouteInput): RoutePlan {
     );
   }
 
-  const capabilities = input.catalog.getCapabilityCatalog();
-  assertContract<CapabilityCatalog>("capability-catalog", capabilities);
   const createdAt = input.createdAt ?? new Date().toISOString();
-  const catalogSnapshot = input.catalog.snapshot(createdAt);
-  assertContract<CatalogSnapshot>("catalog-snapshot", catalogSnapshot);
+  const materialized = materializeCatalog(input.catalog, createdAt);
   const normalized = normalizeCapabilities(input.request);
   const resolution = resolveRoute({
     request: input.request,
     project: input.project,
-    catalog: input.catalog,
+    catalog: materialized.catalog,
     policy,
-    capabilities,
+    capabilities: materialized.capabilities,
     normalized
   });
 
   return finalizePlan({
     request: input.request,
     project: input.project,
-    catalogSnapshot,
+    catalogSnapshot: materialized.snapshot,
     policySnapshotId: getPolicySnapshotId(policy),
     requestedCapabilities: normalized.requested,
     resolution,

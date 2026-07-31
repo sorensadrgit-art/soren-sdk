@@ -416,7 +416,7 @@ function runtimeEligible(
   if (integration.version.status === "unresolved") return false;
   if (integration.authorization.required) return false;
   if (
-    policy.rules.maxBundleKilobytes !== null &&
+    policy.rules.maxBundleKilobytes != null &&
     integration.kind === "runtime-package"
   ) {
     return false;

@@ -128,7 +128,10 @@ export function assignCapabilities(
     const capability = capabilityById(catalog, capabilityId);
     const quality = requestedQuality(request, capabilityId);
     const explicitScope = stringQuality(quality, "scope");
-    const scope = explicitScope ?? `capability:${capabilityId}`;
+    const baseScope = explicitScope ?? `capability:${capabilityId}`;
+    const workspace = stringQuality(quality, "workspace");
+    const scope =
+      workspace === null ? baseScope : `workspace:${workspace}::${baseScope}`;
     const explicitProperty = stringQuality(quality, "property");
     const properties = assignmentProperties(
       provider,

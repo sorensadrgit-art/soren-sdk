@@ -137,7 +137,14 @@ function guardDependencies(
         (dependency.workspace ?? ".") !== "." || !localNames.has(dependency.name)
     );
   }
-  return { ...project, dependencies };
+  const frameworks = project.frameworks.map((framework) => ({
+    ...framework,
+    version:
+      framework.version === null
+        ? null
+        : expandPartialComparators(framework.version)
+  }));
+  return { ...project, dependencies, frameworks };
 }
 
 interface PropertyRequirement {

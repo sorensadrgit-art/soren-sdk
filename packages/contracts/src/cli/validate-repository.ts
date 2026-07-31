@@ -232,7 +232,9 @@ function parseYamlNumber(value: string): number | undefined {
     return sign * Number.parseInt(unsigned.slice(2), 2);
   }
   if (
-    /^[+-]?(?:0|[1-9]\d*)(?:\.\d+)?(?:e[+-]?\d+)?$/i.test(normalized)
+    /^[+-]?(?:(?:0|[1-9]\d*)(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(
+      normalized
+    )
   ) {
     return Number(normalized);
   }
