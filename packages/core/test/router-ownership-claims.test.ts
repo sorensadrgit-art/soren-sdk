@@ -27,7 +27,7 @@ describe("Phase 4 ownership claim properties", () => {
     if (gsapTimeline === undefined) {
       throw new Error("Expected GSAP timeline ownership fixture.");
     }
-    gsapTimeline.properties = ["opacity", "transform"];
+    gsapTimeline.properties = ["transform"];
 
     const project = projectFixture();
     const plan = routeCapabilities({
@@ -69,6 +69,7 @@ describe("Phase 4 ownership claim properties", () => {
     if (webOwnership === undefined) {
       throw new Error("Expected Web Platform animation ownership fixture.");
     }
+    webOwnership.exclusive = false;
     webOwnership.properties = ["opacity"];
 
     const motion = manifestFixture("motion", ["motion.spring"]);
