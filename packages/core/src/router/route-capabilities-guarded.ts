@@ -9,6 +9,7 @@ import type { RouteInput } from "./types.js";
 
 type Version = readonly [number, number, number];
 const MOTION_MINIMUM_REACT: Version = [18, 2, 0];
+const SEMVER_PRERELEASE = /v?\d+(?:\.\d+){1,2}-[0-9A-Za-z]/;
 
 function selectedWorkspace(request: RouteRequest): string | null {
   const workspaces = new Set(
@@ -33,7 +34,7 @@ function isRootOrSelected(
 }
 
 function parseVersion(value: string): Version | null {
-  const match = /^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/.exec(value.trim());
+  const match = /^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?$/.exec(value.trim());
   if (match === null) return null;
   return [
     Number.parseInt(match[1] ?? "0", 10),
@@ -70,7 +71,12 @@ function wildcardMinimum(value: string): Version | null {
 
 function clauseMinimum(clause: string): Version | null {
   const normalized = clause.trim();
-  if (normalized === "" || normalized === "*" || /\blatest\b/i.test(normalized)) {
+  if (
+    normalized === "" ||
+    normalized === "*" ||
+    /\blatest\b/i.test(normalized) ||
+    SEMVER_PRERELEASE.test(normalized)
+  ) {
     return null;
   }
 
@@ -85,7 +91,7 @@ function clauseMinimum(clause: string): Version | null {
 
   if (/^[\^~]/.test(normalized)) return parseVersion(normalized.slice(1));
 
-  const lowerBound = /(?:^|\s)(>=|>)\s*(v?\d+(?:\.\d+){0,2})/.exec(
+  const lowerBound = /(?:^|\s)(>=|>)\s*(v?\d+(?:\.\d+){0,2})(?:\s|$)/.exec(
     normalized
   );
   if (lowerBound !== null) return parseVersion(lowerBound[2] ?? "");
