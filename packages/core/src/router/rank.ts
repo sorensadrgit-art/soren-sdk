@@ -145,7 +145,7 @@ export function compareRouteCandidates(
 
   const supportComparisons = [
     compareNumbers(-left.primaryCount, -right.primaryCount),
-    compareNumbers(left.secondaryCount, right.secondaryCount),
+    compareNumbers(-left.secondaryCount, -right.secondaryCount),
     compareNumbers(left.fallbackCount, right.fallbackCount),
     compareNumbers(-left.confidenceTotal, -right.confidenceTotal)
   ];
