@@ -85,6 +85,28 @@ function claimOwnsProperty(claim: OwnershipClaim, property: string): boolean {
   );
 }
 
+function assignmentProperties(
+  provider: ProviderCandidate,
+  capability: Capability,
+  explicitScope: string | null,
+  explicitProperty: string | null
+): string[] {
+  if (explicitProperty !== null) return [explicitProperty];
+  if (explicitScope === null) return [capability.ownershipDomain];
+
+  const properties = new Set<string>();
+  for (const claim of provider.manifest.ownershipClaims) {
+    if (claim.domain !== capability.ownershipDomain) continue;
+    for (const property of claim.properties ?? []) {
+      if (property.trim().length > 0) properties.add(property);
+    }
+  }
+
+  return properties.size > 0
+    ? [...properties].sort()
+    : [capability.ownershipDomain];
+}
+
 export function assignCapabilities(
   providerSet: readonly ProviderCandidate[],
   capabilityIds: readonly string[],
@@ -105,25 +127,33 @@ export function assignCapabilities(
 
     const capability = capabilityById(catalog, capabilityId);
     const quality = requestedQuality(request, capabilityId);
-    const scope =
-      stringQuality(quality, "scope") ?? `capability:${capabilityId}`;
-    const property =
-      stringQuality(quality, "property") ?? capability.ownershipDomain;
-    const exclusive = provider.manifest.ownershipClaims.some(
-      (claim) =>
-        claim.domain === capability.ownershipDomain &&
-        claim.exclusive &&
-        claimOwnsProperty(claim, property)
+    const explicitScope = stringQuality(quality, "scope");
+    const scope = explicitScope ?? `capability:${capabilityId}`;
+    const explicitProperty = stringQuality(quality, "property");
+    const properties = assignmentProperties(
+      provider,
+      capability,
+      explicitScope,
+      explicitProperty
     );
 
-    assignments.push({
-      capabilityId,
-      providerId: provider.providerId,
-      domain: capability.ownershipDomain,
-      scope,
-      property,
-      exclusive
-    });
+    for (const property of properties) {
+      const exclusive = provider.manifest.ownershipClaims.some(
+        (claim) =>
+          claim.domain === capability.ownershipDomain &&
+          claim.exclusive &&
+          claimOwnsProperty(claim, property)
+      );
+
+      assignments.push({
+        capabilityId,
+        providerId: provider.providerId,
+        domain: capability.ownershipDomain,
+        scope,
+        property,
+        exclusive
+      });
+    }
   }
 
   return assignments.sort((left, right) =>
