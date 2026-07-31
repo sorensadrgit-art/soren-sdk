@@ -130,6 +130,28 @@ function parseSingleQuotedYamlScalar(value: string, line: number): string {
   throw new SkillYamlError("Unterminated single-quoted YAML scalar.", line);
 }
 
+function parseYamlNumber(value: string): number | undefined {
+  const normalized = value.replaceAll("_", "");
+  const sign = normalized.startsWith("-") ? -1 : 1;
+  const unsigned = normalized.replace(/^[+-]/, "");
+
+  if (/^0x[0-9a-f]+$/i.test(unsigned)) {
+    return sign * Number.parseInt(unsigned.slice(2), 16);
+  }
+  if (/^0o[0-7]+$/i.test(unsigned)) {
+    return sign * Number.parseInt(unsigned.slice(2), 8);
+  }
+  if (/^0b[01]+$/i.test(unsigned)) {
+    return sign * Number.parseInt(unsigned.slice(2), 2);
+  }
+  if (
+    /^[+-]?(?:0|[1-9]\d*)(?:\.\d+)?(?:e[+-]?\d+)?$/i.test(normalized)
+  ) {
+    return Number(normalized);
+  }
+  return undefined;
+}
+
 function parseYamlScalar(value: string, line: number): YamlValue {
   const trimmed = stripYamlComment(value, line).trim();
   if (trimmed === "") {
@@ -175,9 +197,8 @@ function parseYamlScalar(value: string, line: number): YamlValue {
   if (/^(?:true|false)$/i.test(trimmed)) {
     return trimmed.toLowerCase() === "true";
   }
-  if (/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(trimmed)) {
-    return Number(trimmed);
-  }
+  const numeric = parseYamlNumber(trimmed);
+  if (numeric !== undefined) return numeric;
   return trimmed;
 }
 
