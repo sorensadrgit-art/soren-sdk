@@ -208,6 +208,31 @@ describe("connector semantic validation", () => {
     }
   });
 
+  it.each([
+    "git+https://github.com/example/skill.git",
+    "ssh://git@github.com/example/skill.git"
+  ])("detects a remote Agent Skill from the non-local URI scheme: %s", (source) => {
+    const result = validateConnectorManifest(
+      connectorWithRemoteAgentSkill(
+        { status: "resolved", value: "1.2.3" },
+        source,
+        "none"
+      ),
+      {
+        expectedPublisher: "soren-sdk",
+        capabilityCatalog: capabilityCatalog()
+      }
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(
+        result.issues.some(
+          (issue) => issue.keyword === "available-agent-skill-pin"
+        )
+      ).toBe(true);
+    }
+  });
+
   it("accepts an available remote Agent Skill pinned to an immutable commit", () => {
     expect(
       validateConnectorManifest(
