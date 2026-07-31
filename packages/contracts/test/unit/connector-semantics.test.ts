@@ -74,6 +74,38 @@ function connectorWithMcpProtocolVersions(
   return connector;
 }
 
+function connectorWithRemoteAgentSkill(
+  version: ConnectorManifest["integrations"][number]["version"],
+  source = "https://github.com/example/skill"
+): ConnectorManifest {
+  const connector = structuredClone(
+    fixture("valid", "connector.json")
+  ) as ConnectorManifest;
+  connector.integrations.push({
+    id: "fixture-agent-skill",
+    kind: "agent-skill",
+    mode: "knowledge",
+    status: "available",
+    source,
+    version,
+    authorization: {
+      required: false,
+      method: "none",
+      paidPlan: false
+    },
+    executionRisk: "read-only",
+    dataExposure: "remote-source",
+    permissions: {
+      filesystem: "none",
+      network: ["github.com"],
+      projectWrite: false
+    },
+    licenseExpression: "MIT",
+    fallback: null
+  });
+  return connector;
+}
+
 describe("connector semantic validation", () => {
   it.each([
     ["prose-version-placeholder.json", "version-placeholder"],
@@ -117,6 +149,36 @@ describe("connector semantic validation", () => {
     expect(
       validateConnectorManifest(
         connectorWithMcpProtocolVersions(["2025-06-18"]),
+        {
+          expectedPublisher: "soren-sdk",
+          capabilityCatalog: capabilityCatalog()
+        }
+      ).ok
+    ).toBe(true);
+  });
+
+  it("rejects an available remote Agent Skill without an immutable version or source pin", () => {
+    const result = validateConnectorManifest(
+      connectorWithRemoteAgentSkill({ status: "not-applicable" }),
+      {
+        expectedPublisher: "soren-sdk",
+        capabilityCatalog: capabilityCatalog()
+      }
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(
+        result.issues.some(
+          (issue) => issue.keyword === "available-agent-skill-pin"
+        )
+      ).toBe(true);
+    }
+  });
+
+  it("accepts an available remote Agent Skill with a resolved immutable version", () => {
+    expect(
+      validateConnectorManifest(
+        connectorWithRemoteAgentSkill({ status: "resolved", value: "1.2.3" }),
         {
           expectedPublisher: "soren-sdk",
           capabilityCatalog: capabilityCatalog()
