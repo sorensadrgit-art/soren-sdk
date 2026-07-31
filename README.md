@@ -133,6 +133,7 @@ Phase 4 is limited to three providers:
 - Provider-candidate and environment-filtering layer added
 - Conservative React `18.2+` compatibility evaluation added for Motion React claims
 - Runtime artifact, license, paid-service, forbidden-provider, connector-health, and dependency-reuse candidate checks added
+- Candidate-layer lint and strict TypeScript issues corrected
 
 ### Currently under verification
 
