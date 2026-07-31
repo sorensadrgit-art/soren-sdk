@@ -131,9 +131,9 @@ function parseYamlScalar(value: string, line: number): YamlValue {
     return trimmed.slice(1, -1).replaceAll("''", "'");
   }
 
-  if (/^[\[{&*!|>@`]/.test(trimmed)) {
+  if (/^(?:[-?:](?=\s)|[,\[\]{}#&*!|>%@`])/.test(trimmed)) {
     throw new SkillYamlError(
-      "Unsupported YAML collection, tag, anchor, alias, or block scalar.",
+      "Unsupported YAML collection, tag, anchor, alias, indicator, or block scalar.",
       line
     );
   }
