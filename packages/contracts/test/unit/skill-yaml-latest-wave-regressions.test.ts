@@ -112,6 +112,26 @@ metadata: {publisher: soren-sdk, version: 1.0.0}`);
   });
 
   it.each([
+    ["description", "_123"],
+    ["compatibility", "1__23"]
+  ])("preserves valid underscore plain scalar %s values", async (field, scalar) => {
+    const frontmatter = `${VALID_METADATA}\ndescription: Use when browser-native animation fully satisfies the request.`
+      .split("\n")
+      .map((line) =>
+        line.startsWith(`${field}:`) ? `${field}: ${scalar}` : line
+      )
+      .join("\n");
+    const root = await createFixture(frontmatter);
+    try {
+      const report = validateRepository(root);
+      expect(report.errors).toEqual([]);
+      expect(report.validatedConnectors).toEqual(["web-platform"]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
     ["license", ".inf", "skill-license"],
     ["compatibility", ".nan", "skill-compatibility"]
   ])(
