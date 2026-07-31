@@ -157,28 +157,40 @@ describe("connector semantic validation", () => {
     ).toBe(true);
   });
 
-  it("rejects an available remote Agent Skill without an immutable version or source pin", () => {
-    const result = validateConnectorManifest(
-      connectorWithRemoteAgentSkill({ status: "not-applicable" }),
-      {
-        expectedPublisher: "soren-sdk",
-        capabilityCatalog: capabilityCatalog()
+  it.each([
+    [{ status: "not-applicable" as const }, "https://github.com/example/skill"],
+    [
+      { status: "resolved" as const, value: "1.2.3" },
+      "https://github.com/example/skill"
+    ]
+  ])(
+    "rejects an available remote Agent Skill without an immutable content source pin",
+    (version, source) => {
+      const result = validateConnectorManifest(
+        connectorWithRemoteAgentSkill(version, source),
+        {
+          expectedPublisher: "soren-sdk",
+          capabilityCatalog: capabilityCatalog()
+        }
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.issues.some(
+            (issue) => issue.keyword === "available-agent-skill-pin"
+          )
+        ).toBe(true);
       }
-    );
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(
-        result.issues.some(
-          (issue) => issue.keyword === "available-agent-skill-pin"
-        )
-      ).toBe(true);
     }
-  });
+  );
 
-  it("accepts an available remote Agent Skill with a resolved immutable version", () => {
+  it("accepts an available remote Agent Skill pinned to an immutable commit", () => {
     expect(
       validateConnectorManifest(
-        connectorWithRemoteAgentSkill({ status: "resolved", value: "1.2.3" }),
+        connectorWithRemoteAgentSkill(
+          { status: "resolved", value: "1.2.3" },
+          `https://github.com/example/skill/tree/${"a".repeat(40)}`
+        ),
         {
           expectedPublisher: "soren-sdk",
           capabilityCatalog: capabilityCatalog()
