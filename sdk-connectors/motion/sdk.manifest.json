@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/connector.schema.json",
   "schemaVersion": "2.0.0-draft.1",
-  "connectorVersion": "1.0.2",
+  "connectorVersion": "1.0.3",
   "connector": {
     "id": "motion",
     "name": "Motion connector",
@@ -73,26 +73,15 @@
       "mode": "runtime",
       "status": "available",
       "source": "https://www.npmjs.com/package/motion",
-      "version": { "status": "resolved", "value": "12.42.2" },
-      "authorization": {
-        "required": false,
-        "method": "none",
-        "paidPlan": false
-      },
+      "version": {"status": "resolved", "value": "12.42.2"},
+      "authorization": {"required": false, "method": "none", "paidPlan": false},
       "executionRisk": "none",
       "dataExposure": "none",
-      "permissions": {
-        "filesystem": "none",
-        "network": [],
-        "projectWrite": false
-      },
+      "permissions": {"filesystem": "none", "network": [], "projectWrite": false},
       "licenseExpression": "MIT",
       "fallback": "web-platform-built-in",
       "packageName": "motion",
-      "importPaths": {
-        "javascript": "motion",
-        "react": "motion/react"
-      }
+      "importPaths": {"javascript": "motion", "react": "motion/react"}
     },
     {
       "id": "motion-documentation",
@@ -100,43 +89,28 @@
       "mode": "knowledge",
       "status": "available",
       "source": "https://motion.dev/docs",
-      "version": { "status": "not-applicable" },
-      "authorization": {
-        "required": false,
-        "method": "none",
-        "paidPlan": false
-      },
+      "version": {"status": "not-applicable"},
+      "authorization": {"required": false, "method": "none", "paidPlan": false},
       "executionRisk": "read-only",
       "dataExposure": "remote-source",
-      "permissions": {
-        "filesystem": "none",
-        "network": ["motion.dev"],
-        "projectWrite": false
-      },
+      "permissions": {"filesystem": "none", "network": ["motion.dev"], "projectWrite": false},
       "fallback": null
     },
     {
       "id": "motion-official-skill",
       "kind": "agent-skill",
       "mode": "knowledge",
-      "status": "available",
+      "status": "unverified",
       "source": "https://motion.dev/docs/ai-kit-install",
-      "version": { "status": "resolved", "value": "6.2.0" },
-      "authorization": {
-        "required": false,
-        "method": "none",
-        "paidPlan": false
-      },
+      "version": {"status": "resolved", "value": "6.2.0"},
+      "authorization": {"required": false, "method": "none", "paidPlan": false},
       "executionRisk": "read-only",
       "dataExposure": "remote-source",
-      "permissions": {
-        "filesystem": "none",
-        "network": ["motion.dev"],
-        "projectWrite": false
-      },
+      "permissions": {"filesystem": "none", "network": ["motion.dev"], "projectWrite": false},
       "licenseExpression": "LicenseRef-Motion-AI-Kit",
       "fallback": "motion-documentation",
       "notes": [
+        "Mutable remote instructions; keep unverified until an immutable content digest or commit is recorded.",
         "The base AI Kit includes free guidance and documentation features; Motion+ unlocks additional premium context and audit capabilities."
       ]
     },
@@ -146,24 +120,12 @@
       "mode": "tool",
       "status": "unverified",
       "source": "https://motion.dev/docs/ai-kit-install",
-      "version": { "status": "resolved", "value": "6.2.0" },
-      "protocol": {
-        "name": "mcp",
-        "supportedVersions": [],
-        "extensions": ["mcp-apps"]
-      },
-      "authorization": {
-        "required": false,
-        "method": "oauth",
-        "paidPlan": false
-      },
+      "version": {"status": "resolved", "value": "6.2.0"},
+      "protocol": {"name": "mcp", "supportedVersions": [], "extensions": ["mcp-apps"]},
+      "authorization": {"required": false, "method": "oauth", "paidPlan": false},
       "executionRisk": "read-only",
       "dataExposure": "remote-project-content",
-      "permissions": {
-        "filesystem": "none",
-        "network": ["motion.dev"],
-        "projectWrite": false
-      },
+      "permissions": {"filesystem": "none", "network": ["motion.dev"], "projectWrite": false},
       "licenseExpression": "LicenseRef-Motion-AI-Kit",
       "fallback": "motion-documentation",
       "notes": [
@@ -174,59 +136,20 @@
     }
   ],
   "ownershipClaims": [
-    {
-      "domain": "presence",
-      "scope": "requested-scope",
-      "exclusive": true,
-      "properties": ["opacity", "transform"]
-    },
-    {
-      "domain": "layout",
-      "scope": "requested-scope",
-      "exclusive": true,
-      "properties": ["layout", "transform"]
-    },
-    {
-      "domain": "timing",
-      "scope": "requested-scope",
-      "exclusive": false,
-      "properties": ["transition"]
-    },
-    {
-      "domain": "gesture",
-      "scope": "requested-scope",
-      "exclusive": true,
-      "properties": ["transform"]
-    }
+    {"domain": "presence", "scope": "requested-scope", "exclusive": true, "properties": ["opacity", "transform"]},
+    {"domain": "layout", "scope": "requested-scope", "exclusive": true, "properties": ["layout", "transform"]},
+    {"domain": "timing", "scope": "requested-scope", "exclusive": false, "properties": ["transition"]},
+    {"domain": "gesture", "scope": "requested-scope", "exclusive": true, "properties": ["transform"]}
   ],
   "verification": {
-    "requiredChecks": [
-      "reduced-motion",
-      "react-version",
-      "cleanup",
-      "property-ownership",
-      "animation-performance"
-    ],
-    "hardGates": [
-      "connector-schema-valid",
-      "runtime-version-resolved",
-      "license-policy-resolved",
-      "environment-supported",
-      "no-ownership-conflict",
-      "no-unauthorized-permission"
-    ]
+    "requiredChecks": ["reduced-motion", "react-version", "cleanup", "property-ownership", "animation-performance"],
+    "hardGates": ["connector-schema-valid", "runtime-version-resolved", "license-policy-resolved", "environment-supported", "no-ownership-conflict", "no-unauthorized-permission"]
   },
   "relatedFiles": {
-    "skill": { "path": "./SKILL.md", "status": "present" },
-    "sources": { "path": "./docs.sources.json", "status": "present" },
-    "compatibility": { "path": "./compatibility.json", "status": "present" },
-    "evaluations": {
-      "path": "./evaluations/route-cases.json",
-      "status": "present"
-    }
+    "skill": {"path": "./SKILL.md", "status": "present"},
+    "sources": {"path": "./docs.sources.json", "status": "present"},
+    "compatibility": {"path": "./compatibility.json", "status": "present"},
+    "evaluations": {"path": "./evaluations/route-cases.json", "status": "present"}
   },
-  "knowledge": {
-    "retrievedAt": "2026-07-30",
-    "staleAfterDays": 30
-  }
+  "knowledge": {"retrievedAt": "2026-07-30", "staleAfterDays": 30}
 }
