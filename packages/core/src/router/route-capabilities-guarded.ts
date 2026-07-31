@@ -58,11 +58,25 @@ function normalizeRange(value: string): string {
   return range;
 }
 
+function wildcardMinimum(value: string): Version | null {
+  const match = /^v?(\d+)(?:\.(\d+))?\.(?:x|\*)$/i.exec(value.trim());
+  if (match === null) return null;
+  return [
+    Number.parseInt(match[1] ?? "0", 10),
+    Number.parseInt(match[2] ?? "0", 10),
+    0
+  ];
+}
+
 function clauseMinimum(clause: string): Version | null {
   const normalized = clause.trim();
-  if (normalized === "" || normalized === "*" || /\b(?:latest|x)\b/i.test(normalized)) {
+  if (normalized === "" || normalized === "*" || /\blatest\b/i.test(normalized)) {
     return null;
   }
+
+  const wildcard = wildcardMinimum(normalized);
+  if (wildcard !== null) return wildcard;
+  if (/[x*]/i.test(normalized)) return null;
 
   const hyphen = /^(v?\d+(?:\.\d+){0,2})\s+-\s+v?\d+(?:\.\d+){0,2}$/.exec(
     normalized
@@ -99,13 +113,32 @@ function guardedReactVersion(version: string | null): string | null {
   return reactRangeGuaranteesMinimum(version) ? version : "17.0.0";
 }
 
+function browserQuery(target: string): string {
+  const trimmed = target.trim();
+  const environmentPrefix = /^[A-Za-z0-9_-]+:(.*)$/.exec(trimmed);
+  return (environmentPrefix?.[1] ?? trimmed).trim();
+}
+
+function hasPositiveBrowserTarget(target: string): boolean {
+  return target
+    .split(",")
+    .map(browserQuery)
+    .some(
+      (clause) =>
+        clause.length > 0 && !clause.toLowerCase().startsWith("not ")
+    );
+}
+
 function guardedProject(
   project: ProjectSnapshot,
   workspace: string | null
 ): ProjectSnapshot {
-  const browsers = project.targets.browsers.filter(
+  const declaredBrowsers = project.targets.browsers.filter(
     (target) => !/^\s*\[[^\]]+\]\s*$/.test(target)
   );
+  const browsers = declaredBrowsers.some(hasPositiveBrowserTarget)
+    ? declaredBrowsers
+    : ["ie 11"];
   const dependencies =
     workspace === null
       ? project.dependencies
