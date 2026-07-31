@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -22,6 +22,25 @@ type YamlRecord = Record<string, YamlValue>;
 
 const SEMANTIC_VERSION =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+const YAML_DOUBLE_ESCAPES: Readonly<Record<string, string>> = {
+  "0": "\0",
+  a: "\u0007",
+  b: "\b",
+  t: "\t",
+  n: "\n",
+  v: "\v",
+  f: "\f",
+  r: "\r",
+  e: "\u001b",
+  " ": " ",
+  '"': '"',
+  "/": "/",
+  "\\": "\\",
+  N: "\u0085",
+  _: "\u00a0",
+  L: "\u2028",
+  P: "\u2029"
+};
 
 class SkillYamlError extends Error {
   override readonly name = "SkillYamlError";
@@ -146,6 +165,56 @@ function parseSingleQuotedYamlScalar(value: string, line: number): string {
   throw new SkillYamlError("Unterminated single-quoted YAML scalar.", line);
 }
 
+function parseDoubleQuotedYamlScalar(value: string, line: number): string {
+  if (!value.endsWith('"') || value.length < 2) {
+    throw new SkillYamlError("Unterminated double-quoted YAML scalar.", line);
+  }
+  let parsed = "";
+  for (let index = 1; index < value.length - 1; index += 1) {
+    const character = value[index];
+    if (character === '"') {
+      throw new SkillYamlError(
+        "Unescaped quote inside double-quoted YAML scalar.",
+        line
+      );
+    }
+    if (character !== "\\") {
+      parsed += character;
+      continue;
+    }
+
+    const escape = value[index + 1];
+    if (escape === undefined || index + 1 >= value.length - 1) {
+      throw new SkillYamlError("Incomplete YAML escape sequence.", line);
+    }
+    index += 1;
+    const mapped = YAML_DOUBLE_ESCAPES[escape];
+    if (mapped !== undefined) {
+      parsed += mapped;
+      continue;
+    }
+
+    const digits = escape === "x" ? 2 : escape === "u" ? 4 : escape === "U" ? 8 : 0;
+    if (digits === 0) {
+      throw new SkillYamlError(`Unsupported YAML escape sequence \\${escape}.`, line);
+    }
+    const hex = value.slice(index + 1, index + 1 + digits);
+    if (hex.length !== digits || !/^[0-9a-f]+$/i.test(hex)) {
+      throw new SkillYamlError("Invalid hexadecimal YAML escape sequence.", line);
+    }
+    const codePoint = Number.parseInt(hex, 16);
+    if (
+      codePoint > 0x10ffff ||
+      (codePoint >= 0xd800 && codePoint <= 0xdfff)
+    ) {
+      throw new SkillYamlError("Invalid Unicode YAML escape sequence.", line);
+    }
+    parsed += String.fromCodePoint(codePoint);
+    index += digits;
+  }
+  return parsed;
+}
+
 function parseYamlNumber(value: string): number | undefined {
   const normalized = value.replaceAll("_", "");
   const sign = normalized.startsWith("-") ? -1 : 1;
@@ -175,22 +244,7 @@ function parseYamlScalar(value: string, line: number): YamlValue {
   }
 
   if (trimmed.startsWith('"')) {
-    if (!trimmed.endsWith('"') || trimmed.length < 2) {
-      throw new SkillYamlError("Unterminated double-quoted YAML scalar.", line);
-    }
-    try {
-      const parsed = JSON.parse(trimmed) as unknown;
-      if (typeof parsed !== "string") {
-        throw new SkillYamlError("Quoted YAML scalar must be a string.", line);
-      }
-      return parsed;
-    } catch (error) {
-      if (error instanceof SkillYamlError) throw error;
-      throw new SkillYamlError(
-        `Invalid double-quoted YAML scalar: ${errorMessage(error)}`,
-        line
-      );
-    }
+    return parseDoubleQuotedYamlScalar(trimmed, line);
   }
 
   if (trimmed.startsWith("'")) {
@@ -441,6 +495,14 @@ function isPathInside(root: string, candidate: string): boolean {
   return path === "" || (!path.startsWith("..") && !isAbsolute(path));
 }
 
+function isRealPathInside(root: string, candidate: string): boolean {
+  try {
+    return isPathInside(realpathSync(root), realpathSync(candidate));
+  } catch {
+    return false;
+  }
+}
+
 function yamlString(
   value: YamlRecord,
   field: string,
@@ -571,12 +633,13 @@ function validateSkill(
     const sourcePath = resolve(dirname(skillPath), sourcePathValue);
     if (
       !sourcePathValue.startsWith("./") ||
-      !isPathInside(connectorDirectory, sourcePath)
+      !isPathInside(connectorDirectory, sourcePath) ||
+      !isRealPathInside(connectorDirectory, sourcePath)
     ) {
       issues.push(
         repositoryIssue(
           "skill-source",
-          "Agent Skill source must be a connector-local relative path.",
+          "Agent Skill source must resolve to a connector-local relative path.",
           "/source"
         )
       );
@@ -682,13 +745,16 @@ export function validateRepository(root: string): RepositoryValidationReport {
     const skillRecord = result.value.relatedFiles.skill;
     if (skillRecord.status === "present") {
       const skillPath = resolve(connectorDirectory, skillRecord.path);
-      if (!isPathInside(connectorDirectory, skillPath)) {
+      if (
+        !isPathInside(connectorDirectory, skillPath) ||
+        !isRealPathInside(connectorDirectory, skillPath)
+      ) {
         report.errors.push({
           path: skillPath,
           issues: [
             repositoryIssue(
               "skill-path",
-              "Agent Skill path escapes the connector directory."
+              "Agent Skill path must resolve inside the connector directory."
             )
           ]
         });
