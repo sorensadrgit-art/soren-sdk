@@ -18,6 +18,8 @@ const STRICT_SEMVER =
   /^(?:v)?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const PARTIAL_COMPARATOR =
   /(^|[\s,|:@])(>=|<=|>|<)\s*v?(\d+)(?:\.(\d+))?(?=$|[\s,|])/g;
+const PARTIAL_HYPHEN_RANGE =
+  /(^|[\s,|])v?(\d+)(?:\.(\d+))?(?:\.(\d+))?\s+-\s+v?(\d+)(?:\.(\d+))?(?:\.(\d+))?(?=$|[\s,|])/g;
 
 function isPrereleaseVersion(value: string): boolean {
   return STRICT_SEMVER.exec(value.trim())?.[4] !== undefined;
@@ -42,6 +44,7 @@ function assertProjectSnapshotDigest(project: ProjectSnapshot): void {
     ]
   );
 }
+
 function expandPartialComparators(value: string): string {
   return value.replace(
     PARTIAL_COMPARATOR,
@@ -64,6 +67,44 @@ function expandPartialComparators(value: string): string {
   );
 }
 
+function expandPartialHyphenRanges(value: string): string {
+  return value.replace(
+    PARTIAL_HYPHEN_RANGE,
+    (
+      _match,
+      prefix: string,
+      lowerMajorText: string,
+      lowerMinorText: string | undefined,
+      lowerPatchText: string | undefined,
+      upperMajorText: string,
+      upperMinorText: string | undefined,
+      upperPatchText: string | undefined
+    ) => {
+      const lowerMajor = Number.parseInt(lowerMajorText, 10);
+      const lowerMinor = Number.parseInt(lowerMinorText ?? "0", 10);
+      const lowerPatch = Number.parseInt(lowerPatchText ?? "0", 10);
+      const upperMajor = Number.parseInt(upperMajorText, 10);
+      const upperMinor = Number.parseInt(upperMinorText ?? "0", 10);
+      const lower = `>=${lowerMajor}.${lowerMinor}.${lowerPatch}`;
+      if (upperPatchText !== undefined) {
+        return `${prefix}${lower} <=${upperMajor}.${upperMinor}.${Number.parseInt(
+          upperPatchText,
+          10
+        )}`;
+      }
+      const upper =
+        upperMinorText === undefined
+          ? `<${upperMajor + 1}.0.0`
+          : `<${upperMajor}.${upperMinor + 1}.0`;
+      return `${prefix}${lower} ${upper}`;
+    }
+  );
+}
+
+function normalizeDependencyRange(value: string): string {
+  return expandPartialComparators(expandPartialHyphenRanges(value));
+}
+
 function selectedWorkspace(request: RouteRequest): string | null {
   const workspaces = new Set<string>();
   for (const capability of request.capabilities) {
@@ -82,7 +123,7 @@ function guardDependencies(
 ): ProjectSnapshot {
   let dependencies = project.dependencies.map((dependency) => ({
     ...dependency,
-    version: expandPartialComparators(dependency.version)
+    version: normalizeDependencyRange(dependency.version)
   }));
   const workspace = selectedWorkspace(request);
   if (workspace !== null) {
@@ -98,6 +139,7 @@ function guardDependencies(
   }
   return { ...project, dependencies };
 }
+
 interface PropertyRequirement {
   domain: string;
   property: string;
@@ -127,6 +169,7 @@ function propertyRequirements(
   }
   return requirements;
 }
+
 function guardIntegration(
   integration: IntegrationArtifact,
   providerId: string
@@ -197,6 +240,7 @@ function guardRecord(
     }
   };
 }
+
 class SecurityCatalogView implements CatalogReader {
   private readonly requirements: ReadonlyMap<string, PropertyRequirement>;
 
@@ -225,6 +269,7 @@ class SecurityCatalogView implements CatalogReader {
   health(connectorId: string) {
     return this.base.health(connectorId);
   }
+
   snapshot(createdAt?: string) {
     return createdAt === undefined
       ? this.base.snapshot()
@@ -253,6 +298,7 @@ function parseBrowserClause(value: string): BrowserClause | null {
   }
   return { environment: null, value: trimmed };
 }
+
 function normalizedBrowserClause(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
