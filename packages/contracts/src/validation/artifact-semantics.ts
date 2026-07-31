@@ -74,7 +74,7 @@ export function validateArtifactSemantics(
     }
 
     if (
-      isRemoteAgentSkill(integration) &&
+      integration.kind === "agent-skill" &&
       integration.status === "available" &&
       !hasImmutableContentPin(integration)
     ) {
@@ -82,7 +82,7 @@ export function validateArtifactSemantics(
         issue(
           `/integrations/${index}/version`,
           "available-agent-skill-pin",
-          "Available remote Agent Skills must declare a resolved immutable version.commit or version.digest pin, or remain unverified."
+          "Available Agent Skills must declare a resolved immutable version.commit or version.digest pin, or remain unverified."
         )
       );
     }
