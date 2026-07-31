@@ -20,6 +20,9 @@ export interface RepositoryValidationReport {
 type YamlValue = boolean | null | number | string | Record<string, unknown>;
 type YamlRecord = Record<string, YamlValue>;
 
+const SEMANTIC_VERSION =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+
 class SkillYamlError extends Error {
   override readonly name = "SkillYamlError";
 
@@ -55,6 +58,19 @@ function errorMessage(error: unknown): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isValidSemanticVersion(value: string): boolean {
+  const match = SEMANTIC_VERSION.exec(value.trim());
+  if (match === null) return false;
+  const prerelease = match[4];
+  if (prerelease === undefined) return true;
+  return prerelease.split(".").every(
+    (identifier) =>
+      !/^\d+$/.test(identifier) ||
+      identifier === "0" ||
+      !identifier.startsWith("0")
+  );
 }
 
 function startsQuotedScalar(value: string, index: number): boolean {
@@ -202,6 +218,105 @@ function parseYamlScalar(value: string, line: number): YamlValue {
   return trimmed;
 }
 
+function leadingSpaces(value: string): number {
+  return /^ */.exec(value)?.[0].length ?? 0;
+}
+
+function foldBlockLines(lines: readonly string[]): string {
+  let result = "";
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? "";
+    const next = lines[index + 1];
+    result += line;
+    if (next !== undefined) {
+      result += line === "" || next === "" ? "\n" : " ";
+    }
+  }
+  return result;
+}
+
+function applyBlockChomping(value: string, chomping: string | undefined): string {
+  if (chomping === "-") return value.replace(/\n+$/, "");
+  if (chomping === "+") return `${value}\n`;
+  return `${value.replace(/\n+$/, "")}\n`;
+}
+
+function normalizeYamlBlockScalars(source: string): string {
+  const lines = source.split("\n");
+  const output: string[] = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const originalLine = lines[index] ?? "";
+    const match = /^(( *)([A-Za-z][A-Za-z0-9_-]*):)\s*([>|])([+-])?\s*(?:#.*)?$/.exec(
+      originalLine
+    );
+    if (match === null) {
+      output.push(originalLine);
+      continue;
+    }
+
+    const baseIndent = (match[2] ?? "").length;
+    let blockIndent: number | null = null;
+    let cursor = index + 1;
+    while (cursor < lines.length) {
+      const line = lines[cursor] ?? "";
+      if (line.includes("\t")) {
+        throw new SkillYamlError(
+          "Tabs are not allowed in YAML block scalar indentation.",
+          cursor + 1
+        );
+      }
+      if (line.trim() === "") {
+        cursor += 1;
+        continue;
+      }
+      const indentation = leadingSpaces(line);
+      if (indentation <= baseIndent) break;
+      blockIndent = indentation;
+      break;
+    }
+    if (blockIndent === null) {
+      throw new SkillYamlError(
+        "YAML block scalar requires indented content.",
+        index + 1
+      );
+    }
+
+    const blockLines: string[] = [];
+    cursor = index + 1;
+    while (cursor < lines.length) {
+      const line = lines[cursor] ?? "";
+      if (line.includes("\t")) {
+        throw new SkillYamlError(
+          "Tabs are not allowed in YAML block scalar indentation.",
+          cursor + 1
+        );
+      }
+      if (line.trim() === "") {
+        blockLines.push("");
+        cursor += 1;
+        continue;
+      }
+      const indentation = leadingSpaces(line);
+      if (indentation < blockIndent) break;
+      blockLines.push(line.slice(blockIndent));
+      cursor += 1;
+    }
+
+    const style = match[4] ?? ">";
+    const blockValue =
+      style === "|" ? blockLines.join("\n") : foldBlockLines(blockLines);
+    const value = applyBlockChomping(blockValue, match[5]);
+    output.push(`${match[1] ?? ""} ${JSON.stringify(value)}`);
+    for (let consumed = index + 1; consumed < cursor; consumed += 1) {
+      output.push("");
+    }
+    index = cursor - 1;
+  }
+
+  return output.join("\n");
+}
+
 function parseYamlMapping(source: string): YamlRecord {
   const root: YamlRecord = {};
   const stack: Array<{ indent: number; record: YamlRecord }> = [
@@ -216,7 +331,7 @@ function parseYamlMapping(source: string): YamlRecord {
     const withoutComment = stripYamlComment(originalLine, lineNumber);
     if (withoutComment.trim() === "") continue;
 
-    const indentation = /^ */.exec(withoutComment)?.[0].length ?? 0;
+    const indentation = leadingSpaces(withoutComment);
     if (indentation % 2 !== 0) {
       throw new SkillYamlError(
         "YAML mappings must use two-space indentation.",
@@ -291,8 +406,9 @@ function parseSkillFrontmatter(source: string): {
   }
 
   try {
+    const frontmatter = normalizeYamlBlockScalars(normalized.slice(4, closing));
     return {
-      value: parseYamlMapping(normalized.slice(4, closing)),
+      value: parseYamlMapping(frontmatter),
       issues: []
     };
   } catch (error) {
@@ -402,9 +518,7 @@ function validateSkill(
         : "/metadata/connector-version";
     if (
       typeof metadataVersion !== "string" ||
-      !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(
-        metadataVersion
-      )
+      !isValidSemanticVersion(metadataVersion)
     ) {
       issues.push(
         repositoryIssue(
