@@ -20,7 +20,7 @@ describe("Phase 4 ownership constraints before scoring", () => {
     if (webOwnership === undefined) {
       throw new Error("Expected Web Platform ownership fixture.");
     }
-    webOwnership.exclusive = true;
+    webOwnership.exclusive = false;
     webOwnership.properties = ["opacity"];
 
     const motion = manifestFixture("motion", ["motion.spring"]);
