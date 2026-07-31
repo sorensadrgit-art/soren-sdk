@@ -95,10 +95,17 @@ function browserClauseProvablySupportsWaapi(clause: string): boolean {
   if (match === null) return false;
   const minimum = WAAPI_MINIMUMS[match[1] ?? ""];
   if (minimum === undefined) return false;
-  const lowerBound: [number, number] = [
+  const comparator = match[2] ?? "=";
+  let lowerBound: [number, number] = [
     Number.parseInt(match[3] ?? "0", 10),
     Number.parseInt(match[4] ?? "0", 10)
   ];
+  if (comparator === ">") {
+    lowerBound =
+      match[4] === undefined
+        ? [lowerBound[0] + 1, 0]
+        : [lowerBound[0], lowerBound[1] + 1];
+  }
   return compareBrowserVersion(lowerBound, minimum) >= 0;
 }
 
