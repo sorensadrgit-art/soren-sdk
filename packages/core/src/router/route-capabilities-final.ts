@@ -36,6 +36,8 @@ const MOTION_REACT_CAPABILITIES = new Set([
   "motion.shared-layout",
   "motion.spring"
 ]);
+const RUNTIME_PACKAGE_VERSION =
+  /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const WAAPI_MINIMUMS: Readonly<Record<string, readonly [number, number]>> = {
   android: [84, 0],
   and_chr: [84, 0],
@@ -257,8 +259,11 @@ function pluginDependentSvgRequest(request: RouteRequest): boolean {
     (capability) => capability.required && capability.id === "motion.svg"
   );
   if (svg === undefined) return false;
-  const values = Object.values(svg.quality ?? {})
-    .filter((value): value is string => typeof value === "string")
+  const values = Object.entries(svg.quality ?? {})
+    .flatMap(([key, value]) => {
+      if (value === false || value === 0 || value === "") return [];
+      return [key, typeof value === "string" ? value : String(value)];
+    })
     .join(" ")
     .toLowerCase();
   return /\b(?:draw|drawsvg|morph|morphsvg|path[- ]?morph|path[- ]?drawing)\b/.test(
@@ -287,6 +292,14 @@ function runtimeEligible(
     return false;
   }
   if (!RUNTIME_KINDS.has(integration.kind)) return false;
+  if (
+    integration.kind === "runtime-package" &&
+    (integration.version.status !== "resolved" ||
+      integration.version.value === undefined ||
+      !RUNTIME_PACKAGE_VERSION.test(integration.version.value))
+  ) {
+    return false;
+  }
   if (integration.version.status === "unresolved") return false;
   if (integration.authorization.required) return false;
   if (
