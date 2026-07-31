@@ -93,12 +93,16 @@ describe("deep Codex routing regressions", () => {
       { name: "react", version: "19.0.0", workspace: "apps/app" },
       { name: "react", version: "17.0.2", workspace: "apps/app" }
     ];
+    const request = requestFixture({
+      required: ["motion.layout"],
+      projectSnapshotId: project.snapshotId
+    });
+    const capability = request.capabilities[0];
+    if (capability === undefined) throw new Error("Expected Motion capability.");
+    capability.quality = { workspace: "apps/app" };
+
     const plan = routeCapabilities({
-      request: requestFixture({
-        required: ["motion.layout"],
-        quality: { "motion.layout": { workspace: "apps/app" } },
-        projectSnapshotId: project.snapshotId
-      }),
+      request,
       project,
       catalog: new MemoryCatalogFixture()
     });
