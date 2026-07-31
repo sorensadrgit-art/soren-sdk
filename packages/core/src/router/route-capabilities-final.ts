@@ -173,6 +173,25 @@ function requiredMotionCapabilities(request: RouteRequest) {
   );
 }
 
+function uniqueRequestedWorkspace(
+  request: RouteRequest,
+  predicate: (capabilityId: string) => boolean
+): string | null {
+  const workspaces = new Set(
+    request.capabilities
+      .filter(
+        (capability) => capability.required && predicate(capability.id)
+      )
+      .map((capability) => capability.quality?.workspace)
+      .filter(
+        (workspace): workspace is string =>
+          typeof workspace === "string" && workspace.trim().length > 0
+      )
+      .map((workspace) => workspace.trim())
+  );
+  return workspaces.size === 1 ? [...workspaces][0] ?? null : null;
+}
+
 function requestedMotionWorkspace(request: RouteRequest): {
   workspace: string | null;
   ambiguous: boolean;
@@ -190,6 +209,10 @@ function requestedMotionWorkspace(request: RouteRequest): {
     workspace: workspaces.size === 1 ? [...workspaces][0] ?? null : null,
     ambiguous: workspaces.size > 1
   };
+}
+
+function requestedRouteWorkspace(request: RouteRequest): string | null {
+  return uniqueRequestedWorkspace(request, () => true);
 }
 
 function workspaceExists(
@@ -238,6 +261,21 @@ function selectReactWorkspace(
       (framework) =>
         framework.name !== "react" || framework.workspace === workspace
     )
+  };
+}
+
+function scopeDependencyReuseWorkspace(
+  project: ProjectSnapshot,
+  workspace: string | null
+): ProjectSnapshot {
+  if (workspace === null) return project;
+  return {
+    ...project,
+    dependencies: project.dependencies.filter((dependency) => {
+      if (dependency.name === "react") return true;
+      const dependencyWorkspace = dependency.workspace ?? ".";
+      return dependencyWorkspace === "." || dependencyWorkspace === workspace;
+    })
   };
 }
 
@@ -304,7 +342,7 @@ function pluginDependentSvgRequest(request: RouteRequest): boolean {
     })
     .join(" ")
     .toLowerCase();
-  return /\b(?:draw(?:svg(?:plugin)?)?|morph(?:svg(?:plugin)?)?|path[- ]?morph|path[- ]?drawing)\b/.test(
+  return /\b(?:draw(?:ing|svg(?:plugin)?)?|morph(?:ing|svg(?:plugin)?)?|path[- ]?morph(?:ing)?|path[- ]?drawing)\b/.test(
     values
   );
 }
@@ -479,6 +517,7 @@ export function routeCapabilities(input: RouteInput) {
   assertUniqueCapabilityIds(input);
 
   const workspace = requestedMotionWorkspace(input.request);
+  const routeWorkspace = requestedRouteWorkspace(input.request);
   const motionRequired = requiredMotionCapabilities(input.request).length > 0;
   const workspaceKnown = workspaceExists(input.project, workspace.workspace);
   const workspaceNeedsInput =
@@ -488,7 +527,10 @@ export function routeCapabilities(input: RouteInput) {
       (workspace.workspace === null && reactWorkspacesDisagree(input.project)));
   const effectiveWorkspace = workspaceKnown ? workspace.workspace : null;
   const project = normalizeBrowserTargets(
-    selectReactWorkspace(input.project, effectiveWorkspace)
+    scopeDependencyReuseWorkspace(
+      selectReactWorkspace(input.project, effectiveWorkspace),
+      routeWorkspace
+    )
   );
   const initial = routeCapabilitiesReviewed({
     ...input,
