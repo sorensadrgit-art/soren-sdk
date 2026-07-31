@@ -113,6 +113,30 @@ describe("deep Codex routing regressions", () => {
     );
   });
 
+  it("preserves compatible root React declarations for a selected workspace", () => {
+    const project = projectFixture({ reactVersion: "19.0.0" });
+    project.workspace = {
+      isMonorepo: true,
+      packages: [{ name: "app", path: "apps/app", private: true }]
+    };
+    const request = requestFixture({
+      required: ["motion.layout"],
+      projectSnapshotId: project.snapshotId
+    });
+    const capability = request.capabilities[0];
+    if (capability === undefined) throw new Error("Expected Motion capability.");
+    capability.quality = { workspace: "apps/app" };
+
+    const plan = routeCapabilities({
+      request,
+      project,
+      catalog: new MemoryCatalogFixture()
+    });
+
+    expect(plan.status).toBe("selected");
+    expect(plan.selectedProviders[0]?.providerId).toBe("motion");
+  });
+
   it("treats missing browser targets as unresolved for required WAAPI", () => {
     const project = projectFixture();
     project.targets.browsers = [];
