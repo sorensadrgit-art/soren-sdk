@@ -36,6 +36,17 @@ function selectedWorkspace(request: RouteRequest): string | null {
   return workspaces.size === 1 ? [...workspaces][0] ?? null : null;
 }
 
+function workspaceExists(
+  project: ProjectSnapshot,
+  workspace: string | null
+): boolean {
+  return (
+    workspace === null ||
+    workspace === "." ||
+    project.workspace.packages.some((item) => item.path === workspace)
+  );
+}
+
 function normalizedWorkspace(workspace: string | null | undefined): string {
   return workspace ?? ".";
 }
@@ -248,7 +259,10 @@ function guardedProject(
 export function routeCapabilities(input: RouteInput) {
   assertContract<RouteRequest>("route-request", input.request);
   assertContract<ProjectSnapshot>("project-snapshot", input.project);
-  const workspace = selectedWorkspace(input.request);
+  const requestedWorkspace = selectedWorkspace(input.request);
+  const workspace = workspaceExists(input.project, requestedWorkspace)
+    ? requestedWorkspace
+    : null;
   return routeCapabilitiesFinal({
     ...input,
     project: guardedProject(input.project, workspace)
