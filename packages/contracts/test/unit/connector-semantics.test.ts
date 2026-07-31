@@ -233,6 +233,28 @@ describe("connector semantic validation", () => {
     }
   });
 
+  it("detects a network-hosted file URL as remote", () => {
+    const result = validateConnectorManifest(
+      connectorWithRemoteAgentSkill(
+        { status: "resolved", value: "1.2.3" },
+        "file://server/share/SKILL.md",
+        "local-only"
+      ),
+      {
+        expectedPublisher: "soren-sdk",
+        capabilityCatalog: capabilityCatalog()
+      }
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(
+        result.issues.some(
+          (issue) => issue.keyword === "available-agent-skill-pin"
+        )
+      ).toBe(true);
+    }
+  });
+
   it("accepts an available remote Agent Skill pinned to an immutable commit", () => {
     expect(
       validateConnectorManifest(
