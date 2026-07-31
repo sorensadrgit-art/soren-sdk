@@ -112,7 +112,7 @@ metadata: {publisher: soren-sdk, version: 1.0.0}`);
   });
 
   it.each([
-    ["description", "_123"],
+    ["license", "_123"],
     ["compatibility", "1__23"]
   ])("preserves valid underscore plain scalar %s values", async (field, scalar) => {
     const frontmatter = `${VALID_METADATA}\ndescription: Use when browser-native animation fully satisfies the request.`
