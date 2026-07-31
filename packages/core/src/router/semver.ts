@@ -32,11 +32,9 @@ export function minimumDeclaredVersion(value: string): VersionTuple | null {
 }
 
 function compare(left: VersionTuple, right: VersionTuple): number {
-  for (let index = 0; index < 3; index += 1) {
-    const difference = left[index] - right[index];
-    if (difference !== 0) return difference;
-  }
-  return 0;
+  if (left[0] !== right[0]) return left[0] - right[0];
+  if (left[1] !== right[1]) return left[1] - right[1];
+  return left[2] - right[2];
 }
 
 export function isAtLeast(
