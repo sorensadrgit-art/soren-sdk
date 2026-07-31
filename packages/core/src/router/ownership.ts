@@ -142,18 +142,19 @@ export function findOwnershipConflict(
 ): [CapabilityAssignment, CapabilityAssignment] | null {
   for (let leftIndex = 0; leftIndex < assignments.length; leftIndex += 1) {
     const left = assignments[leftIndex];
-    if (left === undefined || !left.exclusive) continue;
+    if (left === undefined) continue;
     for (
       let rightIndex = leftIndex + 1;
       rightIndex < assignments.length;
       rightIndex += 1
     ) {
       const right = assignments[rightIndex];
-      if (right === undefined || !right.exclusive) continue;
+      if (right === undefined) continue;
       if (
         left.providerId !== right.providerId &&
         left.scope === right.scope &&
-        left.property === right.property
+        left.property === right.property &&
+        (left.exclusive || right.exclusive)
       ) {
         return [left, right];
       }
