@@ -11,7 +11,7 @@ function repositoryRoot(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 }
 
-async function createFixture(): Promise<string> {
+async function createFixture(license: string): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "soren-sdk-skill-single-quote-"));
   const connector = join(root, "sdk-connectors", "web-platform");
   await mkdir(join(root, "capabilities"), { recursive: true });
@@ -37,7 +37,7 @@ async function createFixture(): Promise<string> {
     `---
 name: web-platform
 description: "Use when browser-native animation fully satisfies the request."
-license: 'MIT' garbage'
+license: ${license}
 compatibility: Soren SDK Phase 4; browser-native runtime; no executable scripts
 metadata:
   publisher: soren-sdk
@@ -53,16 +53,24 @@ source-digest: sha256:8a1f03a2689222031b57186f7172ccae7697037462f688c6576f3a5024
   return root;
 }
 
+async function expectRejected(license: string): Promise<void> {
+  const root = await createFixture(license);
+  try {
+    const report = validateRepository(root);
+    expect(report.errors.flatMap((failure) => failure.issues)).toContainEqual(
+      expect.objectContaining({ keyword: "skill-frontmatter" })
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
 describe("strict single-quoted YAML scalars", () => {
   it("rejects an unescaped interior single quote", async () => {
-    const root = await createFixture();
-    try {
-      const report = validateRepository(root);
-      expect(report.errors.flatMap((failure) => failure.issues)).toContainEqual(
-        expect.objectContaining({ keyword: "skill-frontmatter" })
-      );
-    } finally {
-      await rm(root, { recursive: true, force: true });
-    }
+    await expectRejected("'MIT' garbage'");
+  });
+
+  it("rejects trailing text between balanced single-quoted scalars", async () => {
+    await expectRejected("'MIT' garbage 'foo'");
   });
 });
