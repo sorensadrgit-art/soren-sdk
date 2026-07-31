@@ -257,8 +257,7 @@ function pluginDependentSvgRequest(request: RouteRequest): boolean {
     (capability) => capability.required && capability.id === "motion.svg"
   );
   if (svg === undefined) return false;
-  const values = ["effect", "mode", "operation", "property", "technique"]
-    .map((key) => svg.quality?.[key])
+  const values = Object.values(svg.quality ?? {})
     .filter((value): value is string => typeof value === "string")
     .join(" ")
     .toLowerCase();
@@ -290,6 +289,12 @@ function runtimeEligible(
   if (!RUNTIME_KINDS.has(integration.kind)) return false;
   if (integration.version.status === "unresolved") return false;
   if (integration.authorization.required) return false;
+  if (
+    policy.rules.maxBundleKilobytes !== null &&
+    integration.kind === "runtime-package"
+  ) {
+    return false;
+  }
   if (
     integration.licenseExpression === undefined ||
     !policy.rules.allowedLicenses.includes(integration.licenseExpression)
