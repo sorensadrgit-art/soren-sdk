@@ -1,8 +1,11 @@
 import {
   assertContract,
+  digestJson,
   type IntegrationArtifact,
+  type JsonValue,
   type PolicyDocument,
   type ProjectSnapshot,
+  type RoutePlan,
   type RouteRequest
 } from "@soren-sdk/contracts";
 
@@ -25,6 +28,31 @@ const DENIED_EXECUTION_RISKS = new Set([
   "privileged",
   "project-write"
 ]);
+const MOTION_REACT_CAPABILITIES = new Set([
+  "interaction.drag",
+  "interaction.gesture",
+  "motion.layout",
+  "motion.presence",
+  "motion.shared-layout",
+  "motion.spring"
+]);
+const WAAPI_MINIMUMS: Readonly<Record<string, readonly [number, number]>> = {
+  android: [84, 0],
+  and_chr: [84, 0],
+  and_ff: [75, 0],
+  chrome: [84, 0],
+  edge: [84, 0],
+  firefox: [75, 0],
+  ios_saf: [13, 4],
+  op_mob: [64, 0],
+  opera: [70, 0],
+  safari: [13, 1],
+  samsung: [12, 0]
+};
+
+function json(value: unknown): JsonValue {
+  return JSON.parse(JSON.stringify(value)) as JsonValue;
+}
 
 function browserQuery(target: string): string {
   const trimmed = target.trim();
@@ -46,29 +74,32 @@ function requiresBrowserslistResolution(clause: string): boolean {
   }
   return (
     /^[a-z][a-z0-9_-]*$/.test(normalized) &&
-    !new Set([
-      "android",
-      "and_chr",
-      "and_ff",
-      "and_qq",
-      "and_uc",
-      "baidu",
-      "bb",
-      "chrome",
-      "edge",
-      "firefox",
-      "ie",
-      "ie_mob",
-      "ios_saf",
-      "kaios",
-      "node",
-      "op_mini",
-      "op_mob",
-      "opera",
-      "safari",
-      "samsung"
-    ]).has(normalized)
+    !Object.hasOwn(WAAPI_MINIMUMS, normalized)
   );
+}
+
+function compareBrowserVersion(
+  left: readonly [number, number],
+  right: readonly [number, number]
+): number {
+  return left[0] - right[0] || left[1] - right[1];
+}
+
+function browserClauseProvablySupportsWaapi(clause: string): boolean {
+  const normalized = clause.trim().toLowerCase();
+  if (normalized === "defaults") return true;
+  const match =
+    /^(android|and_chr|and_ff|chrome|edge|firefox|ios_saf|op_mob|opera|safari|samsung)\s*(>=|>|=)?\s*(\d+)(?:\.(\d+))?(?:-\d+(?:\.\d+)?)?$/.exec(
+      normalized
+    );
+  if (match === null) return false;
+  const minimum = WAAPI_MINIMUMS[match[1] ?? ""];
+  if (minimum === undefined) return false;
+  const lowerBound: [number, number] = [
+    Number.parseInt(match[3] ?? "0", 10),
+    Number.parseInt(match[4] ?? "0", 10)
+  ];
+  return compareBrowserVersion(lowerBound, minimum) >= 0;
 }
 
 function normalizeBrowserTargets(project: ProjectSnapshot): ProjectSnapshot {
@@ -81,7 +112,10 @@ function normalizeBrowserTargets(project: ProjectSnapshot): ProjectSnapshot {
           clause.length > 0 && !clause.toLowerCase().startsWith("not ")
       )
       .map((clause) =>
-        requiresBrowserslistResolution(clause) ? "ie 11" : clause
+        requiresBrowserslistResolution(clause) ||
+        !browserClauseProvablySupportsWaapi(clause)
+          ? "ie 11"
+          : clause
       )
   );
   return {
@@ -103,6 +137,127 @@ function assertUniqueCapabilityIds(input: RouteInput): void {
     }
     seen.add(capability.id);
   }
+}
+
+function requiredMotionCapabilities(request: RouteRequest) {
+  return request.capabilities.filter(
+    (capability) =>
+      capability.required && MOTION_REACT_CAPABILITIES.has(capability.id)
+  );
+}
+
+function requestedMotionWorkspace(request: RouteRequest): {
+  workspace: string | null;
+  ambiguous: boolean;
+} {
+  const workspaces = new Set(
+    requiredMotionCapabilities(request)
+      .map((capability) => capability.quality?.workspace)
+      .filter(
+        (workspace): workspace is string =>
+          typeof workspace === "string" && workspace.trim().length > 0
+      )
+      .map((workspace) => workspace.trim())
+  );
+  return {
+    workspace: workspaces.size === 1 ? [...workspaces][0] ?? null : null,
+    ambiguous: workspaces.size > 1
+  };
+}
+
+function reactWorkspaceVersions(project: ProjectSnapshot): Map<string, Set<string>> {
+  const versions = new Map<string, Set<string>>();
+  for (const item of [...project.dependencies, ...project.frameworks]) {
+    if (item.name !== "react") continue;
+    const workspace = item.workspace;
+    const existing = versions.get(workspace) ?? new Set<string>();
+    existing.add(item.version);
+    versions.set(workspace, existing);
+  }
+  return versions;
+}
+
+function reactWorkspacesDisagree(project: ProjectSnapshot): boolean {
+  const versions = reactWorkspaceVersions(project);
+  if ([...versions.values()].some((value) => value.size > 1)) return true;
+  return new Set(
+    [...versions.values()].flatMap((value) => [...value])
+  ).size > 1;
+}
+
+function selectReactWorkspace(
+  project: ProjectSnapshot,
+  workspace: string | null
+): ProjectSnapshot {
+  if (workspace === null) return project;
+  return {
+    ...project,
+    dependencies: project.dependencies.filter(
+      (dependency) =>
+        dependency.name !== "react" || dependency.workspace === workspace
+    ),
+    frameworks: project.frameworks.filter(
+      (framework) =>
+        framework.name !== "react" || framework.workspace === workspace
+    )
+  };
+}
+
+function workspaceNeedsInputPlan(initial: RoutePlan): RoutePlan {
+  const stablePayload = {
+    schemaVersion: initial.schemaVersion,
+    contractKind: initial.contractKind,
+    status: "needs-input" as const,
+    requestId: initial.requestId,
+    projectSnapshotId: initial.projectSnapshotId,
+    catalogSnapshotId: initial.catalogSnapshotId,
+    policySnapshotId: initial.policySnapshotId,
+    requestedCapabilities: initial.requestedCapabilities,
+    selectedProviders: [],
+    rejectedProviders: [
+      {
+        providerId: "motion",
+        reasonCode: "ENVIRONMENT_UNSUPPORTED",
+        reason:
+          "React versions differ across workspaces; select the target workspace before routing Motion."
+      }
+    ],
+    ownership: [],
+    constraints: [
+      {
+        code: "ENVIRONMENT_AMBIGUOUS",
+        status: "failed" as const,
+        message:
+          "React versions differ across workspaces; provide quality.workspace for the required Motion capability."
+      }
+    ],
+    uncertainty: 1,
+    requiredInput: ["target workspace"]
+  };
+  const digest = digestJson(json(stablePayload));
+  const plan: RoutePlan = {
+    ...stablePayload,
+    planId: `route_${digest.slice("sha256:".length, "sha256:".length + 24)}`,
+    createdAt: initial.createdAt,
+    digest
+  };
+  assertContract<RoutePlan>("route-plan", plan);
+  return plan;
+}
+
+function pluginDependentSvgRequest(request: RouteRequest): boolean {
+  const svg = request.capabilities.find(
+    (capability) => capability.required && capability.id === "motion.svg"
+  );
+  if (svg === undefined) return false;
+  const values = ["effect", "mode", "operation", "property", "technique"]
+    .map((key) => svg.quality?.[key])
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+  return /\b(?:draw|drawsvg|morph|morphsvg|path[- ]?morph|path[- ]?drawing)\b/.test(
+    values
+  );
 }
 
 function normalizedHost(value: string): string {
@@ -197,11 +352,19 @@ function filterRouteIneligibleRuntimes(
     );
   }
 
+  const capabilityClaims =
+    record.manifest.connector.id === "gsap" && pluginDependentSvgRequest(request)
+      ? record.manifest.capabilityClaims.filter(
+          (claim) => claim.capability !== "motion.svg"
+        )
+      : record.manifest.capabilityClaims;
+
   return {
     ...record,
     manifest: {
       ...record.manifest,
-      integrations
+      integrations,
+      capabilityClaims
     }
   };
 }
@@ -252,10 +415,21 @@ export function routeCapabilities(input: RouteInput) {
   assertContract<PolicyDocument>("policy", policy);
   assertUniqueCapabilityIds(input);
 
-  return routeCapabilitiesReviewed({
+  const workspace = requestedMotionWorkspace(input.request);
+  const motionRequired = requiredMotionCapabilities(input.request).length > 0;
+  const workspaceAmbiguous =
+    motionRequired &&
+    (workspace.ambiguous ||
+      (workspace.workspace === null && reactWorkspacesDisagree(input.project)));
+  const project = normalizeBrowserTargets(
+    selectReactWorkspace(input.project, workspace.workspace)
+  );
+  const initial = routeCapabilitiesReviewed({
     ...input,
     policy,
-    project: normalizeBrowserTargets(input.project),
+    project,
     catalog: routeCatalog(input.catalog, input.request, policy)
   });
+
+  return workspaceAmbiguous ? workspaceNeedsInputPlan(initial) : initial;
 }
