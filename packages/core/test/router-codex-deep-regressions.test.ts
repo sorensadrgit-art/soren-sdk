@@ -30,19 +30,40 @@ describe("deep Codex routing regressions", () => {
     }
   );
 
-  it("accepts a React range whose minimum is 18.2", () => {
-    const project = projectFixture({ reactVersion: "^18.2.0" });
+  it.each(["^18.2.0", "18.2.x", "19.x"])(
+    "accepts a React range whose wildcard interval guarantees 18.2+: %s",
+    (reactVersion) => {
+      const project = projectFixture({ reactVersion });
+      const plan = routeCapabilities({
+        request: requestFixture({
+          required: ["motion.layout"],
+          projectSnapshotId: project.snapshotId
+        }),
+        project,
+        catalog: new MemoryCatalogFixture()
+      });
+
+      expect(plan.status).toBe("selected");
+      expect(plan.selectedProviders[0]?.providerId).toBe("motion");
+    }
+  );
+
+  it("treats missing browser targets as unresolved for required WAAPI", () => {
+    const project = projectFixture();
+    project.targets.browsers = [];
     const plan = routeCapabilities({
       request: requestFixture({
-        required: ["motion.layout"],
+        required: ["platform.waapi-animation"],
         projectSnapshotId: project.snapshotId
       }),
       project,
       catalog: new MemoryCatalogFixture()
     });
 
-    expect(plan.status).toBe("selected");
-    expect(plan.selectedProviders[0]?.providerId).toBe("motion");
+    expect(plan.status).toBe("blocked");
+    expect(plan.constraints).toContainEqual(
+      expect.objectContaining({ code: "ENVIRONMENT_UNSUPPORTED" })
+    );
   });
 
   it("blocks shared ownership when either provider is exclusive", () => {
