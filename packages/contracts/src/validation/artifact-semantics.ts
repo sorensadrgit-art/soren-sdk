@@ -4,7 +4,7 @@ import type {
 } from "../types/index.js";
 import type { ContractIssue } from "../errors/index.js";
 
-const IMMUTABLE_COMMIT = /^[0-9a-f]{40,64}$/i;
+const IMMUTABLE_COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
 const IMMUTABLE_DIGEST = /^sha256:[0-9a-f]{64}$/;
 
 function issue(

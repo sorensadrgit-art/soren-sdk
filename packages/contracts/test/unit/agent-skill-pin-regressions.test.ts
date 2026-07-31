@@ -89,7 +89,8 @@ describe("Agent Skill pin regressions", () => {
   });
 
   it.each([
-    ["commit", { status: "resolved" as const, value: "1.2.3", commit: "a".repeat(40) }],
+    ["sha1 commit", { status: "resolved" as const, value: "1.2.3", commit: "a".repeat(40) }],
+    ["sha256 commit", { status: "resolved" as const, value: "1.2.3", commit: "a".repeat(64) }],
     [
       "digest",
       {
@@ -107,6 +108,26 @@ describe("Agent Skill pin regressions", () => {
         )
       ).ok
     ).toBe(true);
+  });
+
+  it.each([41, 63])("rejects a %i-character commit pin", (length) => {
+    const result = validate(
+      connectorWithSkill(
+        "https://example.com/skills/latest",
+        {
+          status: "resolved",
+          value: "1.2.3",
+          commit: "a".repeat(length)
+        }
+      )
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({ keyword: "available-agent-skill-pin" })
+      );
+    }
   });
 
   it("requires an immutable pin for an available local file-backed skill", () => {
