@@ -324,10 +324,25 @@ function reusableAcrossTargets(
   versions: readonly Version[],
   workspaces: readonly string[]
 ): boolean {
-  if (hasCompatibleDependency(project, packageName, versions, ".")) return true;
-  return workspaces.every((workspace) =>
-    hasCompatibleDependency(project, packageName, versions, workspace)
+  const rootCompatible = hasCompatibleDependency(
+    project,
+    packageName,
+    versions,
+    "."
   );
+  return workspaces.every((workspace) => {
+    const localDependencies = project.dependencies.filter(
+      (dependency) =>
+        dependency.name === packageName &&
+        (dependency.workspace ?? ".") === workspace
+    );
+    if (localDependencies.length === 0) return rootCompatible;
+    return localDependencies.some((dependency) =>
+      versions.some((version) =>
+        versionSatisfiesRange(version, dependency.version)
+      )
+    );
+  });
 }
 
 function guardMultiWorkspaceReuse(input: RouteInput): ProjectSnapshot {

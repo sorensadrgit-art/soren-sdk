@@ -9,6 +9,7 @@ import {
   type RouteRequest
 } from "@soren-sdk/contracts";
 
+import { projectSnapshotDigest } from "../src/index.js";
 import type {
   CatalogReader,
   ConnectorHealthReport,
@@ -321,7 +322,7 @@ export function projectFixture(
     kind: "dependency" as const,
     workspace: "."
   }));
-  return {
+  const snapshot: ProjectSnapshot = {
     schemaVersion: "1.0.0-draft.1",
     contractKind: "project-snapshot",
     snapshotId: options.snapshotId ?? PROJECT_ID,
@@ -349,6 +350,14 @@ export function projectFixture(
     targets: { browsers: ["defaults"], runtimes: ["node >=24"] },
     warnings: []
   };
+  if (options.snapshotId === undefined) {
+    Object.defineProperty(snapshot, "snapshotId", {
+      configurable: true,
+      enumerable: true,
+      get: () => projectSnapshotDigest(snapshot)
+    });
+  }
+  return snapshot;
 }
 
 export interface RequestFixtureOptions {

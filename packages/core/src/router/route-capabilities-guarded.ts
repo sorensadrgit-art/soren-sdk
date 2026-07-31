@@ -19,21 +19,45 @@ const MOTION_REACT_CAPABILITIES = new Set([
   "motion.spring"
 ]);
 
-function selectedWorkspace(request: RouteRequest): string | null {
-  const workspaces = new Set(
-    request.capabilities
-      .filter(
-        (capability) =>
-          capability.required && MOTION_REACT_CAPABILITIES.has(capability.id)
-      )
-      .map((capability) => capability.quality?.workspace)
-      .filter(
-        (workspace): workspace is string =>
-          typeof workspace === "string" && workspace.trim().length > 0
-      )
-      .map((workspace) => workspace.trim())
+function requiredMotionCapabilities(request: RouteRequest) {
+  return request.capabilities.filter(
+    (capability) =>
+      capability.required && MOTION_REACT_CAPABILITIES.has(capability.id)
   );
-  return workspaces.size === 1 ? [...workspaces][0] ?? null : null;
+}
+
+function requestedMotionWorkspaces(request: RouteRequest): string[] {
+  return [
+    ...new Set(
+      requiredMotionCapabilities(request)
+        .map((capability) => capability.quality?.workspace)
+        .filter(
+          (workspace): workspace is string =>
+            typeof workspace === "string" && workspace.trim().length > 0
+        )
+        .map((workspace) => workspace.trim())
+    )
+  ].sort();
+}
+
+function allMotionCapabilitiesHaveWorkspace(request: RouteRequest): boolean {
+  const required = requiredMotionCapabilities(request);
+  return (
+    required.length > 0 &&
+    required.every(
+      (capability) =>
+        typeof capability.quality?.workspace === "string" &&
+        capability.quality.workspace.trim().length > 0
+    )
+  );
+}
+
+function selectedWorkspace(request: RouteRequest): string | null {
+  const workspaces = requestedMotionWorkspaces(request);
+  if (workspaces.length === 1) return workspaces[0] ?? null;
+  return workspaces.length > 1 && allMotionCapabilitiesHaveWorkspace(request)
+    ? workspaces[0] ?? null
+    : null;
 }
 
 function workspaceExists(
@@ -143,6 +167,58 @@ function reactRangeGuaranteesMinimum(value: string): boolean {
 function guardedReactVersion(version: string | null): string | null {
   if (version === null) return null;
   return reactRangeGuaranteesMinimum(version) ? version : "17.0.0";
+}
+
+function reactSourcesForWorkspace(
+  project: ProjectSnapshot,
+  workspace: string
+) {
+  const all = [...project.dependencies, ...project.frameworks].filter(
+    (item) => item.name === "react"
+  );
+  const local = all.filter(
+    (item) => normalizedWorkspace(item.workspace) === workspace
+  );
+  return local.length > 0
+    ? local
+    : all.filter((item) => normalizedWorkspace(item.workspace) === ".");
+}
+
+function explicitMotionWorkspacesSupported(
+  project: ProjectSnapshot,
+  request: RouteRequest
+): boolean {
+  const workspaces = requestedMotionWorkspaces(request);
+  if (workspaces.length < 2) return true;
+  if (!allMotionCapabilitiesHaveWorkspace(request)) return false;
+  return workspaces.every((workspace) => {
+    if (!workspaceExists(project, workspace)) return false;
+    const sources = reactSourcesForWorkspace(project, workspace);
+    return (
+      sources.length > 0 &&
+      sources.every(
+        (source) =>
+          source.version !== null &&
+          reactRangeGuaranteesMinimum(source.version)
+      )
+    );
+  });
+}
+
+function forceUnsupportedReact(project: ProjectSnapshot): ProjectSnapshot {
+  return {
+    ...project,
+    dependencies: project.dependencies.map((dependency) =>
+      dependency.name === "react"
+        ? { ...dependency, version: "17.0.0" }
+        : dependency
+    ),
+    frameworks: project.frameworks.map((framework) =>
+      framework.name === "react"
+        ? { ...framework, version: "17.0.0" }
+        : framework
+    )
+  };
 }
 
 function browserQuery(target: string): string {
@@ -263,8 +339,12 @@ export function routeCapabilities(input: RouteInput) {
   const workspace = workspaceExists(input.project, requestedWorkspace)
     ? requestedWorkspace
     : null;
+  const guarded = guardedProject(input.project, workspace);
+  const project = explicitMotionWorkspacesSupported(input.project, input.request)
+    ? guarded
+    : forceUnsupportedReact(guarded);
   return routeCapabilitiesFinal({
     ...input,
-    project: guardedProject(input.project, workspace)
+    project
   });
 }

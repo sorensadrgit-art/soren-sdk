@@ -1,9 +1,7 @@
 import { join } from "node:path";
 
 import {
-  digestJson,
   validateContract,
-  type JsonValue,
   type ProjectSnapshot
 } from "@soren-sdk/contracts";
 
@@ -25,11 +23,8 @@ import {
   ProjectInspectionError,
   type InspectProjectOptions
 } from "./types.js";
+import { projectSnapshotDigest } from "./project-snapshot-digest.js";
 import { detectWorkspaces } from "./workspaces.js";
-
-function jsonValue(value: unknown): JsonValue {
-  return value as JsonValue;
-}
 
 function stableWarnings(values: Iterable<string>): string[] {
   return [...new Set(values)].sort();
@@ -76,7 +71,7 @@ export function inspectProject(options: InspectProjectOptions): ProjectSnapshot 
   const snapshot: ProjectSnapshot = {
     schemaVersion: "1.0.0-draft.1",
     contractKind: "project-snapshot",
-    snapshotId: digestJson(jsonValue(digestPayload)),
+    snapshotId: projectSnapshotDigest(digestPayload),
     createdAt: options.createdAt ?? new Date().toISOString(),
     root,
     ...digestPayload

@@ -2,6 +2,7 @@ export * from "./catalog/service.js";
 export * from "./catalog/types.js";
 export * from "./inspector/types.js";
 export * from "./inspector/inspect-project.js";
+export * from "./inspector/project-snapshot-digest.js";
 export * from "./router/policy.js";
 export * from "./router/route-capabilities-security.js";
 export * from "./router/types.js";

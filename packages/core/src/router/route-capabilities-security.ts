@@ -1,4 +1,5 @@
 import {
+  ContractValidationError,
   assertContract,
   type CapabilityCatalog,
   type IntegrationArtifact,
@@ -7,6 +8,7 @@ import {
 } from "@soren-sdk/contracts";
 
 import type { CatalogReader, ConnectorRecord } from "../catalog/types.js";
+import { projectSnapshotDigest } from "../inspector/project-snapshot-digest.js";
 import { routeCapabilities as routeCapabilitiesWorkspaceReuse } from "./route-capabilities-workspace-reuse.js";
 import type { RouteInput } from "./types.js";
 
@@ -19,6 +21,26 @@ const PARTIAL_COMPARATOR =
 
 function isPrereleaseVersion(value: string): boolean {
   return STRICT_SEMVER.exec(value.trim())?.[4] !== undefined;
+}
+
+function assertProjectSnapshotDigest(project: ProjectSnapshot): void {
+  const expected = projectSnapshotDigest(project);
+  if (project.snapshotId === expected) return;
+  throw new ContractValidationError(
+    "Project Snapshot content does not match its snapshotId.",
+    [
+      {
+        instancePath: "/snapshotId",
+        schemaPath: "#/project-snapshot/snapshotId",
+        keyword: "project-snapshot-digest",
+        message: "Project Snapshot content digest does not match snapshotId.",
+        params: {
+          actual: project.snapshotId,
+          expected
+        }
+      }
+    ]
+  );
 }
 function expandPartialComparators(value: string): string {
   return value.replace(
@@ -270,6 +292,7 @@ function effectiveBrowserTargets(
 export function routeCapabilities(input: RouteInput) {
   assertContract<RouteRequest>("route-request", input.request);
   assertContract<ProjectSnapshot>("project-snapshot", input.project);
+  assertProjectSnapshotDigest(input.project);
   const project = guardDependencies(
     effectiveBrowserTargets(input.project),
     input.request

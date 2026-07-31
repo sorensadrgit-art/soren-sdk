@@ -220,6 +220,8 @@ function parseYamlNumber(value: string): number | undefined {
   const sign = normalized.startsWith("-") ? -1 : 1;
   const unsigned = normalized.replace(/^[+-]/, "");
 
+  if (/^\.inf$/i.test(unsigned)) return sign * Number.POSITIVE_INFINITY;
+  if (/^\.nan$/i.test(unsigned)) return Number.NaN;
   if (/^0x[0-9a-f]+$/i.test(unsigned)) {
     return sign * Number.parseInt(unsigned.slice(2), 16);
   }
@@ -293,6 +295,74 @@ function applyBlockChomping(value: string, chomping: string | undefined): string
   if (chomping === "-") return value.replace(/\n+$/, "");
   if (chomping === "+") return `${value}\n`;
   return `${value.replace(/\n+$/, "")}\n`;
+}
+
+function hasClosingDoubleQuote(value: string): boolean {
+  let escaped = false;
+  for (let index = 1; index < value.length; index += 1) {
+    const character = value[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (character === '"') return true;
+  }
+  return false;
+}
+
+function normalizeYamlMultilineQuotedScalars(source: string): string {
+  const lines = source.split("\n");
+  const output: string[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const originalLine = lines[index] ?? "";
+    const match = /^(( *)([A-Za-z][A-Za-z0-9_-]*):\s*)(".*)$/.exec(
+      originalLine
+    );
+    if (match === null || hasClosingDoubleQuote(match[4] ?? "")) {
+      output.push(originalLine);
+      continue;
+    }
+
+    const baseIndent = (match[2] ?? "").length;
+    let scalar = match[4] ?? '"';
+    let cursor = index + 1;
+    let previousBlank = false;
+    while (cursor < lines.length && !hasClosingDoubleQuote(scalar)) {
+      const line = lines[cursor] ?? "";
+      if (line.includes("\t")) {
+        throw new SkillYamlError(
+          "Tabs are not allowed in multiline YAML scalar indentation.",
+          cursor + 1
+        );
+      }
+      if (line.trim() === "") {
+        scalar += "\n";
+        previousBlank = true;
+        cursor += 1;
+        continue;
+      }
+      if (leadingSpaces(line) <= baseIndent) break;
+      scalar += `${previousBlank ? "" : " "}${line.trim()}`;
+      previousBlank = false;
+      cursor += 1;
+    }
+    if (!hasClosingDoubleQuote(scalar)) {
+      throw new SkillYamlError(
+        "Unterminated multiline double-quoted YAML scalar.",
+        index + 1
+      );
+    }
+    output.push(`${match[1] ?? ""}${scalar}`);
+    for (let consumed = index + 1; consumed < cursor; consumed += 1) {
+      output.push("");
+    }
+    index = cursor - 1;
+  }
+  return output.join("\n");
 }
 
 function normalizeYamlBlockScalars(source: string): string {
@@ -475,7 +545,9 @@ function parseSkillFrontmatter(source: string): {
   }
 
   try {
-    const frontmatter = normalizeYamlBlockScalars(normalized.slice(4, closing));
+    const frontmatter = normalizeYamlBlockScalars(
+      normalizeYamlMultilineQuotedScalars(normalized.slice(4, closing))
+    );
     return {
       value: parseYamlMapping(frontmatter),
       issues: []

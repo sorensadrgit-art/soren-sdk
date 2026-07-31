@@ -192,22 +192,41 @@ function uniqueRequestedWorkspace(
   return workspaces.size === 1 ? [...workspaces][0] ?? null : null;
 }
 
+function requestedMotionWorkspaces(request: RouteRequest): string[] {
+  return [
+    ...new Set(
+      requiredMotionCapabilities(request)
+        .map((capability) => capability.quality?.workspace)
+        .filter(
+          (workspace): workspace is string =>
+            typeof workspace === "string" && workspace.trim().length > 0
+        )
+        .map((workspace) => workspace.trim())
+    )
+  ].sort();
+}
+
 function requestedMotionWorkspace(request: RouteRequest): {
   workspace: string | null;
   ambiguous: boolean;
 } {
-  const workspaces = new Set(
-    requiredMotionCapabilities(request)
-      .map((capability) => capability.quality?.workspace)
-      .filter(
-        (workspace): workspace is string =>
-          typeof workspace === "string" && workspace.trim().length > 0
-      )
-      .map((workspace) => workspace.trim())
-  );
+  const required = requiredMotionCapabilities(request);
+  const workspaces = requestedMotionWorkspaces(request);
+  const allExplicit =
+    required.length > 0 &&
+    required.every(
+      (capability) =>
+        typeof capability.quality?.workspace === "string" &&
+        capability.quality.workspace.trim().length > 0
+    );
+  if (allExplicit && workspaces.length > 0) {
+    return { workspace: workspaces[0] ?? null, ambiguous: false };
+  }
   return {
-    workspace: workspaces.size === 1 ? [...workspaces][0] ?? null : null,
-    ambiguous: workspaces.size > 1
+    workspace: workspaces.length === 1 && required.length === 1
+      ? workspaces[0] ?? null
+      : null,
+    ambiguous: workspaces.length > 0
   };
 }
 
@@ -517,15 +536,24 @@ export function routeCapabilities(input: RouteInput) {
   assertUniqueCapabilityIds(input);
 
   const workspace = requestedMotionWorkspace(input.request);
+  const motionWorkspaces = requestedMotionWorkspaces(input.request);
   const routeWorkspace = requestedRouteWorkspace(input.request);
   const motionRequired = requiredMotionCapabilities(input.request).length > 0;
-  const workspaceKnown = workspaceExists(input.project, workspace.workspace);
+  const workspacesKnown = motionWorkspaces.every((item) =>
+    workspaceExists(input.project, item)
+  );
+  const representativeKnown = workspaceExists(
+    input.project,
+    workspace.workspace
+  );
   const workspaceNeedsInput =
     motionRequired &&
     (workspace.ambiguous ||
-      !workspaceKnown ||
+      !workspacesKnown ||
+      !representativeKnown ||
       (workspace.workspace === null && reactWorkspacesDisagree(input.project)));
-  const effectiveWorkspace = workspaceKnown ? workspace.workspace : null;
+  const effectiveWorkspace =
+    workspacesKnown && representativeKnown ? workspace.workspace : null;
   const project = normalizeBrowserTargets(
     scopeDependencyReuseWorkspace(
       selectReactWorkspace(input.project, effectiveWorkspace),
