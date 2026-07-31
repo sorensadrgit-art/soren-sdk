@@ -46,6 +46,7 @@ import type {
   ConnectorManifest,
   JsonValue
 } from "../types/index.js";
+import { validateArtifactSemantics } from "./artifact-semantics.js";
 import {
   validateConnectorSemantics,
   type ConnectorSemanticOptions
@@ -165,7 +166,10 @@ export function validateConnectorManifest(
     return schemaResult;
   }
 
-  const issues = validateConnectorSemantics(schemaResult.value, options);
+  const issues = [
+    ...validateConnectorSemantics(schemaResult.value, options),
+    ...validateArtifactSemantics(schemaResult.value)
+  ];
   return issues.length === 0
     ? schemaResult
     : { ok: false, issues };
