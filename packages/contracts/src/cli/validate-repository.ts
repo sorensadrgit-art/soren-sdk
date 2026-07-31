@@ -216,29 +216,25 @@ function parseDoubleQuotedYamlScalar(value: string, line: number): string {
 }
 
 function parseYamlNumber(value: string): number | undefined {
-  const normalized = value.replaceAll("_", "");
-  const sign = normalized.startsWith("-") ? -1 : 1;
-  const unsigned = normalized.replace(/^[+-]/, "");
+  const sign = value.startsWith("-") ? -1 : 1;
+  const unsigned = value.replace(/^[+-]/, "");
 
   if (/^\.inf$/i.test(unsigned)) return sign * Number.POSITIVE_INFINITY;
   if (/^\.nan$/i.test(unsigned)) return Number.NaN;
-  if (/^0x[0-9a-f]+$/i.test(unsigned)) {
-    return sign * Number.parseInt(unsigned.slice(2), 16);
+
+  const basedNumbers = [
+    { pattern: /^0x[0-9a-f](?:_?[0-9a-f])*$/i, radix: 16 },
+    { pattern: /^0o[0-7](?:_?[0-7])*$/i, radix: 8 },
+    { pattern: /^0b[01](?:_?[01])*$/i, radix: 2 }
+  ] as const;
+  for (const { pattern, radix } of basedNumbers) {
+    if (!pattern.test(unsigned)) continue;
+    const normalized = unsigned.replaceAll("_", "");
+    return sign * Number.parseInt(normalized.slice(2), radix);
   }
-  if (/^0o[0-7]+$/i.test(unsigned)) {
-    return sign * Number.parseInt(unsigned.slice(2), 8);
-  }
-  if (/^0b[01]+$/i.test(unsigned)) {
-    return sign * Number.parseInt(unsigned.slice(2), 2);
-  }
-  if (
-    /^[+-]?(?:(?:0|[1-9]\d*)(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(
-      normalized
-    )
-  ) {
-    return Number(normalized);
-  }
-  return undefined;
+
+  const decimal = /^[+-]?(?:(?:\d(?:_?\d)*)(?:\.(?:\d(?:_?\d)*)?)?|\.\d(?:_?\d)*)(?:e[+-]?\d(?:_?\d)*)?$/i;
+  return decimal.test(value) ? Number(value.replaceAll("_", "")) : undefined;
 }
 
 function splitYamlFlowEntries(value: string, line: number): string[] {

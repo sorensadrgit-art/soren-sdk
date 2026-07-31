@@ -105,38 +105,90 @@ function normalizeDependencyRange(value: string): string {
   return expandPartialComparators(expandPartialHyphenRanges(value));
 }
 
-function selectedWorkspace(request: RouteRequest): string | null {
-  const workspaces = new Set<string>();
-  for (const capability of request.capabilities) {
-    if (!capability.required) continue;
-    const workspace = capability.quality?.workspace;
-    if (typeof workspace === "string" && workspace.trim() !== "") {
-      workspaces.add(workspace.trim());
+function runtimePackageShadowTargets(
+  request: RouteRequest,
+  catalog: CatalogReader
+): Map<string, string> {
+  const targets = new Map<string, Set<string>>();
+  const unscoped = new Set<string>();
+
+  for (const record of catalog.list()) {
+    if (record.kind !== "schema-v2") continue;
+    const claims = new Set(
+      record.manifest.capabilityClaims.map((claim) => claim.capability)
+    );
+    const relevant = request.capabilities.filter(
+      (capability) => capability.required && claims.has(capability.id)
+    );
+    if (relevant.length === 0) continue;
+
+    const explicit = new Set<string>();
+    let hasUnscoped = false;
+    for (const capability of relevant) {
+      const workspace = capability.quality?.workspace;
+      if (typeof workspace !== "string" || workspace.trim() === "") {
+        hasUnscoped = true;
+      } else {
+        explicit.add(workspace.trim());
+      }
+    }
+
+    for (const integration of record.manifest.integrations) {
+      if (
+        integration.kind !== "runtime-package" ||
+        integration.mode !== "runtime" ||
+        integration.packageName === undefined
+      ) {
+        continue;
+      }
+      if (hasUnscoped) {
+        unscoped.add(integration.packageName);
+        continue;
+      }
+      const packageTargets =
+        targets.get(integration.packageName) ?? new Set<string>();
+      for (const workspace of explicit) packageTargets.add(workspace);
+      targets.set(integration.packageName, packageTargets);
     }
   }
-  return workspaces.size === 1 ? [...workspaces][0] ?? null : null;
+
+  const result = new Map<string, string>();
+  for (const [packageName, workspaces] of targets) {
+    if (unscoped.has(packageName) || workspaces.size !== 1) continue;
+    const workspace = [...workspaces][0];
+    if (workspace !== undefined && workspace !== ".") {
+      result.set(packageName, workspace);
+    }
+  }
+  return result;
 }
 
 function guardDependencies(
   project: ProjectSnapshot,
-  request: RouteRequest
+  request: RouteRequest,
+  catalog: CatalogReader
 ): ProjectSnapshot {
   let dependencies = project.dependencies.map((dependency) => ({
     ...dependency,
     version: normalizeDependencyRange(dependency.version)
   }));
-  const workspace = selectedWorkspace(request);
-  if (workspace !== null && workspace !== ".") {
-    const localNames = new Set(
-      dependencies
-        .filter((dependency) => dependency.workspace === workspace)
-        .map((dependency) => dependency.name)
-    );
-    dependencies = dependencies.filter(
-      (dependency) =>
-        (dependency.workspace ?? ".") !== "." || !localNames.has(dependency.name)
-    );
-  }
+  const shadowTargets = runtimePackageShadowTargets(request, catalog);
+  const shadowedRootPackages = new Set(
+    [...shadowTargets].flatMap(([packageName, workspace]) =>
+      dependencies.some(
+        (dependency) =>
+          dependency.name === packageName &&
+          (dependency.workspace ?? ".") === workspace
+      )
+        ? [packageName]
+        : []
+    )
+  );
+  dependencies = dependencies.filter(
+    (dependency) =>
+      (dependency.workspace ?? ".") !== "." ||
+      !shadowedRootPackages.has(dependency.name)
+  );
   const frameworks = project.frameworks.map((framework) => ({
     ...framework,
     version:
@@ -358,7 +410,8 @@ export function routeCapabilities(input: RouteInput) {
   assertProjectSnapshotDigest(input.project);
   const project = guardDependencies(
     effectiveBrowserTargets(input.project),
-    input.request
+    input.request,
+    input.catalog
   );
   return routeCapabilitiesWorkspaceReuse({
     ...input,

@@ -40,16 +40,30 @@ function parseVersion(value: string): ParsedVersion | null {
   };
 }
 
-function normalizeRange(value: string): string {
+interface DependencySpec {
+  range: string;
+  aliasTarget: string | null;
+}
+
+function dependencySpec(value: string): DependencySpec {
   let result = value.trim();
   if (result.startsWith("workspace:")) {
     result = result.slice("workspace:".length).trim();
   }
-  if (result.startsWith("npm:")) {
-    const separator = result.lastIndexOf("@");
-    result = separator > "npm:".length ? result.slice(separator + 1) : result;
+  if (!result.startsWith("npm:")) {
+    return { range: result, aliasTarget: null };
   }
-  return result;
+  const alias = result.slice("npm:".length);
+  const separator = alias.lastIndexOf("@");
+  if (separator <= 0) return { range: "", aliasTarget: alias };
+  return {
+    aliasTarget: alias.slice(0, separator),
+    range: alias.slice(separator + 1)
+  };
+}
+
+function normalizeRange(value: string): string {
+  return dependencySpec(value).range;
 }
 
 function strongerLower(
@@ -219,7 +233,14 @@ function parseRangeClause(value: string): VersionInterval | null {
     return parsed === null ? null : partialInterval(parsed);
   }
 
-  const tokens = clause.replaceAll(",", " ").split(/\s+/).filter(Boolean);
+  const normalizedComparators = clause.replace(
+    /(>=|<=|>|<|=)\s+(?=v?\d)/g,
+    "$1"
+  );
+  const tokens = normalizedComparators
+    .replaceAll(",", " ")
+    .split(/\s+/)
+    .filter(Boolean);
   let interval: VersionInterval = { lower: null, upper: null };
   for (const token of tokens) {
     const parsed = parseComparator(token);
@@ -358,14 +379,21 @@ function hasCompatibleDependency(
   versions: readonly Version[],
   workspace: string
 ): boolean {
-  return project.dependencies.some(
-    (dependency) =>
-      dependency.name === packageName &&
-      (dependency.workspace ?? ".") === workspace &&
-      versions.some((version) =>
-        versionSatisfiesRange(version, dependency.version)
-      )
-  );
+  return project.dependencies.some((dependency) => {
+    if (
+      dependency.name !== packageName ||
+      (dependency.workspace ?? ".") !== workspace
+    ) {
+      return false;
+    }
+    const spec = dependencySpec(dependency.version);
+    if (spec.aliasTarget !== null && spec.aliasTarget !== packageName) {
+      return false;
+    }
+    return versions.some((version) =>
+      versionSatisfiesRange(version, spec.range)
+    );
+  });
 }
 
 function reusableAcrossTargets(
@@ -387,11 +415,15 @@ function reusableAcrossTargets(
         (dependency.workspace ?? ".") === workspace
     );
     if (localDependencies.length === 0) return rootCompatible;
-    return localDependencies.some((dependency) =>
-      versions.some((version) =>
-        versionSatisfiesRange(version, dependency.version)
-      )
-    );
+    return localDependencies.some((dependency) => {
+      const spec = dependencySpec(dependency.version);
+      if (spec.aliasTarget !== null && spec.aliasTarget !== packageName) {
+        return false;
+      }
+      return versions.some((version) =>
+        versionSatisfiesRange(version, spec.range)
+      );
+    });
   });
 }
 
