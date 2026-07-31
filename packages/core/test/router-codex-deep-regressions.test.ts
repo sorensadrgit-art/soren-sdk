@@ -172,6 +172,54 @@ describe("deep Codex routing regressions", () => {
     expect(plan.selectedProviders[0]?.providerId).toBe("motion");
   });
 
+  it("does not let an unrelated capability choose the React workspace", () => {
+    const project = projectFixture();
+    project.workspace = {
+      isMonorepo: true,
+      packages: [
+        { name: "legacy", path: "apps/legacy", private: true },
+        { name: "modern", path: "apps/modern", private: true }
+      ]
+    };
+    project.dependencies = [
+      ...project.dependencies.filter((dependency) => dependency.name !== "react"),
+      {
+        name: "react",
+        version: "17.0.2",
+        kind: "dependency",
+        workspace: "apps/legacy"
+      },
+      {
+        name: "react",
+        version: "19.0.0",
+        kind: "dependency",
+        workspace: "apps/modern"
+      }
+    ];
+    project.frameworks = [
+      { name: "react", version: "17.0.2", workspace: "apps/legacy" },
+      { name: "react", version: "19.0.0", workspace: "apps/modern" }
+    ];
+    const request = requestFixture({
+      required: ["motion.spring", "motion.timeline"],
+      projectSnapshotId: project.snapshotId
+    });
+    const timeline = request.capabilities.find(
+      (capability) => capability.id === "motion.timeline"
+    );
+    if (timeline === undefined) throw new Error("Expected timeline capability.");
+    timeline.quality = { workspace: "apps/modern" };
+
+    const plan = routeCapabilities({
+      request,
+      project,
+      catalog: new MemoryCatalogFixture()
+    });
+
+    expect(plan.status).toBe("needs-input");
+    expect(plan.requiredInput).toContain("target workspace");
+  });
+
   it("treats missing browser targets as unresolved for required WAAPI", () => {
     const project = projectFixture();
     project.targets.browsers = [];
@@ -217,6 +265,27 @@ describe("deep Codex routing regressions", () => {
       project,
       catalog: new MemoryCatalogFixture(),
       policy
+    });
+
+    expect(plan.status).toBe("blocked");
+    expect(plan.selectedProviders).toEqual([]);
+  });
+
+  it("rejects runtime packages without a resolved version", () => {
+    const motion = manifestFixture("motion", ["motion.layout"]);
+    const runtime = motion.integrations.find(
+      (integration) => integration.kind === "runtime-package"
+    );
+    if (runtime === undefined) throw new Error("Expected Motion runtime package.");
+    runtime.version = { status: "not-applicable" };
+    const project = projectFixture();
+    const plan = routeCapabilities({
+      request: requestFixture({
+        required: ["motion.layout"],
+        projectSnapshotId: project.snapshotId
+      }),
+      project,
+      catalog: new MemoryCatalogFixture([schemaRecordFixture(motion)])
     });
 
     expect(plan.status).toBe("blocked");
@@ -290,6 +359,26 @@ describe("deep Codex routing regressions", () => {
     const capability = request.capabilities[0];
     if (capability === undefined) throw new Error("Expected SVG capability.");
     capability.quality = { feature: "path-morph" };
+
+    const plan = routeCapabilities({
+      request,
+      project,
+      catalog: new MemoryCatalogFixture()
+    });
+
+    expect(plan.status).toBe("blocked");
+    expect(plan.selectedProviders).toEqual([]);
+  });
+
+  it("inspects SVG quality keys when boolean values carry the requirement", () => {
+    const project = projectFixture();
+    const request = requestFixture({
+      required: ["motion.svg"],
+      projectSnapshotId: project.snapshotId
+    });
+    const capability = request.capabilities[0];
+    if (capability === undefined) throw new Error("Expected SVG capability.");
+    capability.quality = { morph: true };
 
     const plan = routeCapabilities({
       request,
