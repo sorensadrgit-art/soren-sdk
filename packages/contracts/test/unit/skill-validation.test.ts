@@ -199,6 +199,34 @@ source-digest: ${WEB_PLATFORM_SOURCE_DIGEST}
     }
   );
 
+  it.each(["0x10", "0o20", "0b10000"])(
+    "rejects non-decimal YAML numerics in required string fields: %s",
+    async (license) => {
+      const root = await createSkillFixture(`---
+name: web-platform
+description: Use when browser-native animation fully satisfies the request.
+license: ${license}
+compatibility: Soren SDK Phase 4; browser-native runtime; no executable scripts
+metadata:
+  publisher: soren-sdk
+  version: 1.0.0
+source: ./docs.sources.json
+source-digest: ${WEB_PLATFORM_SOURCE_DIGEST}
+---
+
+# Web Platform Routing Skill
+`);
+      try {
+        const report = validateRepository(root);
+        expect(report.errors.flatMap((failure) => failure.issues)).toContainEqual(
+          expect.objectContaining({ keyword: "skill-license" })
+        );
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    }
+  );
+
   it("rejects a skill whose source registry digest does not match", async () => {
     const root = await createSkillFixture(`---
 name: web-platform
