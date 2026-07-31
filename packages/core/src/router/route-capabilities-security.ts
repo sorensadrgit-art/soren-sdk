@@ -7,7 +7,11 @@ import {
   type RouteRequest
 } from "@soren-sdk/contracts";
 
-import type { CatalogReader, ConnectorRecord } from "../catalog/types.js";
+import type {
+  CatalogReader,
+  ConnectorHealthReport,
+  ConnectorRecord
+} from "../catalog/types.js";
 import { projectSnapshotDigest } from "../inspector/project-snapshot-digest.js";
 import { routeCapabilities as routeCapabilitiesWorkspaceReuse } from "./route-capabilities-workspace-reuse.js";
 import type { RouteInput } from "./types.js";
@@ -23,6 +27,46 @@ const PARTIAL_HYPHEN_RANGE =
 
 function isPrereleaseVersion(value: string): boolean {
   return STRICT_SEMVER.exec(value.trim())?.[4] !== undefined;
+}
+
+function recordId(record: ConnectorRecord): string {
+  return record.kind === "schema-v2"
+    ? record.manifest.connector.id
+    : record.directoryId;
+}
+
+function freezeCatalog(catalog: CatalogReader): CatalogReader {
+  const capabilities = structuredClone(catalog.getCapabilityCatalog());
+  const records = catalog.list().map((record) => structuredClone(record));
+  const health = new Map<string, ConnectorHealthReport>();
+  const recordsById = new Map<string, ConnectorRecord>();
+  for (const record of records) {
+    const id = recordId(record);
+    recordsById.set(record.directoryId, record);
+    recordsById.set(id, record);
+    if (!health.has(id)) health.set(id, structuredClone(catalog.health(id)));
+  }
+  const snapshot = structuredClone(catalog.snapshot());
+  return {
+    getCapabilityCatalog: () => capabilities,
+    list: () => [...records],
+    get: (connectorId) => recordsById.get(connectorId),
+    health: (connectorId) =>
+      health.get(connectorId) ?? {
+        connectorId,
+        state: "missing",
+        selectable: false,
+        reviewStatus: null,
+        blockers: [],
+        warnings: [],
+        errors: ["missing"]
+      },
+    snapshot: (createdAt = snapshot.createdAt) => ({
+      ...snapshot,
+      createdAt,
+      connectors: snapshot.connectors.map((connector) => ({ ...connector }))
+    })
+  };
 }
 
 function assertProjectSnapshotDigest(project: ProjectSnapshot): void {
@@ -269,7 +313,9 @@ function supportsRequestedProperty(
   return record.manifest.ownershipClaims.some(
     (claim) =>
       claim.domain === requirement.domain &&
-      claim.properties?.includes(requirement.property) === true
+      (claim.properties === undefined ||
+        claim.properties.length === 0 ||
+        claim.properties.includes(requirement.property))
   );
 }
 
@@ -408,14 +454,15 @@ export function routeCapabilities(input: RouteInput) {
   assertContract<RouteRequest>("route-request", input.request);
   assertContract<ProjectSnapshot>("project-snapshot", input.project);
   assertProjectSnapshotDigest(input.project);
+  const catalog = freezeCatalog(input.catalog);
   const project = guardDependencies(
     effectiveBrowserTargets(input.project),
     input.request,
-    input.catalog
+    catalog
   );
   return routeCapabilitiesWorkspaceReuse({
     ...input,
     project,
-    catalog: new SecurityCatalogView(input.catalog, input.request)
+    catalog: new SecurityCatalogView(catalog, input.request)
   });
 }

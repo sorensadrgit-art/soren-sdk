@@ -320,7 +320,11 @@ function intervalContains(
 }
 
 function versionSatisfiesRange(version: Version, range: string): boolean {
-  return rangeIntervals(range).some((interval) =>
+  const normalized = normalizeRange(range);
+  if (/(?:^|[\s|,])(?:[~^<>=]*v?)?\d+\.\d+\.\d+-[0-9A-Za-z]/.test(normalized)) {
+    return false;
+  }
+  return rangeIntervals(normalized).some((interval) =>
     intervalContains(interval, version)
   );
 }

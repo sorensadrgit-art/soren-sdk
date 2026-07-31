@@ -418,6 +418,10 @@ function leadingSpaces(value: string): number {
   return /^ */.exec(value)?.[0].length ?? 0;
 }
 
+function hasTabIndentation(value: string): boolean {
+  return (/^[ \t]*/.exec(value)?.[0] ?? "").includes("\t");
+}
+
 function foldBlockLines(lines: readonly string[]): string {
   let result = "";
   for (let index = 0; index < lines.length; index += 1) {
@@ -496,7 +500,7 @@ function normalizeYamlMultilineQuotedScalars(source: string): string {
       !hasClosingQuotedScalar(scalar, quote)
     ) {
       const line = lines[cursor] ?? "";
-      if (line.includes("\t")) {
+      if (hasTabIndentation(line)) {
         throw new SkillYamlError(
           "Tabs are not allowed in multiline YAML scalar indentation.",
           cursor + 1
@@ -552,7 +556,7 @@ function normalizeYamlBlockScalars(source: string): string {
     let cursor = index + 1;
     while (cursor < lines.length) {
       const line = lines[cursor] ?? "";
-      if (line.includes("\t")) {
+      if (hasTabIndentation(line)) {
         throw new SkillYamlError(
           "Tabs are not allowed in YAML block scalar indentation.",
           cursor + 1
@@ -584,7 +588,7 @@ function normalizeYamlBlockScalars(source: string): string {
     cursor = index + 1;
     while (cursor < lines.length) {
       const line = lines[cursor] ?? "";
-      if (line.includes("\t")) {
+      if (hasTabIndentation(line)) {
         throw new SkillYamlError(
           "Tabs are not allowed in YAML block scalar indentation.",
           cursor + 1
@@ -625,7 +629,7 @@ function parseYamlMapping(source: string): YamlRecord {
 
   for (const [index, originalLine] of source.split("\n").entries()) {
     const lineNumber = index + 1;
-    if (originalLine.includes("\t")) {
+    if (hasTabIndentation(originalLine)) {
       throw new SkillYamlError("Tabs are not allowed in YAML indentation.", lineNumber);
     }
     const withoutComment = stripYamlComment(originalLine, lineNumber);

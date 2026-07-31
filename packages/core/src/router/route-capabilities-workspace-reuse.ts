@@ -279,18 +279,26 @@ function versionSatisfiesRange(version: Version, range: string): boolean {
 }
 
 function requestedWorkspaces(request: RouteRequest): string[] {
-  return [
-    ...new Set(
-      request.capabilities
-        .filter((capability) => capability.required)
-        .map((capability) => capability.quality?.workspace)
-        .filter(
-          (workspace): workspace is string =>
-            typeof workspace === "string" && workspace.trim().length > 0
-        )
-        .map((workspace) => workspace.trim())
+  const required = request.capabilities.filter((capability) => capability.required);
+  const workspaces = new Set(
+    required
+      .map((capability) => capability.quality?.workspace)
+      .filter(
+        (workspace): workspace is string =>
+          typeof workspace === "string" && workspace.trim().length > 0
+      )
+      .map((workspace) => workspace.trim())
+  );
+  if (
+    required.some(
+      (capability) =>
+        typeof capability.quality?.workspace !== "string" ||
+        capability.quality.workspace.trim().length === 0
     )
-  ].sort();
+  ) {
+    workspaces.add(".");
+  }
+  return [...workspaces].sort();
 }
 
 function schemaRecords(records: ConnectorRecord[]) {
@@ -333,7 +341,9 @@ function providerTargetWorkspaces(
       typeof capability.quality?.workspace !== "string" ||
       capability.quality.workspace.trim().length === 0
   );
-  return hasUnscoped ? [...routeWorkspaces] : explicit;
+  const targets = new Set(explicit);
+  if (hasUnscoped) targets.add(".");
+  return [...targets].sort();
 }
 
 function runtimePackageTargets(
