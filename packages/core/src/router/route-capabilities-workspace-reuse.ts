@@ -181,9 +181,10 @@ function parseComparator(token: string): VersionInterval | null {
 
 function parseRangeClause(value: string): VersionInterval | null {
   const clause = value.trim();
-  if (clause === "" || clause === "*" || clause.toLowerCase() === "latest") {
+  if (clause === "" || clause === "*") {
     return { lower: null, upper: null };
   }
+  if (clause.toLowerCase() === "latest") return null;
 
   const hyphen = /^(v?\d+(?:\.\d+){0,2})\s+-\s+(v?\d+(?:\.\d+){0,2})$/.exec(
     clause
@@ -278,9 +279,54 @@ function schemaRecords(records: ConnectorRecord[]) {
   );
 }
 
-function runtimePackageVersions(input: RouteInput): Map<string, Version[]> {
-  const packages = new Map<string, Version[]>();
+interface RuntimePackageTarget {
+  versions: Version[];
+  workspaces: Set<string>;
+}
+
+function providerTargetWorkspaces(
+  request: RouteRequest,
+  record: Extract<ConnectorRecord, { kind: "schema-v2" }>,
+  routeWorkspaces: readonly string[]
+): string[] {
+  const claims = new Set(
+    record.manifest.capabilityClaims.map((claim) => claim.capability)
+  );
+  const required = request.capabilities.filter(
+    (capability) => capability.required && claims.has(capability.id)
+  );
+  if (required.length === 0) return [];
+  const explicit = [
+    ...new Set(
+      required
+        .map((capability) => capability.quality?.workspace)
+        .filter(
+          (workspace): workspace is string =>
+            typeof workspace === "string" && workspace.trim().length > 0
+        )
+        .map((workspace) => workspace.trim())
+    )
+  ].sort();
+  const hasUnscoped = required.some(
+    (capability) =>
+      typeof capability.quality?.workspace !== "string" ||
+      capability.quality.workspace.trim().length === 0
+  );
+  return hasUnscoped ? [...routeWorkspaces] : explicit;
+}
+
+function runtimePackageTargets(
+  input: RouteInput,
+  routeWorkspaces: readonly string[]
+): Map<string, RuntimePackageTarget> {
+  const packages = new Map<string, RuntimePackageTarget>();
   for (const record of schemaRecords(input.catalog.list())) {
+    const workspaces = providerTargetWorkspaces(
+      input.request,
+      record,
+      routeWorkspaces
+    );
+    if (workspaces.length === 0) continue;
     for (const integration of record.manifest.integrations) {
       if (
         integration.kind !== "runtime-package" ||
@@ -294,9 +340,13 @@ function runtimePackageVersions(input: RouteInput): Map<string, Version[]> {
       }
       const parsed = parseVersion(integration.version.value);
       if (parsed === null) continue;
-      const versions = packages.get(integration.packageName) ?? [];
-      versions.push(parsed.version);
-      packages.set(integration.packageName, versions);
+      const target = packages.get(integration.packageName) ?? {
+        versions: [],
+        workspaces: new Set<string>()
+      };
+      target.versions.push(parsed.version);
+      for (const workspace of workspaces) target.workspaces.add(workspace);
+      packages.set(integration.packageName, target);
     }
   }
   return packages;
@@ -349,10 +399,17 @@ function guardMultiWorkspaceReuse(input: RouteInput): ProjectSnapshot {
   const workspaces = requestedWorkspaces(input.request);
   if (workspaces.length < 2) return input.project;
 
-  const packages = runtimePackageVersions(input);
+  const packages = runtimePackageTargets(input, workspaces);
   const denied = new Set<string>();
-  for (const [packageName, versions] of packages) {
-    if (!reusableAcrossTargets(input.project, packageName, versions, workspaces)) {
+  for (const [packageName, target] of packages) {
+    if (
+      !reusableAcrossTargets(
+        input.project,
+        packageName,
+        target.versions,
+        [...target.workspaces]
+      )
+    ) {
       denied.add(packageName);
     }
   }

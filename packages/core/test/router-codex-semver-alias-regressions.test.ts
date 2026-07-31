@@ -66,6 +66,49 @@ describe("npm alias and hyphen-range reuse regressions", () => {
     );
   });
 
+  it("preserves root dependencies for an explicit root workspace", () => {
+    const project = projectFixture({ dependencies: ["motion"] });
+    const request = requestFixture({
+      required: ["motion.layout"],
+      projectSnapshotId: project.snapshotId
+    });
+    const layout = request.capabilities[0];
+    if (layout === undefined) throw new Error("Expected layout capability.");
+    layout.quality = { workspace: "." };
+
+    const plan = routeCapabilities({
+      request,
+      project,
+      catalog: new MemoryCatalogFixture()
+    });
+
+    expect(plan.status).toBe("selected");
+    expect(plan.selectedProviders[0]?.reasonCode).toBe(
+      "EXISTING_DEPENDENCY_REUSE"
+    );
+  });
+
+  it("does not treat the latest dist-tag as dependency reuse", () => {
+    const project = projectFixture({ dependencies: ["motion"] });
+    const dependency = project.dependencies.find(
+      (item) => item.name === "motion"
+    );
+    if (dependency === undefined) throw new Error("Expected Motion dependency.");
+    dependency.version = "latest";
+
+    const plan = routeCapabilities({
+      request: requestFixture({
+        required: ["motion.layout"],
+        projectSnapshotId: project.snapshotId
+      }),
+      project,
+      catalog: new MemoryCatalogFixture()
+    });
+
+    expect(plan.status).toBe("selected");
+    expect(plan.selectedProviders[0]?.reasonCode).toBe("CAPABILITY_MATCH");
+  });
+
   it("expands partial hyphen upper bounds for dependency reuse", () => {
     const project = projectFixture({ dependencies: ["motion"] });
     const dependency = project.dependencies.find(

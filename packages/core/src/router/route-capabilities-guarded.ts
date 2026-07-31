@@ -258,14 +258,18 @@ function guardedProject(
   const candidateDependencies =
     workspace === null
       ? project.dependencies
-      : project.dependencies.filter((dependency) =>
-          isRootOrSelected(dependency.workspace, workspace)
+      : project.dependencies.filter(
+          (dependency) =>
+            dependency.name !== "react" ||
+            isRootOrSelected(dependency.workspace, workspace)
         );
   const candidateFrameworks =
     workspace === null
       ? project.frameworks
-      : project.frameworks.filter((framework) =>
-          isRootOrSelected(framework.workspace, workspace)
+      : project.frameworks.filter(
+          (framework) =>
+            framework.name !== "react" ||
+            isRootOrSelected(framework.workspace, workspace)
         );
   const hasWorkspaceLocalReact =
     workspace !== null &&

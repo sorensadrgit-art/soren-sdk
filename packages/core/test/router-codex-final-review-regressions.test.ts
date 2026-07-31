@@ -230,6 +230,56 @@ describe("final Codex review regressions", () => {
     expect(blocked.catalogSnapshotId).not.toBe(healthy.catalogSnapshotId);
   });
 
+  it("scopes reuse to each provider's requested workspaces", () => {
+    const project = twoWorkspaceProject();
+    project.dependencies.push(
+      {
+        name: "motion",
+        version: "12.42.1",
+        kind: "dependency",
+        workspace: "packages/app"
+      },
+      {
+        name: "gsap",
+        version: "3.15.0",
+        kind: "dependency",
+        workspace: "packages/admin"
+      }
+    );
+    const request = requestFixture({
+      required: ["motion.layout", "motion.timeline"],
+      projectSnapshotId: project.snapshotId
+    });
+    const layout = request.capabilities.find((item) => item.id === "motion.layout");
+    const timeline = request.capabilities.find(
+      (item) => item.id === "motion.timeline"
+    );
+    if (layout === undefined || timeline === undefined) {
+      throw new Error("Expected layout and timeline capabilities.");
+    }
+    layout.quality = { workspace: "packages/app" };
+    timeline.quality = { workspace: "packages/admin" };
+
+    const plan = routeCapabilities({
+      request,
+      project,
+      catalog: new MemoryCatalogFixture()
+    });
+
+    expect(plan.status).toBe("selected");
+    expect(
+      Object.fromEntries(
+        plan.selectedProviders.map((provider) => [
+          provider.providerId,
+          provider.reasonCode
+        ])
+      )
+    ).toEqual({
+      gsap: "EXISTING_DEPENDENCY_REUSE",
+      motion: "EXISTING_DEPENDENCY_REUSE"
+    });
+  });
+
   it("expands partial React comparators in framework records", () => {
     const project = projectFixture({ reactVersion: null });
     project.workspace = {

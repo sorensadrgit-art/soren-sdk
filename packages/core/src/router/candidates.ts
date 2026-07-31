@@ -249,9 +249,10 @@ function parseRangeClause(value: string): VersionInterval | null {
   const clause = value
     .trim()
     .replace(/(>=|<=|>|<|=)\s+(?=v?\d)/g, "$1");
-  if (clause === "" || clause === "*" || clause.toLowerCase() === "latest") {
+  if (clause === "" || clause === "*") {
     return { lower: null, upper: null };
   }
+  if (clause.toLowerCase() === "latest") return null;
 
   const hyphen = /^(v?\d+(?:\.\d+){0,2})\s+-\s+(v?\d+(?:\.\d+){0,2})$/.exec(
     clause

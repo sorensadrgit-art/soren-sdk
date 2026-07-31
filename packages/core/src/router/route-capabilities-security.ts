@@ -126,7 +126,7 @@ function guardDependencies(
     version: normalizeDependencyRange(dependency.version)
   }));
   const workspace = selectedWorkspace(request);
-  if (workspace !== null) {
+  if (workspace !== null && workspace !== ".") {
     const localNames = new Set(
       dependencies
         .filter((dependency) => dependency.workspace === workspace)
