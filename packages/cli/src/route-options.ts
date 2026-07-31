@@ -49,12 +49,12 @@ function optionalString(value: string | undefined, option: string): string | und
 }
 
 function parseProviderLimit(value: string): number {
-  if (!/^[1-9]\d*$/.test(value)) {
-    throw new TypeError("--max-providers must be a positive integer.");
+  if (!/^(?:0|[1-9]\d*)$/.test(value)) {
+    throw new TypeError("--max-providers must be a non-negative integer.");
   }
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed)) {
-    throw new TypeError("--max-providers must be a positive integer.");
+    throw new TypeError("--max-providers must be a non-negative integer.");
   }
   return parsed;
 }

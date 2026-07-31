@@ -58,7 +58,7 @@ Supported repeatable flags:
 Other routing flags:
 
 - `--project <path>` defaults to `.`
-- `--max-providers <positive-integer>` defaults to `2`
+- `--max-providers <non-negative-integer>` defaults to `2`; `0` restricts routing to native coverage only
 - `--scope <scope>`
 - `--property <property>`
 - `--json`

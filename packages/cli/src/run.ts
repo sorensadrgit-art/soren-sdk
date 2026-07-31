@@ -221,7 +221,7 @@ export function runCli(options: RunCliOptions): number {
       return 1;
     }
     if (error instanceof RouteInputError) {
-      options.io.stderr(`${error.code}: ${error.message}\n`);
+      options.io.stderr(`${error.message}\n`);
       return 1;
     }
     options.io.stderr(

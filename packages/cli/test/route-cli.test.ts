@@ -123,6 +123,17 @@ describe("route CLI options", () => {
     ]);
   });
 
+  it("accepts a zero provider limit for native-only routing", () => {
+    expect(
+      parseRouteOptions([
+        "--capability",
+        "platform.css-transition",
+        "--max-providers",
+        "0"
+      ]).maxProviders
+    ).toBe(0);
+  });
+
   it("rejects missing capabilities, invalid limits, and unknown flags", () => {
     expect(() => parseRouteOptions([])).toThrow("at least one capability");
     expect(() =>
@@ -130,17 +141,16 @@ describe("route CLI options", () => {
         "--capability",
         "motion.timeline",
         "--max-providers",
-        "0"
+        "1.5"
       ])
-    ).toThrow("positive integer");
+    ).toThrow("non-negative integer");
     expect(() =>
       parseRouteOptions([
         "--capability",
         "motion.timeline",
-        "--max-providers",
-        "1.5"
+        "--max-providers=-1"
       ])
-    ).toThrow("positive integer");
+    ).toThrow("non-negative integer");
     expect(() =>
       parseRouteOptions([
         "--capability",
@@ -270,6 +280,34 @@ describe("explicit capability route command", () => {
         status: "blocked",
         selectedProviders: []
       });
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it("prints a single ROUTE_INPUT_INVALID prefix on stderr", async () => {
+    const fixture = await project({ name: "dup-app", private: true });
+    try {
+      const io = captureIo();
+      expect(
+        runCli({
+          argv: [
+            "route",
+            "--project",
+            fixture.root,
+            "--capability",
+            "motion.layout",
+            "--optional",
+            "motion.layout",
+            "--json"
+          ],
+          cwd: repositoryRoot(),
+          io: io.io
+        })
+      ).toBe(1);
+      const stderr = io.stderr.join("");
+      expect(stderr).toMatch(/^ROUTE_INPUT_INVALID: /);
+      expect(stderr).not.toContain("ROUTE_INPUT_INVALID: ROUTE_INPUT_INVALID");
     } finally {
       await fixture.cleanup();
     }

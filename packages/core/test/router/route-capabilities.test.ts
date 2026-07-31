@@ -49,6 +49,38 @@ describe("routeCapabilities", () => {
     expect(reasonCodes(plan)).toContain("NATIVE_CAPABILITY_MATCH");
   });
 
+  it("does not report the native provider as a rejected alternative", () => {
+    const plan = routeCapabilities({
+      request: request([{ id: "platform.css-transition", required: true }]),
+      project: projectFixture(),
+      catalog: routingCatalog()
+    });
+
+    expect(plan.status).toBe("native");
+    expect(
+      plan.rejectedProviders.map((provider) => provider.providerId)
+    ).not.toContain("web-platform");
+  });
+
+  it("does not report the native provider as rejected on a mixed route", () => {
+    const plan = routeCapabilities({
+      request: request([
+        { id: "platform.css-transition", required: true },
+        { id: "motion.layout", required: true }
+      ]),
+      project: projectFixture({ react: "19.2.0" }),
+      catalog: routingCatalog()
+    });
+
+    expect(plan.status).toBe("selected");
+    expect(plan.selectedProviders.map((provider) => provider.providerId)).toEqual([
+      "motion"
+    ]);
+    expect(
+      plan.rejectedProviders.map((provider) => provider.providerId)
+    ).not.toContain("web-platform");
+  });
+
   it.each([
     "motion.presence",
     "motion.layout",
