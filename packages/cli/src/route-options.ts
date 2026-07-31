@@ -1,6 +1,7 @@
 import { parseArgs } from "node:util";
 
 import {
+  canonicalJson,
   digestJson,
   type Digest,
   type JsonValue,
@@ -77,6 +78,40 @@ function capability(
   };
 }
 
+function stableUnique(values: readonly string[]): string[] {
+  return [...new Set(values)];
+}
+
+function normalizedCapabilities(
+  capabilities: RouteRequest["capabilities"]
+): RouteRequest["capabilities"] {
+  return capabilities
+    .map((item) => ({
+      id: item.id,
+      required: item.required,
+      ...(item.quality === undefined
+        ? {}
+        : {
+            quality: Object.fromEntries(
+              Object.entries(item.quality).sort(([left], [right]) =>
+                left.localeCompare(right)
+              )
+            )
+          })
+    }))
+    .sort((left, right) =>
+      [left.id, left.required ? "0" : "1", canonicalJson(asJsonValue(left.quality ?? {}))]
+        .join("\0")
+        .localeCompare(
+          [
+            right.id,
+            right.required ? "0" : "1",
+            canonicalJson(asJsonValue(right.quality ?? {}))
+          ].join("\0")
+        )
+    );
+}
+
 export function parseRouteOptions(args: string[]): ParsedRouteOptions {
   const parsed = parseArgs({
     args,
@@ -91,9 +126,10 @@ export function parseRouteOptions(args: string[]): ParsedRouteOptions {
   }
   const scope = optionalString(parsed.values.scope, "--scope");
   const property = optionalString(parsed.values.property, "--property");
+  const project = optionalString(parsed.values.project, "--project") ?? ".";
 
   return {
-    project: parsed.values.project ?? ".",
+    project,
     capabilities: [
       ...required.map((id) => capability(id, true, scope, property)),
       ...optional.map((id) => capability(id, false, scope, property))
@@ -114,22 +150,23 @@ export function buildRouteRequest(
   projectSnapshotId: Digest,
   createdAt: string
 ): RouteRequest {
+  const capabilities = normalizedCapabilities(options.capabilities);
+  const preferredProviders = stableUnique(options.preferredProviders);
+  const forbiddenProviders = [...new Set(options.forbiddenProviders)].sort();
   const input = {
     projectSnapshotId,
-    capabilities: options.capabilities,
-    preferredProviders: options.preferredProviders,
-    forbiddenProviders: options.forbiddenProviders,
+    capabilities,
+    preferredProviders,
+    forbiddenProviders,
     maxProviders: options.maxProviders
   };
   const digest = digestJson(asJsonValue(input));
-  const required = options.capabilities
+  const required = capabilities
     .filter((item) => item.required)
-    .map((item) => item.id)
-    .sort();
-  const optional = options.capabilities
+    .map((item) => item.id);
+  const optional = capabilities
     .filter((item) => !item.required)
-    .map((item) => item.id)
-    .sort();
+    .map((item) => item.id);
   const summary = [
     `required: ${required.join(", ") || "none"}`,
     `optional: ${optional.join(", ") || "none"}`
@@ -142,10 +179,10 @@ export function buildRouteRequest(
     createdAt,
     projectSnapshotId,
     summary,
-    capabilities: options.capabilities,
+    capabilities,
     preferences: {
-      preferredProviders: options.preferredProviders,
-      forbiddenProviders: options.forbiddenProviders,
+      preferredProviders,
+      forbiddenProviders,
       maxProviders: options.maxProviders,
       allowPaidServices: false,
       allowExperimental: false
