@@ -95,6 +95,21 @@ describe("final Codex routing regressions", () => {
     );
   });
 
+  it("ignores Browserslist environment section headers", () => {
+    const project = projectFixture();
+    project.targets.browsers = ["[production]", "chrome 120"];
+    const plan = routeCapabilities({
+      request: requestFixture({
+        required: ["platform.waapi-animation"],
+        projectSnapshotId: project.snapshotId
+      }),
+      project,
+      catalog: new MemoryCatalogFixture()
+    });
+
+    expect(plan.status).toBe("native");
+  });
+
   it("rejects explicit Safari versions without the required WAAPI surface", () => {
     const project = projectFixture();
     project.targets.browsers = ["safari 8"];
@@ -181,6 +196,32 @@ describe("final Codex routing regressions", () => {
 
     expect(plan.status).toBe("selected");
     expect(plan.selectedProviders[0]?.providerId).toBe("motion");
+  });
+
+  it("does not reuse a runtime installed only in another workspace", () => {
+    const project = monorepoWithMixedReactVersions();
+    project.dependencies.push({
+      name: "motion",
+      version: "12.42.2",
+      kind: "dependency",
+      workspace: "apps/legacy"
+    });
+    const request = requestFixture({
+      required: ["motion.layout"],
+      projectSnapshotId: project.snapshotId
+    });
+    const capability = request.capabilities[0];
+    if (capability === undefined) throw new Error("Expected Motion capability.");
+    capability.quality = { workspace: "apps/modern" };
+
+    const plan = routeCapabilities({
+      request,
+      project,
+      catalog: new MemoryCatalogFixture()
+    });
+
+    expect(plan.status).toBe("selected");
+    expect(plan.selectedProviders[0]?.reasonCode).toBe("CAPABILITY_MATCH");
   });
 
   it("blocks Motion for an explicitly selected incompatible workspace", () => {
