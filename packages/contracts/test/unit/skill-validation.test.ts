@@ -86,6 +86,30 @@ describe("connector Agent Skill validation", () => {
     }
   });
 
+  it("accepts apostrophes inside valid plain YAML scalars", async () => {
+    const root = await createSkillFixture(`---
+name: web-platform
+description: Use when it's needed for browser-native animation.
+license: LicenseRef-Soren-SDK-Internal
+compatibility: Soren SDK Phase 4; browser-native runtime; no executable scripts
+metadata:
+  publisher: soren-sdk
+  version: 1.0.0
+source: ./docs.sources.json
+source-digest: ${WEB_PLATFORM_SOURCE_DIGEST}
+---
+
+# Web Platform Routing Skill
+`);
+    try {
+      const report = validateRepository(root);
+      expect(report.errors).toEqual([]);
+      expect(report.validatedConnectors).toEqual(["web-platform"]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("accepts the documented metadata.connector-version key", async () => {
     const root = await createSkillFixture(validSkill("connector-version"));
     try {
