@@ -168,7 +168,7 @@ function requestedMotionWorkspace(request: RouteRequest): {
 function reactWorkspaceVersions(project: ProjectSnapshot): Map<string, Set<string>> {
   const versions = new Map<string, Set<string>>();
   for (const item of [...project.dependencies, ...project.frameworks]) {
-    if (item.name !== "react") continue;
+    if (item.name !== "react" || item.version === null) continue;
     const workspace = item.workspace ?? ".";
     const existing = versions.get(workspace) ?? new Set<string>();
     existing.add(item.version);
