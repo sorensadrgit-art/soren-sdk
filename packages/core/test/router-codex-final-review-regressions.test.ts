@@ -22,26 +22,32 @@ function json(value: unknown): JsonValue {
   return JSON.parse(JSON.stringify(value)) as JsonValue;
 }
 
-function connectorSnapshot(records: ConnectorRecord[]) {
-  return records
+function connectorSnapshot(catalog: CatalogReader) {
+  return catalog
+    .list()
     .filter(
       (record): record is Extract<ConnectorRecord, { kind: "schema-v2" }> =>
         record.kind === "schema-v2"
     )
-    .map((record) => ({
-      id: record.manifest.connector.id,
-      connectorVersion: record.manifest.connectorVersion,
-      digest: digestJson(json(record.manifest)),
-      reviewStatus: record.manifest.connector.reviewStatus,
-      selectable: record.manifest.connector.selectable
-    }))
+    .map((record) => {
+      const connectorId = record.manifest.connector.id;
+      return {
+        id: connectorId,
+        connectorVersion: record.manifest.connectorVersion,
+        digest: digestJson(
+          json({ manifest: record.manifest, health: catalog.health(connectorId) })
+        ),
+        reviewStatus: record.manifest.connector.reviewStatus,
+        selectable: record.manifest.connector.selectable
+      };
+    })
     .sort((left, right) => left.id.localeCompare(right.id));
 }
 
 function expectedCatalogSnapshotId(catalog: CatalogReader): Digest {
   return digestJson({
     capabilityCatalogDigest: digestJson(json(catalog.getCapabilityCatalog())),
-    connectors: connectorSnapshot(catalog.list())
+    connectors: connectorSnapshot(catalog)
   });
 }
 
@@ -148,6 +154,80 @@ describe("final Codex review regressions", () => {
       plan.selectedProviders.map((provider) => provider.providerId).sort()
     ).toEqual(["gsap", "motion"]);
     expect(new Set(plan.ownership.map((entry) => entry.scope)).size).toBe(2);
+  });
+
+  it("normalizes explicit and omitted root workspaces for ownership", () => {
+    const project = projectFixture();
+    const request = requestFixture({
+      required: ["motion.layout", "motion.timeline"],
+      projectSnapshotId: project.snapshotId
+    });
+    const layout = request.capabilities.find((item) => item.id === "motion.layout");
+    const timeline = request.capabilities.find(
+      (item) => item.id === "motion.timeline"
+    );
+    if (layout === undefined || timeline === undefined) {
+      throw new Error("Expected layout and timeline capabilities.");
+    }
+    layout.quality = {
+      workspace: ".",
+      scope: "hero",
+      property: "transform"
+    };
+    timeline.quality = { scope: "hero", property: "transform" };
+
+    const plan = routeCapabilities({
+      request,
+      project,
+      catalog: new MemoryCatalogFixture()
+    });
+
+    expect(plan.status).toBe("blocked");
+    expect(plan.selectedProviders).toEqual([]);
+    expect(plan.constraints).toContainEqual(
+      expect.objectContaining({ code: "OWNERSHIP_CONFLICT", status: "failed" })
+    );
+  });
+
+  it("binds effective connector health into the catalog snapshot", () => {
+    const healthyCatalog = new MemoryCatalogFixture();
+    const blockedCatalog: CatalogReader = {
+      getCapabilityCatalog: () => healthyCatalog.getCapabilityCatalog(),
+      list: () => healthyCatalog.list(),
+      get: (connectorId) => healthyCatalog.get(connectorId),
+      health: (connectorId) => {
+        const health = healthyCatalog.health(connectorId);
+        return connectorId === "motion"
+          ? {
+              ...health,
+              state: "blocked",
+              selectable: false,
+              blockers: ["missing related skill file"]
+            }
+          : health;
+      },
+      snapshot: (createdAt) => healthyCatalog.snapshot(createdAt)
+    };
+    const project = projectFixture();
+    const request = requestFixture({
+      required: ["motion.layout"],
+      projectSnapshotId: project.snapshotId
+    });
+
+    const healthy = routeCapabilities({
+      request,
+      project,
+      catalog: healthyCatalog
+    });
+    const blocked = routeCapabilities({
+      request,
+      project,
+      catalog: blockedCatalog
+    });
+
+    expect(healthy.status).toBe("selected");
+    expect(blocked.status).toBe("blocked");
+    expect(blocked.catalogSnapshotId).not.toBe(healthy.catalogSnapshotId);
   });
 
   it("expands partial React comparators in framework records", () => {

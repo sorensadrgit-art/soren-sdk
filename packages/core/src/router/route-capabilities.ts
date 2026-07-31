@@ -91,13 +91,17 @@ function materializeCatalog(
       (record): record is Extract<ConnectorRecord, { kind: "schema-v2" }> =>
         record.kind === "schema-v2"
     )
-    .map((record) => ({
-      id: record.manifest.connector.id,
-      connectorVersion: record.manifest.connectorVersion,
-      digest: digestJson(json(record.manifest)),
-      reviewStatus: record.manifest.connector.reviewStatus,
-      selectable: record.manifest.connector.selectable
-    }))
+    .map((record) => {
+      const connectorId = record.manifest.connector.id;
+      const health = healthReports.get(connectorId) ?? missingHealth(connectorId);
+      return {
+        id: connectorId,
+        connectorVersion: record.manifest.connectorVersion,
+        digest: digestJson(json({ manifest: record.manifest, health })),
+        reviewStatus: record.manifest.connector.reviewStatus,
+        selectable: record.manifest.connector.selectable
+      };
+    })
     .sort((left, right) => left.id.localeCompare(right.id));
   const snapshot: CatalogSnapshot = {
     schemaVersion: "1.0.0-draft.1",

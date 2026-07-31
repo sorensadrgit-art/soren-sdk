@@ -130,8 +130,12 @@ export function assignCapabilities(
     const explicitScope = stringQuality(quality, "scope");
     const baseScope = explicitScope ?? `capability:${capabilityId}`;
     const workspace = stringQuality(quality, "workspace");
+    const normalizedWorkspace =
+      workspace === null || workspace === "." ? null : workspace;
     const scope =
-      workspace === null ? baseScope : `workspace:${workspace}::${baseScope}`;
+      normalizedWorkspace === null
+        ? baseScope
+        : `workspace:${normalizedWorkspace}::${baseScope}`;
     const explicitProperty = stringQuality(quality, "property");
     const properties = assignmentProperties(
       provider,
