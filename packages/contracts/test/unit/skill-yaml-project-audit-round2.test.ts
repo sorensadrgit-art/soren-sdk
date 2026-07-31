@@ -86,4 +86,20 @@ describe("quoted Skill YAML project audit regressions", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it("accepts a safe scalar flow sequence in optional metadata", async () => {
+    const root = await createFixture(
+      frontmatter().replace(
+        "  version: 1.0.0",
+        "  version: 1.0.0\n  tags: [animation, accessibility]"
+      )
+    );
+    try {
+      const report = validateRepository(root);
+      expect(report.errors).toEqual([]);
+      expect(report.validatedConnectors).toEqual(["web-platform"]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });
