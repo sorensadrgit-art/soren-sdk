@@ -25,11 +25,15 @@ function selectedWorkspace(request: RouteRequest): string | null {
   return workspaces.size === 1 ? [...workspaces][0] ?? null : null;
 }
 
+function normalizedWorkspace(workspace: string | null | undefined): string {
+  return workspace ?? ".";
+}
+
 function isRootOrSelected(
   workspace: string | null | undefined,
   selected: string
 ): boolean {
-  const normalized = workspace ?? ".";
+  const normalized = normalizedWorkspace(workspace);
   return normalized === "." || normalized === selected;
 }
 
@@ -136,14 +140,11 @@ function hasPositiveBrowserTarget(target: string): boolean {
 }
 
 function routedReactWorkspace(
-  name: string,
   current: string | null | undefined,
   selected: string | null
 ): string {
-  const normalized = current ?? ".";
-  return name === "react" && selected !== null && normalized === "."
-    ? selected
-    : normalized;
+  const normalized = normalizedWorkspace(current);
+  return selected !== null && normalized === "." ? selected : normalized;
 }
 
 function guardedProject(
@@ -156,18 +157,38 @@ function guardedProject(
   const browsers = declaredBrowsers.some(hasPositiveBrowserTarget)
     ? declaredBrowsers
     : ["ie 11"];
-  const dependencies =
+  const candidateDependencies =
     workspace === null
       ? project.dependencies
       : project.dependencies.filter((dependency) =>
           isRootOrSelected(dependency.workspace, workspace)
         );
-  const frameworks =
+  const candidateFrameworks =
     workspace === null
       ? project.frameworks
       : project.frameworks.filter((framework) =>
           isRootOrSelected(framework.workspace, workspace)
         );
+  const hasWorkspaceLocalReact =
+    workspace !== null &&
+    [...candidateDependencies, ...candidateFrameworks].some(
+      (item) =>
+        item.name === "react" && normalizedWorkspace(item.workspace) === workspace
+    );
+  const dependencies = hasWorkspaceLocalReact
+    ? candidateDependencies.filter(
+        (dependency) =>
+          dependency.name !== "react" ||
+          normalizedWorkspace(dependency.workspace) === workspace
+      )
+    : candidateDependencies;
+  const frameworks = hasWorkspaceLocalReact
+    ? candidateFrameworks.filter(
+        (framework) =>
+          framework.name !== "react" ||
+          normalizedWorkspace(framework.workspace) === workspace
+      )
+    : candidateFrameworks;
   const selectedReactVersions = [
     ...dependencies
       .filter((dependency) => dependency.name === "react")
@@ -188,11 +209,7 @@ function guardedProject(
       dependency.name === "react"
         ? {
             ...dependency,
-            workspace: routedReactWorkspace(
-              dependency.name,
-              dependency.workspace,
-              workspace
-            ),
+            workspace: routedReactWorkspace(dependency.workspace, workspace),
             version: selectedWorkspaceReactUnsupported
               ? "17.0.0"
               : guardedReactVersion(dependency.version) ?? dependency.version
@@ -203,11 +220,7 @@ function guardedProject(
       framework.name === "react"
         ? {
             ...framework,
-            workspace: routedReactWorkspace(
-              framework.name,
-              framework.workspace,
-              workspace
-            ),
+            workspace: routedReactWorkspace(framework.workspace, workspace),
             version: selectedWorkspaceReactUnsupported
               ? "17.0.0"
               : guardedReactVersion(framework.version)
