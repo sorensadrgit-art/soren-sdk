@@ -346,8 +346,7 @@ function providerTargetWorkspaces(
 }
 
 function runtimePackageTargets(
-  input: RouteInput,
-  routeWorkspaces: readonly string[]
+  input: RouteInput
 ): Map<string, RuntimePackageTarget> {
   const packages = new Map<string, RuntimePackageTarget>();
   for (const record of schemaRecords(input.catalog.list())) {
@@ -436,7 +435,7 @@ function guardMultiWorkspaceReuse(input: RouteInput): ProjectSnapshot {
   const workspaces = requestedWorkspaces(input.request);
   if (workspaces.length < 2) return input.project;
 
-  const packages = runtimePackageTargets(input, workspaces);
+  const packages = runtimePackageTargets(input);
   const denied = new Set<string>();
   for (const [packageName, target] of packages) {
     if (
