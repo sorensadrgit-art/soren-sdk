@@ -1,5 +1,6 @@
 import {
   assertContract,
+  type CapabilityCatalog,
   type IntegrationArtifact,
   type ProjectSnapshot,
   type RouteRequest
@@ -13,16 +14,101 @@ const PRERELEASE_PACKAGE_SENTINEL =
   "soren-sdk-prerelease-runtime-unmatched";
 const STRICT_SEMVER =
   /^(?:v)?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+const PARTIAL_COMPARATOR =
+  /(^|[\s,|:@])(>=|<=|>|<)\s*v?(\d+)(?:\.(\d+))?(?=$|[\s,|])/g;
 
 function isPrereleaseVersion(value: string): boolean {
   return STRICT_SEMVER.exec(value.trim())?.[4] !== undefined;
 }
+function expandPartialComparators(value: string): string {
+  return value.replace(
+    PARTIAL_COMPARATOR,
+    (_match, prefix: string, operator: string, majorText: string, minorText?: string) => {
+      const major = Number.parseInt(majorText, 10);
+      const minor = minorText === undefined ? null : Number.parseInt(minorText, 10);
+      if (operator === ">") {
+        return minor === null
+          ? `${prefix}>=${major + 1}.0.0`
+          : `${prefix}>=${major}.${minor + 1}.0`;
+      }
+      if (operator === "<=") {
+        return minor === null
+          ? `${prefix}<${major + 1}.0.0`
+          : `${prefix}<${major}.${minor + 1}.0`;
+      }
+      const patchLevel = `${major}.${minor ?? 0}.0`;
+      return `${prefix}${operator}${patchLevel}`;
+    }
+  );
+}
 
+function selectedWorkspace(request: RouteRequest): string | null {
+  const workspaces = new Set<string>();
+  for (const capability of request.capabilities) {
+    if (!capability.required) continue;
+    const workspace = capability.quality?.workspace;
+    if (typeof workspace === "string" && workspace.trim() !== "") {
+      workspaces.add(workspace.trim());
+    }
+  }
+  return workspaces.size === 1 ? [...workspaces][0] ?? null : null;
+}
+
+function guardDependencies(
+  project: ProjectSnapshot,
+  request: RouteRequest
+): ProjectSnapshot {
+  let dependencies = project.dependencies.map((dependency) => ({
+    ...dependency,
+    version: expandPartialComparators(dependency.version)
+  }));
+  const workspace = selectedWorkspace(request);
+  if (workspace !== null) {
+    const localNames = new Set(
+      dependencies
+        .filter((dependency) => dependency.workspace === workspace)
+        .map((dependency) => dependency.name)
+    );
+    dependencies = dependencies.filter(
+      (dependency) =>
+        (dependency.workspace ?? ".") !== "." || !localNames.has(dependency.name)
+    );
+  }
+  return { ...project, dependencies };
+}
+interface PropertyRequirement {
+  domain: string;
+  property: string;
+}
+
+function propertyRequirements(
+  request: RouteRequest,
+  catalog: CapabilityCatalog
+): Map<string, PropertyRequirement> {
+  const domains = new Map(
+    catalog.capabilities.map((capability) => [
+      capability.id,
+      capability.ownershipDomain
+    ])
+  );
+  const requirements = new Map<string, PropertyRequirement>();
+  for (const capability of request.capabilities) {
+    const property = capability.quality?.property;
+    const domain = domains.get(capability.id);
+    if (typeof property !== "string" || property.trim() === "" || domain === undefined) {
+      continue;
+    }
+    requirements.set(capability.id, {
+      domain,
+      property: property.trim()
+    });
+  }
+  return requirements;
+}
 function guardIntegration(
   integration: IntegrationArtifact
 ): IntegrationArtifact {
   if (integration.kind !== "runtime-package") return integration;
-
   let guarded = integration;
   if (
     guarded.status === "available" &&
@@ -44,42 +130,69 @@ function guardIntegration(
   return guarded;
 }
 
-function guardRecord(record: ConnectorRecord): ConnectorRecord {
+function supportsRequestedProperty(
+  record: Extract<ConnectorRecord, { kind: "schema-v2" }>,
+  requirement: PropertyRequirement
+): boolean {
+  return record.manifest.ownershipClaims.some(
+    (claim) =>
+      claim.domain === requirement.domain &&
+      claim.properties?.includes(requirement.property) === true
+  );
+}
+
+function guardRecord(
+  record: ConnectorRecord,
+  requirements: ReadonlyMap<string, PropertyRequirement>
+): ConnectorRecord {
   if (record.kind !== "schema-v2") return record;
   const integrations = record.manifest.integrations.map(guardIntegration);
-  const changed = integrations.some(
-    (integration, index) => integration !== record.manifest.integrations[index]
-  );
+  const capabilityClaims = record.manifest.capabilityClaims.filter((claim) => {
+    const requirement = requirements.get(claim.capability);
+    return requirement === undefined || supportsRequestedProperty(record, requirement);
+  });
+  const changed =
+    integrations.some(
+      (integration, index) => integration !== record.manifest.integrations[index]
+    ) || capabilityClaims.length !== record.manifest.capabilityClaims.length;
   if (!changed) return record;
   return {
     ...record,
     manifest: {
       ...record.manifest,
+      capabilityClaims,
       integrations
     }
   };
 }
-
 class SecurityCatalogView implements CatalogReader {
-  constructor(private readonly base: CatalogReader) {}
+  private readonly requirements: ReadonlyMap<string, PropertyRequirement>;
+
+  constructor(
+    private readonly base: CatalogReader,
+    request: RouteRequest
+  ) {
+    this.requirements = propertyRequirements(request, base.getCapabilityCatalog());
+  }
 
   getCapabilityCatalog() {
     return this.base.getCapabilityCatalog();
   }
 
   list(): ConnectorRecord[] {
-    return this.base.list().map(guardRecord);
+    return this.base.list().map((record) => guardRecord(record, this.requirements));
   }
 
   get(connectorId: string): ConnectorRecord | undefined {
     const record = this.base.get(connectorId);
-    return record === undefined ? undefined : guardRecord(record);
+    return record === undefined
+      ? undefined
+      : guardRecord(record, this.requirements);
   }
 
   health(connectorId: string) {
     return this.base.health(connectorId);
   }
-
   snapshot(createdAt?: string) {
     return createdAt === undefined
       ? this.base.snapshot()
@@ -108,7 +221,6 @@ function parseBrowserClause(value: string): BrowserClause | null {
   }
   return { environment: null, value: trimmed };
 }
-
 function normalizedBrowserClause(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
@@ -158,9 +270,13 @@ function effectiveBrowserTargets(
 export function routeCapabilities(input: RouteInput) {
   assertContract<RouteRequest>("route-request", input.request);
   assertContract<ProjectSnapshot>("project-snapshot", input.project);
+  const project = guardDependencies(
+    effectiveBrowserTargets(input.project),
+    input.request
+  );
   return routeCapabilitiesWorkspaceReuse({
     ...input,
-    project: effectiveBrowserTargets(input.project),
-    catalog: new SecurityCatalogView(input.catalog)
+    project,
+    catalog: new SecurityCatalogView(input.catalog, input.request)
   });
 }

@@ -384,9 +384,11 @@ function normalizeYamlBlockScalars(source: string): string {
 
 function parseYamlMapping(source: string): YamlRecord {
   const root: YamlRecord = {};
-  const stack: Array<{ indent: number; record: YamlRecord }> = [
-    { indent: -2, record: root }
-  ];
+  const stack: Array<{
+    indent: number;
+    record: YamlRecord;
+    childIndent: number | null;
+  }> = [{ indent: -1, record: root, childIndent: 0 }];
 
   for (const [index, originalLine] of source.split("\n").entries()) {
     const lineNumber = index + 1;
@@ -397,12 +399,6 @@ function parseYamlMapping(source: string): YamlRecord {
     if (withoutComment.trim() === "") continue;
 
     const indentation = leadingSpaces(withoutComment);
-    if (indentation % 2 !== 0) {
-      throw new SkillYamlError(
-        "YAML mappings must use two-space indentation.",
-        lineNumber
-      );
-    }
     const content = withoutComment.slice(indentation);
     const match = /^([A-Za-z][A-Za-z0-9_-]*):(?:\s+(.*))?$/.exec(content);
     if (match === null) {
@@ -419,8 +415,12 @@ function parseYamlMapping(source: string): YamlRecord {
       stack.pop();
     }
     const parent = stack[stack.length - 1];
-    if (parent === undefined || indentation !== parent.indent + 2) {
+    if (parent === undefined || indentation <= parent.indent) {
       throw new SkillYamlError("Invalid YAML mapping indentation.", lineNumber);
+    }
+    if (parent.childIndent === null) parent.childIndent = indentation;
+    else if (indentation !== parent.childIndent) {
+      throw new SkillYamlError("Inconsistent YAML mapping indentation.", lineNumber);
     }
 
     const key = match[1] ?? "";
@@ -431,7 +431,11 @@ function parseYamlMapping(source: string): YamlRecord {
     if (rawValue === undefined || rawValue.trim() === "") {
       const nested: YamlRecord = {};
       parent.record[key] = nested;
-      stack.push({ indent: indentation, record: nested });
+      stack.push({
+        indent: indentation,
+        record: nested,
+        childIndent: null
+      });
     } else {
       parent.record[key] = parseYamlScalar(rawValue, lineNumber);
     }

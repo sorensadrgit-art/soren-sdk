@@ -10,7 +10,7 @@ import {
 } from "./router-fixtures.js";
 
 describe("Phase 4 ownership claim properties", () => {
-  it("does not invent exclusivity for an undeclared property", () => {
+  it("blocks an explicit property outside provider ownership claims", () => {
     const motion = manifestFixture("motion", ["motion.layout"]);
     const motionLayout = motion.ownershipClaims.find(
       (claim) => claim.domain === "layout"
@@ -46,17 +46,8 @@ describe("Phase 4 ownership claim properties", () => {
       ])
     });
 
-    expect(plan.status).toBe("selected");
-    expect(plan.selectedProviders.map((provider) => provider.providerId).sort()).toEqual([
-      "gsap",
-      "motion"
-    ]);
-    expect(plan.ownership).toContainEqual({
-      providerId: "motion",
-      domain: "layout",
-      scope: "hero",
-      properties: ["opacity"]
-    });
+    expect(plan.status).toBe("blocked");
+    expect(plan.selectedProviders).toEqual([]);
   });
 
   it("removes ownership-conflicting alternatives before tie resolution", () => {
