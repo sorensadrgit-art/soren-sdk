@@ -113,6 +113,7 @@ interface RouteCliOptions {
   json: boolean;
   scope?: string;
   property?: string;
+  workspace?: string;
 }
 
 function parseRouteOptions(args: string[]): RouteCliOptions {
@@ -129,6 +130,7 @@ function parseRouteOptions(args: string[]): RouteCliOptions {
       "max-providers": { type: "string", default: "3" },
       scope: { type: "string" },
       property: { type: "string" },
+      workspace: { type: "string" },
       json: { type: "boolean", default: false }
     }
   });
@@ -163,6 +165,9 @@ function parseRouteOptions(args: string[]): RouteCliOptions {
   if (parsed.values.property !== undefined) {
     result.property = parsed.values.property;
   }
+  if (parsed.values.workspace !== undefined) {
+    result.workspace = parsed.values.workspace;
+  }
   return result;
 }
 
@@ -173,7 +178,8 @@ function buildRouteRequest(
 ): RouteRequest {
   const quality = {
     ...(parsed.scope === undefined ? {} : { scope: parsed.scope }),
-    ...(parsed.property === undefined ? {} : { property: parsed.property })
+    ...(parsed.property === undefined ? {} : { property: parsed.property }),
+    ...(parsed.workspace === undefined ? {} : { workspace: parsed.workspace })
   };
   const hasQuality = Object.keys(quality).length > 0;
   const capabilities: RouteRequest["capabilities"] = [
@@ -222,7 +228,7 @@ function usage(): string {
   return [
     "Usage:",
     "  soren-sdk inspect [path] [--json]",
-    "  soren-sdk route --capability <id> [--capability <id> ...] [--optional <id> ...] [--project <path>] [--preferred <provider>] [--forbidden <provider>] [--max-providers <n>] [--scope <scope>] [--property <property>] [--json]",
+    "  soren-sdk route --capability <id> [--capability <id> ...] [--optional <id> ...] [--project <path>] [--preferred <provider>] [--forbidden <provider>] [--max-providers <n>] [--scope <scope>] [--property <property>] [--workspace <workspace>] [--json]",
     "  soren-sdk catalog list [--json]",
     "  soren-sdk catalog get <connector-id> [--json]",
     "  soren-sdk connector health <connector-id> [--json]",

@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -246,6 +246,85 @@ describe("Soren SDK CLI", () => {
         })
       ).toBe(0);
       expect(JSON.parse(json.stdout.join(""))).toMatchObject({
+        status: "selected",
+        selectedProviders: [{ providerId: "motion" }]
+      });
+    } finally {
+      await rm(project, { recursive: true, force: true });
+    }
+  });
+
+  it("selects a target workspace for Motion routes", async () => {
+    const project = await mkdtemp(join(tmpdir(), "soren-sdk-route-workspace-"));
+    try {
+      await mkdir(join(project, "packages", "app"), { recursive: true });
+      await mkdir(join(project, "packages", "admin"), { recursive: true });
+      await writeFile(
+        join(project, "package.json"),
+        JSON.stringify({
+          name: "workspace-route-fixture",
+          private: true,
+          workspaces: ["packages/*"]
+        }),
+        "utf8"
+      );
+      await writeFile(
+        join(project, "packages", "app", "package.json"),
+        JSON.stringify({
+          name: "app",
+          private: true,
+          dependencies: { react: "19.0.0" }
+        }),
+        "utf8"
+      );
+      await writeFile(
+        join(project, "packages", "admin", "package.json"),
+        JSON.stringify({
+          name: "admin",
+          private: true,
+          dependencies: { react: "17.0.0" }
+        }),
+        "utf8"
+      );
+
+      const unresolved = captureIo();
+      expect(
+        runCli({
+          argv: [
+            "route",
+            "--project",
+            project,
+            "--capability",
+            "motion.layout",
+            "--json"
+          ],
+          cwd: repositoryRoot(),
+          io: unresolved.io
+        })
+      ).toBe(0);
+      expect(JSON.parse(unresolved.stdout.join(""))).toMatchObject({
+        status: "needs-input",
+        requiredInput: ["target workspace"]
+      });
+
+      const selected = captureIo();
+      expect(
+        runCli({
+          argv: [
+            "route",
+            "--project",
+            project,
+            "--capability",
+            "motion.layout",
+            "--workspace",
+            "packages/app",
+            "--json"
+          ],
+          cwd: repositoryRoot(),
+          io: selected.io
+        })
+      ).toBe(0);
+      expect(JSON.parse(selected.stdout.join(""))).toMatchObject({
         status: "selected",
         selectedProviders: [{ providerId: "motion" }]
       });

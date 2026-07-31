@@ -241,6 +241,144 @@ function parseYamlNumber(value: string): number | undefined {
   return undefined;
 }
 
+function splitYamlFlowEntries(value: string, line: number): string[] {
+  const entries: string[] = [];
+  let start = 0;
+  let depth = 0;
+  let singleQuoted = false;
+  let doubleQuoted = false;
+  let escaped = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (doubleQuoted) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') doubleQuoted = false;
+      continue;
+    }
+    if (singleQuoted) {
+      if (character === "'") {
+        if (value[index + 1] === "'") index += 1;
+        else singleQuoted = false;
+      }
+      continue;
+    }
+    if (character === '"') {
+      doubleQuoted = true;
+      continue;
+    }
+    if (character === "'") {
+      singleQuoted = true;
+      continue;
+    }
+    if (character === "{") {
+      depth += 1;
+      continue;
+    }
+    if (character === "}") {
+      depth -= 1;
+      if (depth < 0) {
+        throw new SkillYamlError("Unexpected closing YAML flow mapping brace.", line);
+      }
+      continue;
+    }
+    if (character === "[" || character === "]") {
+      throw new SkillYamlError("YAML flow sequences are not supported.", line);
+    }
+    if (character === "," && depth === 0) {
+      entries.push(value.slice(start, index));
+      start = index + 1;
+    }
+  }
+
+  if (singleQuoted || doubleQuoted || escaped || depth !== 0) {
+    throw new SkillYamlError("Unterminated YAML flow mapping.", line);
+  }
+  entries.push(value.slice(start));
+  return entries;
+}
+
+function yamlFlowSeparator(entry: string, line: number): number {
+  let depth = 0;
+  let singleQuoted = false;
+  let doubleQuoted = false;
+  let escaped = false;
+
+  for (let index = 0; index < entry.length; index += 1) {
+    const character = entry[index];
+    if (doubleQuoted) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') doubleQuoted = false;
+      continue;
+    }
+    if (singleQuoted) {
+      if (character === "'") {
+        if (entry[index + 1] === "'") index += 1;
+        else singleQuoted = false;
+      }
+      continue;
+    }
+    if (character === '"') {
+      doubleQuoted = true;
+      continue;
+    }
+    if (character === "'") {
+      singleQuoted = true;
+      continue;
+    }
+    if (character === "{") depth += 1;
+    else if (character === "}") depth -= 1;
+    else if (character === ":" && depth === 0) return index;
+  }
+
+  throw new SkillYamlError("Expected a colon in YAML flow mapping entry.", line);
+}
+
+function parseYamlFlowKey(value: string, line: number): string {
+  const key = value.trim();
+  if (key.startsWith('"')) return parseDoubleQuotedYamlScalar(key, line);
+  if (key.startsWith("'")) return parseSingleQuotedYamlScalar(key, line);
+  if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(key)) {
+    throw new SkillYamlError("Invalid YAML flow mapping key.", line);
+  }
+  return key;
+}
+
+function parseYamlFlowMapping(value: string, line: number): YamlRecord {
+  if (!value.startsWith("{") || !value.endsWith("}")) {
+    throw new SkillYamlError("Unterminated YAML flow mapping.", line);
+  }
+  const inner = value.slice(1, -1).trim();
+  if (inner === "") return {};
+
+  const record: YamlRecord = {};
+  const entries = splitYamlFlowEntries(inner, line);
+  for (const [index, rawEntry] of entries.entries()) {
+    const entry = rawEntry.trim();
+    if (entry === "" && index === entries.length - 1 && inner.endsWith(",")) {
+      continue;
+    }
+    if (entry === "") {
+      throw new SkillYamlError("Empty YAML flow mapping entry.", line);
+    }
+    const separator = yamlFlowSeparator(entry, line);
+    const key = parseYamlFlowKey(entry.slice(0, separator), line);
+    if (Object.hasOwn(record, key)) {
+      throw new SkillYamlError(`Duplicate YAML key "${key}".`, line);
+    }
+    const rawValue = entry.slice(separator + 1).trim();
+    if (rawValue === "") {
+      throw new SkillYamlError("Expected a YAML flow mapping value.", line);
+    }
+    record[key] = rawValue.startsWith("{")
+      ? parseYamlFlowMapping(rawValue, line)
+      : parseYamlScalar(rawValue, line);
+  }
+  return record;
+}
+
 function parseYamlScalar(value: string, line: number): YamlValue {
   const trimmed = stripYamlComment(value, line).trim();
   if (trimmed === "") {
@@ -253,6 +391,10 @@ function parseYamlScalar(value: string, line: number): YamlValue {
 
   if (trimmed.startsWith("'")) {
     return parseSingleQuotedYamlScalar(trimmed, line);
+  }
+
+  if (trimmed.startsWith("{")) {
+    return parseYamlFlowMapping(trimmed, line);
   }
 
   if (/^(?:[-?:](?=\s)|[,\[\]{}#&*!|>%@`])/.test(trimmed)) {
