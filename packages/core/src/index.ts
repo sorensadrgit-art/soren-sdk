@@ -4,3 +4,4 @@ export * from "./inspector/types.js";
 export * from "./inspector/inspect-project.js";
 export * from "./router/types.js";
 export * from "./router/policy.js";
+export * from "./router/route-capabilities.js";
