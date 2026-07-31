@@ -36,8 +36,13 @@ const MOTION_REACT_CAPABILITIES = new Set([
   "motion.shared-layout",
   "motion.spring"
 ]);
-const RUNTIME_PACKAGE_VERSION =
-  /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+const SEMANTIC_VERSION =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+const UNKNOWN_REACT_VERSION = "<unknown>";
+const WORKSPACE_RESOLVABLE_FAILURES = new Set([
+  "ENVIRONMENT_AMBIGUOUS",
+  "ENVIRONMENT_UNSUPPORTED"
+]);
 const WAAPI_MINIMUMS: Readonly<Record<string, readonly [number, number]>> = {
   android: [84, 0],
   and_chr: [84, 0],
@@ -54,6 +59,19 @@ const WAAPI_MINIMUMS: Readonly<Record<string, readonly [number, number]>> = {
 
 function json(value: unknown): JsonValue {
   return JSON.parse(JSON.stringify(value)) as JsonValue;
+}
+
+function isValidSemanticVersion(value: string): boolean {
+  const match = SEMANTIC_VERSION.exec(value.trim());
+  if (match === null) return false;
+  const prerelease = match[4];
+  if (prerelease === undefined) return true;
+  return prerelease.split(".").every(
+    (identifier) =>
+      !/^\d+$/.test(identifier) ||
+      identifier === "0" ||
+      !identifier.startsWith("0")
+  );
 }
 
 function browserQuery(target: string): string {
@@ -174,13 +192,24 @@ function requestedMotionWorkspace(request: RouteRequest): {
   };
 }
 
+function workspaceExists(
+  project: ProjectSnapshot,
+  workspace: string | null
+): boolean {
+  return (
+    workspace === null ||
+    workspace === "." ||
+    project.workspace.packages.some((item) => item.path === workspace)
+  );
+}
+
 function reactWorkspaceVersions(project: ProjectSnapshot): Map<string, Set<string>> {
   const versions = new Map<string, Set<string>>();
   for (const item of [...project.dependencies, ...project.frameworks]) {
-    if (item.name !== "react" || item.version === null) continue;
+    if (item.name !== "react") continue;
     const workspace = item.workspace ?? ".";
     const existing = versions.get(workspace) ?? new Set<string>();
-    existing.add(item.version);
+    existing.add(item.version ?? UNKNOWN_REACT_VERSION);
     versions.set(workspace, existing);
   }
   return versions;
@@ -228,7 +257,7 @@ function workspaceNeedsInputPlan(initial: RoutePlan): RoutePlan {
         providerId: "motion",
         reasonCode: "ENVIRONMENT_UNSUPPORTED",
         reason:
-          "React versions differ across workspaces; select the target workspace before routing Motion."
+          "The target workspace is missing, invalid, or has unresolved React compatibility."
       }
     ],
     ownership: [],
@@ -237,7 +266,7 @@ function workspaceNeedsInputPlan(initial: RoutePlan): RoutePlan {
         code: "ENVIRONMENT_AMBIGUOUS",
         status: "failed" as const,
         message:
-          "React versions differ across workspaces; provide quality.workspace for the required Motion capability."
+          "Provide a valid quality.workspace for the required React-dependent Motion capability."
       }
     ],
     uncertainty: 1,
@@ -254,6 +283,15 @@ function workspaceNeedsInputPlan(initial: RoutePlan): RoutePlan {
   return plan;
 }
 
+function hasHardWorkspaceFailure(plan: RoutePlan): boolean {
+  if (plan.status !== "blocked") return false;
+  return plan.constraints.some(
+    (constraint) =>
+      constraint.status === "failed" &&
+      !WORKSPACE_RESOLVABLE_FAILURES.has(constraint.code)
+  );
+}
+
 function pluginDependentSvgRequest(request: RouteRequest): boolean {
   const svg = request.capabilities.find(
     (capability) => capability.required && capability.id === "motion.svg"
@@ -266,7 +304,7 @@ function pluginDependentSvgRequest(request: RouteRequest): boolean {
     })
     .join(" ")
     .toLowerCase();
-  return /\b(?:draw|drawsvg|morph|morphsvg|path[- ]?morph|path[- ]?drawing)\b/.test(
+  return /\b(?:draw(?:svg(?:plugin)?)?|morph(?:svg(?:plugin)?)?|path[- ]?morph|path[- ]?drawing)\b/.test(
     values
   );
 }
@@ -296,7 +334,7 @@ function runtimeEligible(
     integration.kind === "runtime-package" &&
     (integration.version.status !== "resolved" ||
       integration.version.value === undefined ||
-      !RUNTIME_PACKAGE_VERSION.test(integration.version.value))
+      !isValidSemanticVersion(integration.version.value))
   ) {
     return false;
   }
@@ -442,12 +480,15 @@ export function routeCapabilities(input: RouteInput) {
 
   const workspace = requestedMotionWorkspace(input.request);
   const motionRequired = requiredMotionCapabilities(input.request).length > 0;
-  const workspaceAmbiguous =
+  const workspaceKnown = workspaceExists(input.project, workspace.workspace);
+  const workspaceNeedsInput =
     motionRequired &&
     (workspace.ambiguous ||
+      !workspaceKnown ||
       (workspace.workspace === null && reactWorkspacesDisagree(input.project)));
+  const effectiveWorkspace = workspaceKnown ? workspace.workspace : null;
   const project = normalizeBrowserTargets(
-    selectReactWorkspace(input.project, workspace.workspace)
+    selectReactWorkspace(input.project, effectiveWorkspace)
   );
   const initial = routeCapabilitiesReviewed({
     ...input,
@@ -456,5 +497,7 @@ export function routeCapabilities(input: RouteInput) {
     catalog: routeCatalog(input.catalog, input.request, policy)
   });
 
-  return workspaceAmbiguous ? workspaceNeedsInputPlan(initial) : initial;
+  return workspaceNeedsInput && !hasHardWorkspaceFailure(initial)
+    ? workspaceNeedsInputPlan(initial)
+    : initial;
 }
