@@ -132,6 +132,34 @@ source-digest: ${WEB_PLATFORM_SOURCE_DIGEST}
     }
   });
 
+  it.each(["- Use when routing", "? Use when routing"])(
+    "rejects an indicator-prefixed plain scalar: %s",
+    async (description) => {
+      const root = await createSkillFixture(`---
+name: web-platform
+description: ${description}
+license: LicenseRef-Soren-SDK-Internal
+compatibility: Soren SDK Phase 4; browser-native runtime; no executable scripts
+metadata:
+  publisher: soren-sdk
+  version: 1.0.0
+source: ./docs.sources.json
+source-digest: ${WEB_PLATFORM_SOURCE_DIGEST}
+---
+
+# Web Platform Routing Skill
+`);
+      try {
+        const report = validateRepository(root);
+        expect(report.errors.flatMap((failure) => failure.issues)).toContainEqual(
+          expect.objectContaining({ keyword: "skill-frontmatter" })
+        );
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    }
+  );
+
   it("rejects a skill whose source registry digest does not match", async () => {
     const root = await createSkillFixture(`---
 name: web-platform
