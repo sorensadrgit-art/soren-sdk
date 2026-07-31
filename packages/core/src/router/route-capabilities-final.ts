@@ -230,6 +230,21 @@ function requestedMotionWorkspace(request: RouteRequest): {
   };
 }
 
+function requestedRouteWorkspaces(request: RouteRequest): string[] {
+  return [
+    ...new Set(
+      request.capabilities
+        .filter((capability) => capability.required)
+        .map((capability) => capability.quality?.workspace)
+        .filter(
+          (workspace): workspace is string =>
+            typeof workspace === "string" && workspace.trim().length > 0
+        )
+        .map((workspace) => workspace.trim())
+    )
+  ].sort();
+}
+
 function requestedRouteWorkspace(request: RouteRequest): string | null {
   return uniqueRequestedWorkspace(request, () => true);
 }
@@ -311,10 +326,13 @@ function workspaceNeedsInputPlan(initial: RoutePlan): RoutePlan {
     selectedProviders: [],
     rejectedProviders: [
       {
-        providerId: "motion",
+        providerId:
+          initial.selectedProviders[0]?.providerId ??
+          initial.rejectedProviders[0]?.providerId ??
+          "workspace",
         reasonCode: "ENVIRONMENT_UNSUPPORTED",
         reason:
-          "The target workspace is missing, invalid, or has unresolved React compatibility."
+          "A required target workspace is missing, invalid, or has unresolved compatibility."
       }
     ],
     ownership: [],
@@ -323,7 +341,7 @@ function workspaceNeedsInputPlan(initial: RoutePlan): RoutePlan {
         code: "ENVIRONMENT_AMBIGUOUS",
         status: "failed" as const,
         message:
-          "Provide a valid quality.workspace for the required React-dependent Motion capability."
+          "Provide a valid quality.workspace for every explicitly targeted required capability."
       }
     ],
     uncertainty: 1,
@@ -538,7 +556,11 @@ export function routeCapabilities(input: RouteInput) {
   const workspace = requestedMotionWorkspace(input.request);
   const motionWorkspaces = requestedMotionWorkspaces(input.request);
   const routeWorkspace = requestedRouteWorkspace(input.request);
+  const routeWorkspaces = requestedRouteWorkspaces(input.request);
   const motionRequired = requiredMotionCapabilities(input.request).length > 0;
+  const routeWorkspacesKnown = routeWorkspaces.every((item) =>
+    workspaceExists(input.project, item)
+  );
   const workspacesKnown = motionWorkspaces.every((item) =>
     workspaceExists(input.project, item)
   );
@@ -547,11 +569,12 @@ export function routeCapabilities(input: RouteInput) {
     workspace.workspace
   );
   const workspaceNeedsInput =
-    motionRequired &&
-    (workspace.ambiguous ||
-      !workspacesKnown ||
-      !representativeKnown ||
-      (workspace.workspace === null && reactWorkspacesDisagree(input.project)));
+    !routeWorkspacesKnown ||
+    (motionRequired &&
+      (workspace.ambiguous ||
+        !workspacesKnown ||
+        !representativeKnown ||
+        (workspace.workspace === null && reactWorkspacesDisagree(input.project))));
   const effectiveWorkspace =
     workspacesKnown && representativeKnown ? workspace.workspace : null;
   const project = normalizeBrowserTargets(

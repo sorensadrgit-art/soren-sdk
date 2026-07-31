@@ -78,6 +78,24 @@ metadata:
     }
   });
 
+  it("accepts multiline single-quoted YAML scalars", async () => {
+    const root = await createFixture(`name: web-platform
+description: 'Use when browser-native animation
+  fully satisfies the requested capability.'
+license: LicenseRef-Soren-SDK-Internal
+compatibility: Soren SDK Phase 4; browser-native runtime; no executable scripts
+metadata:
+  publisher: soren-sdk
+  version: 1.0.0`);
+    try {
+      const report = validateRepository(root);
+      expect(report.errors).toEqual([]);
+      expect(report.validatedConnectors).toEqual(["web-platform"]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it.each([
     ["license", ".inf", "skill-license"],
     ["compatibility", ".nan", "skill-compatibility"]

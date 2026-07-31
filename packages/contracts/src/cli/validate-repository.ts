@@ -297,19 +297,31 @@ function applyBlockChomping(value: string, chomping: string | undefined): string
   return `${value.replace(/\n+$/, "")}\n`;
 }
 
-function hasClosingDoubleQuote(value: string): boolean {
+function hasClosingQuotedScalar(
+  value: string,
+  quote: "\"" | "'"
+): boolean {
   let escaped = false;
   for (let index = 1; index < value.length; index += 1) {
     const character = value[index];
-    if (escaped) {
-      escaped = false;
+    if (quote === "\"") {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (character === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (character === quote) return true;
       continue;
     }
-    if (character === "\\") {
-      escaped = true;
+    if (character !== quote) continue;
+    if (value[index + 1] === quote) {
+      index += 1;
       continue;
     }
-    if (character === '"') return true;
+    return true;
   }
   return false;
 }
@@ -319,19 +331,30 @@ function normalizeYamlMultilineQuotedScalars(source: string): string {
   const output: string[] = [];
   for (let index = 0; index < lines.length; index += 1) {
     const originalLine = lines[index] ?? "";
-    const match = /^(( *)([A-Za-z][A-Za-z0-9_-]*):\s*)(".*)$/.exec(
+    const match = /^(( *)([A-Za-z][A-Za-z0-9_-]*):\s*)((?:"|').*)$/.exec(
       originalLine
     );
-    if (match === null || hasClosingDoubleQuote(match[4] ?? "")) {
+    const scalarStart = match?.[4]?.[0];
+    const quote = scalarStart === "\"" || scalarStart === "'"
+      ? scalarStart
+      : null;
+    if (
+      match === null ||
+      quote === null ||
+      hasClosingQuotedScalar(match[4] ?? quote, quote)
+    ) {
       output.push(originalLine);
       continue;
     }
 
     const baseIndent = (match[2] ?? "").length;
-    let scalar = match[4] ?? '"';
+    let scalar = match[4] ?? quote;
     let cursor = index + 1;
     let previousBlank = false;
-    while (cursor < lines.length && !hasClosingDoubleQuote(scalar)) {
+    while (
+      cursor < lines.length &&
+      !hasClosingQuotedScalar(scalar, quote)
+    ) {
       const line = lines[cursor] ?? "";
       if (line.includes("\t")) {
         throw new SkillYamlError(
@@ -350,9 +373,9 @@ function normalizeYamlMultilineQuotedScalars(source: string): string {
       previousBlank = false;
       cursor += 1;
     }
-    if (!hasClosingDoubleQuote(scalar)) {
+    if (!hasClosingQuotedScalar(scalar, quote)) {
       throw new SkillYamlError(
-        "Unterminated multiline double-quoted YAML scalar.",
+        "Unterminated multiline quoted YAML scalar.",
         index + 1
       );
     }

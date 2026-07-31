@@ -128,8 +128,16 @@ function propertyRequirements(
   return requirements;
 }
 function guardIntegration(
-  integration: IntegrationArtifact
+  integration: IntegrationArtifact,
+  providerId: string
 ): IntegrationArtifact {
+  if (
+    integration.kind === "built-in" &&
+    providerId !== "web-platform" &&
+    integration.status === "available"
+  ) {
+    return { ...integration, status: "unverified" };
+  }
   if (integration.kind !== "runtime-package") return integration;
   let guarded = integration;
   if (
@@ -168,7 +176,9 @@ function guardRecord(
   requirements: ReadonlyMap<string, PropertyRequirement>
 ): ConnectorRecord {
   if (record.kind !== "schema-v2") return record;
-  const integrations = record.manifest.integrations.map(guardIntegration);
+  const integrations = record.manifest.integrations.map((integration) =>
+    guardIntegration(integration, record.manifest.connector.id)
+  );
   const capabilityClaims = record.manifest.capabilityClaims.filter((claim) => {
     const requirement = requirements.get(claim.capability);
     return requirement === undefined || supportsRequestedProperty(record, requirement);

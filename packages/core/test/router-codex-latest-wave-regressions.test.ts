@@ -7,8 +7,10 @@ import { describe, expect, it } from "vitest";
 import { routeCapabilities } from "../src/index.js";
 import {
   MemoryCatalogFixture,
+  manifestFixture,
   projectFixture,
-  requestFixture
+  requestFixture,
+  schemaRecordFixture
 } from "./router-fixtures.js";
 
 function twoWorkspaceProject(): ProjectSnapshot {
@@ -139,5 +141,55 @@ describe("latest Codex routing wave", () => {
 
     expect(plan.status).toBe("selected");
     expect(plan.selectedProviders[0]?.reasonCode).toBe("CAPABILITY_MATCH");
+  });
+
+  it("requests a valid workspace for non-React capabilities", () => {
+    const project = projectFixture({ dependencies: ["gsap"] });
+    project.workspace = {
+      isMonorepo: true,
+      packages: [{ name: "app", path: "packages/app", private: true }]
+    };
+    const request = requestFixture({
+      required: ["motion.timeline"],
+      projectSnapshotId: project.snapshotId
+    });
+    const timeline = request.capabilities[0];
+    if (timeline === undefined) throw new Error("Expected timeline capability.");
+    timeline.quality = { workspace: "packages/missing" };
+
+    const plan = routeCapabilities({
+      request,
+      project,
+      catalog: new MemoryCatalogFixture()
+    });
+
+    expect(plan.status).toBe("needs-input");
+    expect(plan.requiredInput).toContain("target workspace");
+    expect(plan.selectedProviders).toEqual([]);
+  });
+
+  it("rejects third-party connectors that claim built-in runtimes", () => {
+    const motion = manifestFixture("motion", ["motion.layout"]);
+    const runtime = motion.integrations.find(
+      (integration) => integration.mode === "runtime"
+    );
+    if (runtime === undefined) throw new Error("Expected Motion runtime.");
+    runtime.kind = "built-in";
+    runtime.version = { status: "not-applicable" };
+    runtime.licenseExpression = "not-applicable";
+    delete runtime.packageName;
+    const project = projectFixture();
+
+    const plan = routeCapabilities({
+      request: requestFixture({
+        required: ["motion.layout"],
+        projectSnapshotId: project.snapshotId
+      }),
+      project,
+      catalog: new MemoryCatalogFixture([schemaRecordFixture(motion)])
+    });
+
+    expect(plan.status).toBe("blocked");
+    expect(plan.selectedProviders).toEqual([]);
   });
 });
