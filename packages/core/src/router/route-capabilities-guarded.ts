@@ -10,11 +10,22 @@ import type { RouteInput } from "./types.js";
 type Version = readonly [number, number, number];
 const MOTION_MINIMUM_REACT: Version = [18, 2, 0];
 const SEMVER_PRERELEASE = /v?\d+(?:\.\d+){1,2}-[0-9A-Za-z]/;
+const MOTION_REACT_CAPABILITIES = new Set([
+  "interaction.drag",
+  "interaction.gesture",
+  "motion.layout",
+  "motion.presence",
+  "motion.shared-layout",
+  "motion.spring"
+]);
 
 function selectedWorkspace(request: RouteRequest): string | null {
   const workspaces = new Set(
     request.capabilities
-      .filter((capability) => capability.required)
+      .filter(
+        (capability) =>
+          capability.required && MOTION_REACT_CAPABILITIES.has(capability.id)
+      )
       .map((capability) => capability.quality?.workspace)
       .filter(
         (workspace): workspace is string =>
