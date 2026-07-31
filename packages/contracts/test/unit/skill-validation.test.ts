@@ -45,6 +45,23 @@ async function createSkillFixture(skill: string): Promise<string> {
   return root;
 }
 
+function validSkill(metadataVersionKey = "version"): string {
+  return `---
+name: web-platform
+description: "Use when browser-native animation fully satisfies the request."
+license: LicenseRef-Soren-SDK-Internal
+compatibility: Soren SDK Phase 4; browser-native runtime; no executable scripts
+metadata:
+  publisher: soren-sdk
+  ${metadataVersionKey}: 1.0.0
+source: ./docs.sources.json
+source-digest: ${WEB_PLATFORM_SOURCE_DIGEST}
+---
+
+# Web Platform Routing Skill
+`;
+}
+
 describe("connector Agent Skill validation", () => {
   it("rejects a present skill without required YAML frontmatter", async () => {
     const root = await createSkillFixture("# Missing frontmatter\n");
@@ -59,20 +76,18 @@ describe("connector Agent Skill validation", () => {
   });
 
   it("accepts valid YAML with nested publisher and version metadata", async () => {
-    const root = await createSkillFixture(`---
-name: web-platform
-description: "Use when browser-native animation fully satisfies the request."
-license: LicenseRef-Soren-SDK-Internal
-compatibility: Soren SDK Phase 4; browser-native runtime; no executable scripts
-metadata:
-  publisher: soren-sdk
-  version: 1.0.0
-source: ./docs.sources.json
-source-digest: ${WEB_PLATFORM_SOURCE_DIGEST}
----
+    const root = await createSkillFixture(validSkill());
+    try {
+      const report = validateRepository(root);
+      expect(report.errors).toEqual([]);
+      expect(report.validatedConnectors).toEqual(["web-platform"]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 
-# Web Platform Routing Skill
-`);
+  it("accepts the documented metadata.connector-version key", async () => {
+    const root = await createSkillFixture(validSkill("connector-version"));
     try {
       const report = validateRepository(root);
       expect(report.errors).toEqual([]);
