@@ -91,11 +91,28 @@ function parseVersion(value: string): ParsedVersion | null {
   };
 }
 
+function stripWorkspaceProtocol(value: string): string {
+  const result = value.trim();
+  return result.startsWith("workspace:")
+    ? result.slice("workspace:".length).trim()
+    : result;
+}
+
+function npmAliasTarget(value: string): string | null {
+  const result = stripWorkspaceProtocol(value);
+  if (!result.startsWith("npm:")) return null;
+  const aliasSpec = result.slice("npm:".length);
+  const separator = aliasSpec.lastIndexOf("@");
+  return separator > 0 ? aliasSpec.slice(0, separator) : aliasSpec;
+}
+
+function dependencyTargetsPackage(value: string, packageName: string): boolean {
+  const aliasTarget = npmAliasTarget(value);
+  return aliasTarget === null || aliasTarget === packageName;
+}
+
 function normalizeRange(value: string): string {
-  let result = value.trim();
-  if (result.startsWith("workspace:")) {
-    result = result.slice("workspace:".length).trim();
-  }
+  let result = stripWorkspaceProtocol(value);
   if (result.startsWith("npm:")) {
     const separator = result.lastIndexOf("@");
     result = separator > "npm:".length ? result.slice(separator + 1) : result;
@@ -229,7 +246,9 @@ function parseComparator(token: string): VersionInterval | null {
 }
 
 function parseRangeClause(value: string): VersionInterval | null {
-  const clause = value.trim();
+  const clause = value
+    .trim()
+    .replace(/(>=|<=|>|<|=)\s+(?=v?\d)/g, "$1");
   if (clause === "" || clause === "*" || clause.toLowerCase() === "latest") {
     return { lower: null, upper: null };
   }
@@ -406,6 +425,10 @@ function hasDependencyReuse(
     return project.dependencies.some(
       (dependency) =>
         dependency.name === integration.packageName &&
+        dependencyTargetsPackage(
+          dependency.version,
+          integration.packageName ?? ""
+        ) &&
         versionSatisfiesRange(resolvedVersion.version, dependency.version)
     );
   });
