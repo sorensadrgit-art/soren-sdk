@@ -54,11 +54,7 @@ replaceExact(
     return sign * Number.parseInt(normalized.slice(2), radix);
   }
 
-  const digits = String.raw\\`\\d(?:_?\\d)*\\`;
-  const decimal = new RegExp(
-    String.raw\\`^[+-]?(?:(?:\\${digits})(?:\\.(?:\\${digits})?)?|\\.\\${digits})(?:e[+-]?\\${digits})?$\\`,
-    "i"
-  );
+  const decimal = /^[+-]?(?:(?:\\d(?:_?\\d)*)(?:\\.(?:\\d(?:_?\\d)*)?)?|\\.\\d(?:_?\\d)*)(?:e[+-]?\\d(?:_?\\d)*)?$/i;
   return decimal.test(value) ? Number(value.replaceAll("_", "")) : undefined;
 }`
 );
@@ -236,7 +232,8 @@ function guardDependencies(
         unscoped.add(integration.packageName);
         continue;
       }
-      const packageTargets = targets.get(integration.packageName) ?? new Set<string>();
+      const packageTargets =
+        targets.get(integration.packageName) ?? new Set<string>();
       for (const workspace of explicit) packageTargets.add(workspace);
       targets.set(integration.packageName, packageTargets);
     }
