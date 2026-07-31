@@ -99,6 +99,30 @@ function stripYamlComment(value: string, line: number): string {
   return value;
 }
 
+function parseSingleQuotedYamlScalar(value: string, line: number): string {
+  let parsed = "";
+  for (let index = 1; index < value.length; index += 1) {
+    const character = value[index];
+    if (character !== "'") {
+      parsed += character;
+      continue;
+    }
+    if (value[index + 1] === "'") {
+      parsed += "'";
+      index += 1;
+      continue;
+    }
+    if (value.slice(index + 1).trim() !== "") {
+      throw new SkillYamlError(
+        "Unexpected trailing content after single-quoted YAML scalar.",
+        line
+      );
+    }
+    return parsed;
+  }
+  throw new SkillYamlError("Unterminated single-quoted YAML scalar.", line);
+}
+
 function parseYamlScalar(value: string, line: number): YamlValue {
   const trimmed = stripYamlComment(value, line).trim();
   if (trimmed === "") {
@@ -125,10 +149,7 @@ function parseYamlScalar(value: string, line: number): YamlValue {
   }
 
   if (trimmed.startsWith("'")) {
-    if (!trimmed.endsWith("'") || trimmed.length < 2) {
-      throw new SkillYamlError("Unterminated single-quoted YAML scalar.", line);
-    }
-    return trimmed.slice(1, -1).replaceAll("''", "'");
+    return parseSingleQuotedYamlScalar(trimmed, line);
   }
 
   if (/^(?:[-?:](?=\s)|[,\[\]{}#&*!|>%@`])/.test(trimmed)) {
@@ -331,17 +352,37 @@ function validateSkill(
         )
       );
     }
+    const version = metadata.version;
+    const connectorVersion = metadata["connector-version"];
     if (
-      typeof metadata.version !== "string" ||
+      version !== undefined &&
+      connectorVersion !== undefined &&
+      version !== connectorVersion
+    ) {
+      issues.push(
+        repositoryIssue(
+          "skill-metadata-version",
+          "Agent Skill metadata.version and metadata.connector-version must match when both are provided.",
+          "/metadata"
+        )
+      );
+    }
+    const metadataVersion = version ?? connectorVersion;
+    const metadataVersionPath =
+      version !== undefined
+        ? "/metadata/version"
+        : "/metadata/connector-version";
+    if (
+      typeof metadataVersion !== "string" ||
       !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(
-        metadata.version
+        metadataVersion
       )
     ) {
       issues.push(
         repositoryIssue(
           "skill-metadata-version",
-          "Agent Skill metadata.version must be a semantic version string.",
-          "/metadata/version"
+          "Agent Skill metadata.version or metadata.connector-version must be a semantic version string.",
+          metadataVersionPath
         )
       );
     }
