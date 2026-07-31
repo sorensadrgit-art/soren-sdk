@@ -4,7 +4,8 @@ import type {
 } from "../types/index.js";
 import type { ContractIssue } from "../errors/index.js";
 
-const IMMUTABLE_CONTENT_PIN = /(?:^|[\/@_-])[0-9a-f]{40,64}(?:$|[/?#._-])/i;
+const IMMUTABLE_COMMIT = /^[0-9a-f]{40,64}$/i;
+const IMMUTABLE_DIGEST = /^sha256:[0-9a-f]{64}$/;
 
 function issue(
   instancePath: string,
@@ -44,7 +45,13 @@ function isRemoteAgentSkill(integration: IntegrationArtifact): boolean {
 }
 
 function hasImmutableContentPin(integration: IntegrationArtifact): boolean {
-  return IMMUTABLE_CONTENT_PIN.test(integration.source);
+  if (integration.version.status !== "resolved") return false;
+  return (
+    (integration.version.commit !== undefined &&
+      IMMUTABLE_COMMIT.test(integration.version.commit)) ||
+    (integration.version.digest !== undefined &&
+      IMMUTABLE_DIGEST.test(integration.version.digest))
+  );
 }
 
 export function validateArtifactSemantics(
@@ -69,14 +76,13 @@ export function validateArtifactSemantics(
     if (
       isRemoteAgentSkill(integration) &&
       integration.status === "available" &&
-      (integration.version.status !== "resolved" ||
-        !hasImmutableContentPin(integration))
+      !hasImmutableContentPin(integration)
     ) {
       issues.push(
         issue(
-          `/integrations/${index}/source`,
+          `/integrations/${index}/version`,
           "available-agent-skill-pin",
-          "Available remote Agent Skills must declare a resolved version and an immutable commit or content digest in the source URL, or remain unverified."
+          "Available remote Agent Skills must declare a resolved immutable version.commit or version.digest pin, or remain unverified."
         )
       );
     }
