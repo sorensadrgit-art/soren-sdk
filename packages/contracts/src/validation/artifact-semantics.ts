@@ -5,6 +5,7 @@ import type {
 import type { ContractIssue } from "../errors/index.js";
 
 const IMMUTABLE_CONTENT_PIN = /(?:^|[\/@_-])[0-9a-f]{40,64}(?:$|[/?#._-])/i;
+const LOCAL_SOURCE_PROTOCOLS = new Set(["data:", "file:"]);
 
 function issue(
   instancePath: string,
@@ -23,7 +24,7 @@ function issue(
 function isRemoteSource(source: string): boolean {
   try {
     const protocol = new URL(source).protocol.toLowerCase();
-    return protocol === "http:" || protocol === "https:";
+    return !LOCAL_SOURCE_PROTOCOLS.has(protocol);
   } catch {
     return false;
   }
@@ -55,7 +56,7 @@ export function validateArtifactSemantics(
         issue(
           `/integrations/${index}/dataExposure`,
           "agent-skill-exposure",
-          "HTTP(S) Agent Skill sources must declare a remote data-exposure classification."
+          "Remote Agent Skill sources must declare a remote data-exposure classification."
         )
       );
     }
