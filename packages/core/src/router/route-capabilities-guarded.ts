@@ -139,10 +139,11 @@ function routedReactWorkspace(
   name: string,
   current: string | null | undefined,
   selected: string | null
-): string | null | undefined {
-  return name === "react" && selected !== null && (current ?? ".") === "."
+): string {
+  const normalized = current ?? ".";
+  return name === "react" && selected !== null && normalized === "."
     ? selected
-    : current;
+    : normalized;
 }
 
 function guardedProject(
