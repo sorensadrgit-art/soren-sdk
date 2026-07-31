@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import type {
   CatalogSnapshot,
-  ConnectorRecord,
   RouteRequest
-} from "../../src/catalog/types.js";
+} from "@soren-sdk/contracts";
+import type { ConnectorRecord } from "../../src/catalog/types.js";
 import { routeCapabilities } from "../../src/index.js";
 import {
   projectFixture,
