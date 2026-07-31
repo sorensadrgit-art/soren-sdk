@@ -247,7 +247,7 @@ function normalizeYamlBlockScalars(source: string): string {
 
   for (let index = 0; index < lines.length; index += 1) {
     const originalLine = lines[index] ?? "";
-    const match = /^(( *)([A-Za-z][A-Za-z0-9_-]*):)\s*([>|])([+-])?\s*(?:#.*)?$/.exec(
+    const match = /^(( *)([A-Za-z][A-Za-z0-9_-]*):)\s*([>|])(?:(?:([1-9])([+-])?)|(?:([+-])([1-9])?))?\s*(?:#.*)?$/.exec(
       originalLine
     );
     if (match === null) {
@@ -256,7 +256,12 @@ function normalizeYamlBlockScalars(source: string): string {
     }
 
     const baseIndent = (match[2] ?? "").length;
-    let blockIndent: number | null = null;
+    const indentationIndicator = match[5] ?? match[8];
+    const chomping = match[6] ?? match[7];
+    let blockIndent: number | null =
+      indentationIndicator === undefined
+        ? null
+        : baseIndent + Number.parseInt(indentationIndicator, 10);
     let cursor = index + 1;
     while (cursor < lines.length) {
       const line = lines[cursor] ?? "";
@@ -272,7 +277,13 @@ function normalizeYamlBlockScalars(source: string): string {
       }
       const indentation = leadingSpaces(line);
       if (indentation <= baseIndent) break;
-      blockIndent = indentation;
+      if (blockIndent === null) blockIndent = indentation;
+      else if (indentation < blockIndent) {
+        throw new SkillYamlError(
+          "YAML block scalar content is less indented than its explicit indicator.",
+          cursor + 1
+        );
+      }
       break;
     }
     if (blockIndent === null) {
@@ -306,7 +317,7 @@ function normalizeYamlBlockScalars(source: string): string {
     const style = match[4] ?? ">";
     const blockValue =
       style === "|" ? blockLines.join("\n") : foldBlockLines(blockLines);
-    const value = applyBlockChomping(blockValue, match[5]);
+    const value = applyBlockChomping(blockValue, chomping);
     output.push(`${match[1] ?? ""} ${JSON.stringify(value)}`);
     for (let consumed = index + 1; consumed < cursor; consumed += 1) {
       output.push("");
