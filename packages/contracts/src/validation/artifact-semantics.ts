@@ -5,7 +5,6 @@ import type {
 import type { ContractIssue } from "../errors/index.js";
 
 const IMMUTABLE_CONTENT_PIN = /(?:^|[\/@_-])[0-9a-f]{40,64}(?:$|[/?#._-])/i;
-const LOCAL_SOURCE_PROTOCOLS = new Set(["data:", "file:"]);
 
 function issue(
   instancePath: string,
@@ -23,8 +22,14 @@ function issue(
 
 function isRemoteSource(source: string): boolean {
   try {
-    const protocol = new URL(source).protocol.toLowerCase();
-    return !LOCAL_SOURCE_PROTOCOLS.has(protocol);
+    const url = new URL(source);
+    const protocol = url.protocol.toLowerCase();
+    if (protocol === "data:") return false;
+    if (protocol === "file:") {
+      const host = url.hostname.toLowerCase();
+      return host !== "" && host !== "localhost";
+    }
+    return true;
   } catch {
     return false;
   }
