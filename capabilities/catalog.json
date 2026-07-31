@@ -60,7 +60,7 @@
     {
       "id": "motion.svg",
       "family": "motion",
-      "description": "SVG drawing or choreography.",
+      "description": "Core SVG transform, opacity, and numeric-attribute choreography; path morphing and stroke drawing require separate approved plugin artifacts.",
       "native": false,
       "ownershipDomain": "svg-animation"
     },
