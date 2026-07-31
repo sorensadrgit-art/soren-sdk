@@ -128,13 +128,11 @@ function normalizeQuality(
 function normalizeRequest(request: RouteRequest): RouteRequest {
   const byId = new Map<string, NormalizedCapability>();
   for (const capability of request.capabilities) {
-    const normalized: NormalizedCapability = {
-      id: capability.id,
-      required: capability.required,
-      ...(normalizeQuality(capability.quality) === undefined
-        ? {}
-        : { quality: normalizeQuality(capability.quality) })
-    };
+    const quality = normalizeQuality(capability.quality);
+    const normalized: NormalizedCapability =
+      quality === undefined
+        ? { id: capability.id, required: capability.required }
+        : { id: capability.id, required: capability.required, quality };
     const existing = byId.get(capability.id);
     if (existing !== undefined) {
       if (
