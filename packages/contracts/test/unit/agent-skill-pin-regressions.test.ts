@@ -92,7 +92,7 @@ describe("remote Agent Skill pin regressions", () => {
       {
         status: "resolved" as const,
         value: "1.2.3",
-        digest: `sha256:${"b".repeat(64)}`
+        digest: `sha256:${"b".repeat(64)}` as `sha256:${string}`
       }
     ]
   ])("accepts an explicit immutable %s pin on a mutable source URL", (_name, version) => {
