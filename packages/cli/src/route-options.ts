@@ -1,0 +1,154 @@
+import { parseArgs } from "node:util";
+
+import {
+  digestJson,
+  type Digest,
+  type JsonValue,
+  type RouteRequest
+} from "@soren-sdk/contracts";
+
+export interface ParsedRouteOptions {
+  project: string;
+  capabilities: RouteRequest["capabilities"];
+  preferredProviders: string[];
+  forbiddenProviders: string[];
+  maxProviders: number;
+  json: boolean;
+}
+
+const ROUTE_OPTIONS = {
+  project: { type: "string", default: "." },
+  capability: { type: "string", multiple: true },
+  optional: { type: "string", multiple: true },
+  preferred: { type: "string", multiple: true },
+  forbidden: { type: "string", multiple: true },
+  "max-providers": { type: "string", default: "2" },
+  scope: { type: "string" },
+  property: { type: "string" },
+  json: { type: "boolean", default: false }
+} as const;
+
+function nonEmpty(values: string[] | undefined, option: string): string[] {
+  return (values ?? []).map((value) => {
+    const normalized = value.trim();
+    if (normalized === "") {
+      throw new TypeError(`${option} values must not be empty.`);
+    }
+    return normalized;
+  });
+}
+
+function optionalString(value: string | undefined, option: string): string | undefined {
+  if (value === undefined) return undefined;
+  const normalized = value.trim();
+  if (normalized === "") {
+    throw new TypeError(`${option} must not be empty.`);
+  }
+  return normalized;
+}
+
+function parseProviderLimit(value: string): number {
+  if (!/^[1-9]\d*$/.test(value)) {
+    throw new TypeError("--max-providers must be a positive integer.");
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) {
+    throw new TypeError("--max-providers must be a positive integer.");
+  }
+  return parsed;
+}
+
+function capability(
+  id: string,
+  required: boolean,
+  scope: string | undefined,
+  property: string | undefined
+): RouteRequest["capabilities"][number] {
+  if (scope === undefined && property === undefined) {
+    return { id, required };
+  }
+  return {
+    id,
+    required,
+    quality: {
+      ...(property === undefined ? {} : { property }),
+      ...(scope === undefined ? {} : { scope })
+    }
+  };
+}
+
+export function parseRouteOptions(args: string[]): ParsedRouteOptions {
+  const parsed = parseArgs({
+    args,
+    allowPositionals: false,
+    strict: true,
+    options: ROUTE_OPTIONS
+  });
+  const required = nonEmpty(parsed.values.capability, "--capability");
+  const optional = nonEmpty(parsed.values.optional, "--optional");
+  if (required.length + optional.length === 0) {
+    throw new TypeError("route requires at least one capability.");
+  }
+  const scope = optionalString(parsed.values.scope, "--scope");
+  const property = optionalString(parsed.values.property, "--property");
+
+  return {
+    project: parsed.values.project ?? ".",
+    capabilities: [
+      ...required.map((id) => capability(id, true, scope, property)),
+      ...optional.map((id) => capability(id, false, scope, property))
+    ],
+    preferredProviders: nonEmpty(parsed.values.preferred, "--preferred"),
+    forbiddenProviders: nonEmpty(parsed.values.forbidden, "--forbidden"),
+    maxProviders: parseProviderLimit(parsed.values["max-providers"] ?? "2"),
+    json: parsed.values.json ?? false
+  };
+}
+
+function asJsonValue(value: unknown): JsonValue {
+  return value as JsonValue;
+}
+
+export function buildRouteRequest(
+  options: ParsedRouteOptions,
+  projectSnapshotId: Digest,
+  createdAt: string
+): RouteRequest {
+  const input = {
+    projectSnapshotId,
+    capabilities: options.capabilities,
+    preferredProviders: options.preferredProviders,
+    forbiddenProviders: options.forbiddenProviders,
+    maxProviders: options.maxProviders
+  };
+  const digest = digestJson(asJsonValue(input));
+  const required = options.capabilities
+    .filter((item) => item.required)
+    .map((item) => item.id)
+    .sort();
+  const optional = options.capabilities
+    .filter((item) => !item.required)
+    .map((item) => item.id)
+    .sort();
+  const summary = [
+    `required: ${required.join(", ") || "none"}`,
+    `optional: ${optional.join(", ") || "none"}`
+  ].join("; ");
+
+  return {
+    schemaVersion: "1.0.0-draft.1",
+    contractKind: "route-request",
+    requestId: `route_request_${digest.slice("sha256:".length, "sha256:".length + 24)}`,
+    createdAt,
+    projectSnapshotId,
+    summary,
+    capabilities: options.capabilities,
+    preferences: {
+      preferredProviders: options.preferredProviders,
+      forbiddenProviders: options.forbiddenProviders,
+      maxProviders: options.maxProviders,
+      allowPaidServices: false,
+      allowExperimental: false
+    }
+  };
+}
