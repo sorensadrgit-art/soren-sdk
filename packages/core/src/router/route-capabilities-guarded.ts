@@ -157,6 +157,19 @@ function guardedProject(
       : project.frameworks.filter((framework) =>
           isRootOrSelected(framework.workspace, workspace)
         );
+  const selectedReactVersions = [
+    ...dependencies
+      .filter((dependency) => dependency.name === "react")
+      .map((dependency) => dependency.version),
+    ...frameworks
+      .filter((framework) => framework.name === "react")
+      .map((framework) => framework.version)
+  ];
+  const selectedWorkspaceReactUnsupported =
+    workspace !== null &&
+    selectedReactVersions.some(
+      (version) => version === null || !reactRangeGuaranteesMinimum(version)
+    );
 
   return {
     ...project,
@@ -164,13 +177,20 @@ function guardedProject(
       dependency.name === "react"
         ? {
             ...dependency,
-            version: guardedReactVersion(dependency.version) ?? dependency.version
+            version: selectedWorkspaceReactUnsupported
+              ? "17.0.0"
+              : guardedReactVersion(dependency.version) ?? dependency.version
           }
         : dependency
     ),
     frameworks: frameworks.map((framework) =>
       framework.name === "react"
-        ? { ...framework, version: guardedReactVersion(framework.version) }
+        ? {
+            ...framework,
+            version: selectedWorkspaceReactUnsupported
+              ? "17.0.0"
+              : guardedReactVersion(framework.version)
+          }
         : framework
     ),
     targets: {
