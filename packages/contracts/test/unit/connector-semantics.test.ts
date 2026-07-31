@@ -259,8 +259,12 @@ describe("connector semantic validation", () => {
     expect(
       validateConnectorManifest(
         connectorWithRemoteAgentSkill(
-          { status: "resolved", value: "1.2.3" },
-          `https://github.com/example/skill/tree/${"a".repeat(40)}`
+          {
+            status: "resolved",
+            value: "1.2.3",
+            commit: "a".repeat(40)
+          },
+          "https://github.com/example/skill"
         ),
         {
           expectedPublisher: "soren-sdk",
