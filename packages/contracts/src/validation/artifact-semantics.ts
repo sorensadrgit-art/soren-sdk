@@ -20,11 +20,21 @@ function issue(
   };
 }
 
+function isRemoteSource(source: string): boolean {
+  try {
+    const protocol = new URL(source).protocol.toLowerCase();
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function declaresRemoteExposure(integration: IntegrationArtifact): boolean {
+  return integration.dataExposure.startsWith("remote-");
+}
+
 function isRemoteAgentSkill(integration: IntegrationArtifact): boolean {
-  return (
-    integration.kind === "agent-skill" &&
-    integration.dataExposure.startsWith("remote-")
-  );
+  return integration.kind === "agent-skill" && isRemoteSource(integration.source);
 }
 
 function hasImmutableContentPin(integration: IntegrationArtifact): boolean {
@@ -37,6 +47,19 @@ export function validateArtifactSemantics(
   const issues: ContractIssue[] = [];
 
   for (const [index, integration] of manifest.integrations.entries()) {
+    if (
+      isRemoteAgentSkill(integration) &&
+      !declaresRemoteExposure(integration)
+    ) {
+      issues.push(
+        issue(
+          `/integrations/${index}/dataExposure`,
+          "agent-skill-exposure",
+          "HTTP(S) Agent Skill sources must declare a remote data-exposure classification."
+        )
+      );
+    }
+
     if (
       isRemoteAgentSkill(integration) &&
       integration.status === "available" &&
