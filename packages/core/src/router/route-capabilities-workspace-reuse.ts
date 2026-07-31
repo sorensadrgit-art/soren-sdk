@@ -315,8 +315,7 @@ interface RuntimePackageTarget {
 
 function providerTargetWorkspaces(
   request: RouteRequest,
-  record: Extract<ConnectorRecord, { kind: "schema-v2" }>,
-  routeWorkspaces: readonly string[]
+  record: Extract<ConnectorRecord, { kind: "schema-v2" }>
 ): string[] {
   const claims = new Set(
     record.manifest.capabilityClaims.map((claim) => claim.capability)
@@ -352,11 +351,7 @@ function runtimePackageTargets(
 ): Map<string, RuntimePackageTarget> {
   const packages = new Map<string, RuntimePackageTarget>();
   for (const record of schemaRecords(input.catalog.list())) {
-    const workspaces = providerTargetWorkspaces(
-      input.request,
-      record,
-      routeWorkspaces
-    );
+    const workspaces = providerTargetWorkspaces(input.request, record);
     if (workspaces.length === 0) continue;
     for (const integration of record.manifest.integrations) {
       if (
