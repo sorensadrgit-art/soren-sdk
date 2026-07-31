@@ -135,6 +135,16 @@ function hasPositiveBrowserTarget(target: string): boolean {
     );
 }
 
+function routedReactWorkspace(
+  name: string,
+  current: string | null | undefined,
+  selected: string | null
+): string | null | undefined {
+  return name === "react" && selected !== null && (current ?? ".") === "."
+    ? selected
+    : current;
+}
+
 function guardedProject(
   project: ProjectSnapshot,
   workspace: string | null
@@ -177,6 +187,11 @@ function guardedProject(
       dependency.name === "react"
         ? {
             ...dependency,
+            workspace: routedReactWorkspace(
+              dependency.name,
+              dependency.workspace,
+              workspace
+            ),
             version: selectedWorkspaceReactUnsupported
               ? "17.0.0"
               : guardedReactVersion(dependency.version) ?? dependency.version
@@ -187,6 +202,11 @@ function guardedProject(
       framework.name === "react"
         ? {
             ...framework,
+            workspace: routedReactWorkspace(
+              framework.name,
+              framework.workspace,
+              workspace
+            ),
             version: selectedWorkspaceReactUnsupported
               ? "17.0.0"
               : guardedReactVersion(framework.version)
