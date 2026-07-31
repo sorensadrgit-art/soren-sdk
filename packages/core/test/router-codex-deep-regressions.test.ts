@@ -30,6 +30,26 @@ describe("deep Codex routing regressions", () => {
     }
   );
 
+  it.each(["^18.2.0-rc.0", "~18.2.0-beta.1", ">=18.2.0-beta.1"])(
+    "blocks Motion when the React range admits prereleases below stable 18.2: %s",
+    (reactVersion) => {
+      const project = projectFixture({ reactVersion });
+      const plan = routeCapabilities({
+        request: requestFixture({
+          required: ["motion.layout"],
+          projectSnapshotId: project.snapshotId
+        }),
+        project,
+        catalog: new MemoryCatalogFixture()
+      });
+
+      expect(plan.status).toBe("blocked");
+      expect(plan.constraints).toContainEqual(
+        expect.objectContaining({ code: "ENVIRONMENT_UNSUPPORTED" })
+      );
+    }
+  );
+
   it.each(["^18.2.0", "18.2.x", "19.x"])(
     "accepts a React range whose wildcard interval guarantees 18.2+: %s",
     (reactVersion) => {
@@ -82,6 +102,32 @@ describe("deep Codex routing regressions", () => {
         quality: {
           "motion.spring": { scope: "hero", property: "transform" },
           "motion.timeline": { scope: "hero", property: "transform" }
+        },
+        projectSnapshotId: project.snapshotId
+      }),
+      project,
+      catalog: new MemoryCatalogFixture([
+        schemaRecordFixture(motion),
+        schemaRecordFixture(gsap)
+      ])
+    });
+
+    expect(plan.status).toBe("blocked");
+    expect(plan.constraints).toContainEqual(
+      expect.objectContaining({ code: "OWNERSHIP_CONFLICT" })
+    );
+  });
+
+  it("derives omitted ownership properties before declaring a same-scope route conflict-free", () => {
+    const motion = manifestFixture("motion", ["motion.layout"]);
+    const gsap = manifestFixture("gsap", ["motion.timeline"]);
+    const project = projectFixture();
+    const plan = routeCapabilities({
+      request: requestFixture({
+        required: ["motion.layout", "motion.timeline"],
+        quality: {
+          "motion.layout": { scope: "hero" },
+          "motion.timeline": { scope: "hero" }
         },
         projectSnapshotId: project.snapshotId
       }),
