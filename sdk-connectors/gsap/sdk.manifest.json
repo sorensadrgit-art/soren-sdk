@@ -1,1 +1,320 @@
-{"$schema":"https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/connector.schema.json","schemaVersion":"2.0.0-draft.1","connectorVersion":"1.0.0","connector":{"id":"gsap","name":"GSAP connector","publisher":"soren-sdk","reviewStatus":"approved","selectable":true,"blockers":[]},"product":{"canonicalName":"GSAP","homepage":"https://gsap.com/","aliases":["greensock"],"categories":["motion","timeline","scroll"]},"sourceTrust":{"sourceAuthority":"official","integrityLevel":"version-pinned","reviewedAt":"2026-07-30","reviewer":"soren-sdk"},"capabilityClaims":[{"capability":"motion.timeline","support":"primary","confidence":1,"conditions":["The request requires sequenced or overlapping imperative choreography"],"limitations":["Simple self-contained effects should remain native"]},{"capability":"motion.svg","support":"primary","confidence":0.98,"conditions":["SVG drawing, morphing, or coordinated SVG choreography is required"],"limitations":["Required plugins must be present in the approved runtime artifact"]},{"capability":"motion.flip","support":"primary","confidence":0.98,"conditions":["FLIP-based state transition is required"],"limitations":["Requires the approved Flip companion runtime and explicit ownership when combined with Motion"]},{"capability":"scroll.triggered-animation","support":"primary","confidence":1,"conditions":["ScrollTrigger-style progress or trigger control is required"],"limitations":["Requires the approved ScrollTrigger companion runtime and does not claim smooth-scroll transport"]},{"capability":"scroll.pinned-sequence","support":"primary","confidence":1,"conditions":["Pinned scroll-driven storytelling is required"],"limitations":["Requires the approved ScrollTrigger companion runtime, responsive contexts, and pin cleanup"]}],"integrations":[{"id":"gsap-runtime","kind":"runtime-package","mode":"runtime","status":"available","source":"https://www.npmjs.com/package/gsap","version":{"status":"resolved","value":"3.15.0"},"authorization":{"required":false,"method":"none","paidPlan":false},"executionRisk":"none","dataExposure":"none","permissions":{"filesystem":"none","network":[],"projectWrite":false},"licenseExpression":"LicenseRef-GSAP-Standard","fallback":"web-platform-built-in","packageName":"gsap","importPaths":{"javascript":"gsap"},"notes":["Core GSAP runtime; routing records selection but never installs or executes it."]},{"id":"gsap-flip-runtime","kind":"runtime-package","mode":"runtime","status":"available","source":"https://www.npmjs.com/package/gsap","version":{"status":"resolved","value":"3.15.0"},"authorization":{"required":false,"method":"none","paidPlan":false},"executionRisk":"none","dataExposure":"none","permissions":{"filesystem":"none","network":[],"projectWrite":false},"licenseExpression":"LicenseRef-GSAP-Standard","fallback":"gsap-runtime","packageName":"gsap","importPaths":{"javascript":"gsap/Flip"},"notes":["Public Flip plugin companion shipped in the approved gsap package."]},{"id":"gsap-scroll-trigger-runtime","kind":"runtime-package","mode":"runtime","status":"available","source":"https://www.npmjs.com/package/gsap","version":{"status":"resolved","value":"3.15.0"},"authorization":{"required":false,"method":"none","paidPlan":false},"executionRisk":"none","dataExposure":"none","permissions":{"filesystem":"none","network":[],"projectWrite":false},"licenseExpression":"LicenseRef-GSAP-Standard","fallback":"gsap-runtime","packageName":"gsap","importPaths":{"javascript":"gsap/ScrollTrigger"},"notes":["Public ScrollTrigger companion shipped in the approved gsap package."]},{"id":"gsap-documentation","kind":"documentation","mode":"knowledge","status":"available","source":"https://gsap.com/docs/v3/","version":{"status":"not-applicable"},"authorization":{"required":false,"method":"none","paidPlan":false},"executionRisk":"read-only","dataExposure":"remote-source","permissions":{"filesystem":"none","network":["gsap.com"],"projectWrite":false},"fallback":null},{"id":"gsap-official-skill","kind":"agent-skill","mode":"knowledge","status":"available","source":"https://github.com/greensock/gsap-skills","version":{"status":"not-applicable"},"authorization":{"required":false,"method":"none","paidPlan":false},"executionRisk":"read-only","dataExposure":"remote-source","permissions":{"filesystem":"none","network":["github.com"],"projectWrite":false},"licenseExpression":"MIT","fallback":"gsap-documentation"}],"ownershipClaims":[{"domain":"timeline","scope":"requested-scope","exclusive":true,"properties":["filter","opacity","transform"]},{"domain":"svg-animation","scope":"requested-scope","exclusive":true,"properties":["d","draw","transform"]},{"domain":"layout","scope":"requested-scope","exclusive":true,"properties":["layout","transform"]},{"domain":"scroll-trigger","scope":"requested-scope","exclusive":true,"properties":["pin","progress","scroll","transform"]}],"verification":{"requiredChecks":["plugin-registration","cleanup","responsive-context","property-ownership","reduced-motion","animation-performance"],"hardGates":["connector-schema-valid","runtime-version-resolved","license-policy-resolved","required-plugin-available","no-ownership-conflict","no-unauthorized-permission"]},"relatedFiles":{"skill":{"path":"./SKILL.md","status":"present"},"sources":{"path":"./docs.sources.json","status":"present"},"compatibility":{"path":"./compatibility.json","status":"present"},"evaluations":{"path":"./evaluations/route-cases.json","status":"present"}},"knowledge":{"retrievedAt":"2026-07-30","staleAfterDays":30}}
+{
+  "$schema": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/connector.schema.json",
+  "schemaVersion": "2.0.0-draft.1",
+  "connectorVersion": "1.0.1",
+  "connector": {
+    "id": "gsap",
+    "name": "GSAP connector",
+    "publisher": "soren-sdk",
+    "reviewStatus": "approved",
+    "selectable": true,
+    "blockers": []
+  },
+  "product": {
+    "canonicalName": "GSAP",
+    "homepage": "https://gsap.com/",
+    "aliases": [
+      "greensock"
+    ],
+    "categories": [
+      "motion",
+      "timeline",
+      "scroll"
+    ]
+  },
+  "sourceTrust": {
+    "sourceAuthority": "official",
+    "integrityLevel": "version-pinned",
+    "reviewedAt": "2026-07-30",
+    "reviewer": "soren-sdk"
+  },
+  "capabilityClaims": [
+    {
+      "capability": "motion.timeline",
+      "support": "primary",
+      "confidence": 1,
+      "conditions": [
+        "The request requires sequenced or overlapping imperative choreography"
+      ],
+      "limitations": [
+        "Simple self-contained effects should remain native"
+      ]
+    },
+    {
+      "capability": "motion.svg",
+      "support": "primary",
+      "confidence": 0.98,
+      "conditions": [
+        "Coordinated SVG transforms, opacity, or numeric attribute choreography is required"
+      ],
+      "limitations": [
+        "Path morphing, shape morphing, and stroke drawing are excluded until separate approved plugin artifacts are cataloged"
+      ]
+    },
+    {
+      "capability": "motion.flip",
+      "support": "primary",
+      "confidence": 0.98,
+      "conditions": [
+        "FLIP-based state transition is required"
+      ],
+      "limitations": [
+        "Requires the approved Flip companion runtime and explicit ownership when combined with Motion"
+      ]
+    },
+    {
+      "capability": "scroll.triggered-animation",
+      "support": "primary",
+      "confidence": 1,
+      "conditions": [
+        "ScrollTrigger-style progress or trigger control is required"
+      ],
+      "limitations": [
+        "Requires the approved ScrollTrigger companion runtime and does not claim smooth-scroll transport"
+      ]
+    },
+    {
+      "capability": "scroll.pinned-sequence",
+      "support": "primary",
+      "confidence": 1,
+      "conditions": [
+        "Pinned scroll-driven storytelling is required"
+      ],
+      "limitations": [
+        "Requires the approved ScrollTrigger companion runtime, responsive contexts, and pin cleanup"
+      ]
+    }
+  ],
+  "integrations": [
+    {
+      "id": "gsap-runtime",
+      "kind": "runtime-package",
+      "mode": "runtime",
+      "status": "available",
+      "source": "https://www.npmjs.com/package/gsap",
+      "version": {
+        "status": "resolved",
+        "value": "3.15.0"
+      },
+      "authorization": {
+        "required": false,
+        "method": "none",
+        "paidPlan": false
+      },
+      "executionRisk": "none",
+      "dataExposure": "none",
+      "permissions": {
+        "filesystem": "none",
+        "network": [],
+        "projectWrite": false
+      },
+      "licenseExpression": "LicenseRef-GSAP-Standard",
+      "fallback": "web-platform-built-in",
+      "packageName": "gsap",
+      "importPaths": {
+        "javascript": "gsap"
+      },
+      "notes": [
+        "Core GSAP runtime; routing records selection but never installs or executes it."
+      ]
+    },
+    {
+      "id": "gsap-flip-runtime",
+      "kind": "runtime-package",
+      "mode": "runtime",
+      "status": "available",
+      "source": "https://www.npmjs.com/package/gsap",
+      "version": {
+        "status": "resolved",
+        "value": "3.15.0"
+      },
+      "authorization": {
+        "required": false,
+        "method": "none",
+        "paidPlan": false
+      },
+      "executionRisk": "none",
+      "dataExposure": "none",
+      "permissions": {
+        "filesystem": "none",
+        "network": [],
+        "projectWrite": false
+      },
+      "licenseExpression": "LicenseRef-GSAP-Standard",
+      "fallback": "gsap-runtime",
+      "packageName": "gsap",
+      "importPaths": {
+        "javascript": "gsap/Flip"
+      },
+      "notes": [
+        "Public Flip plugin companion shipped in the approved gsap package."
+      ]
+    },
+    {
+      "id": "gsap-scroll-trigger-runtime",
+      "kind": "runtime-package",
+      "mode": "runtime",
+      "status": "available",
+      "source": "https://www.npmjs.com/package/gsap",
+      "version": {
+        "status": "resolved",
+        "value": "3.15.0"
+      },
+      "authorization": {
+        "required": false,
+        "method": "none",
+        "paidPlan": false
+      },
+      "executionRisk": "none",
+      "dataExposure": "none",
+      "permissions": {
+        "filesystem": "none",
+        "network": [],
+        "projectWrite": false
+      },
+      "licenseExpression": "LicenseRef-GSAP-Standard",
+      "fallback": "gsap-runtime",
+      "packageName": "gsap",
+      "importPaths": {
+        "javascript": "gsap/ScrollTrigger"
+      },
+      "notes": [
+        "Public ScrollTrigger companion shipped in the approved gsap package."
+      ]
+    },
+    {
+      "id": "gsap-documentation",
+      "kind": "documentation",
+      "mode": "knowledge",
+      "status": "available",
+      "source": "https://gsap.com/docs/v3/",
+      "version": {
+        "status": "not-applicable"
+      },
+      "authorization": {
+        "required": false,
+        "method": "none",
+        "paidPlan": false
+      },
+      "executionRisk": "read-only",
+      "dataExposure": "remote-source",
+      "permissions": {
+        "filesystem": "none",
+        "network": [
+          "gsap.com"
+        ],
+        "projectWrite": false
+      },
+      "fallback": null
+    },
+    {
+      "id": "gsap-official-skill",
+      "kind": "agent-skill",
+      "mode": "knowledge",
+      "status": "available",
+      "source": "https://github.com/greensock/gsap-skills",
+      "version": {
+        "status": "not-applicable"
+      },
+      "authorization": {
+        "required": false,
+        "method": "none",
+        "paidPlan": false
+      },
+      "executionRisk": "read-only",
+      "dataExposure": "remote-source",
+      "permissions": {
+        "filesystem": "none",
+        "network": [
+          "github.com"
+        ],
+        "projectWrite": false
+      },
+      "licenseExpression": "MIT",
+      "fallback": "gsap-documentation"
+    }
+  ],
+  "ownershipClaims": [
+    {
+      "domain": "timeline",
+      "scope": "requested-scope",
+      "exclusive": true,
+      "properties": [
+        "filter",
+        "opacity",
+        "transform"
+      ]
+    },
+    {
+      "domain": "svg-animation",
+      "scope": "requested-scope",
+      "exclusive": true,
+      "properties": [
+        "opacity",
+        "stroke-dasharray",
+        "stroke-dashoffset",
+        "transform"
+      ]
+    },
+    {
+      "domain": "layout",
+      "scope": "requested-scope",
+      "exclusive": true,
+      "properties": [
+        "layout",
+        "transform"
+      ]
+    },
+    {
+      "domain": "scroll-trigger",
+      "scope": "requested-scope",
+      "exclusive": true,
+      "properties": [
+        "pin",
+        "progress",
+        "scroll",
+        "transform"
+      ]
+    }
+  ],
+  "verification": {
+    "requiredChecks": [
+      "plugin-registration",
+      "cleanup",
+      "responsive-context",
+      "property-ownership",
+      "reduced-motion",
+      "animation-performance"
+    ],
+    "hardGates": [
+      "connector-schema-valid",
+      "runtime-version-resolved",
+      "license-policy-resolved",
+      "required-plugin-available",
+      "no-ownership-conflict",
+      "no-unauthorized-permission"
+    ]
+  },
+  "relatedFiles": {
+    "skill": {
+      "path": "./SKILL.md",
+      "status": "present"
+    },
+    "sources": {
+      "path": "./docs.sources.json",
+      "status": "present"
+    },
+    "compatibility": {
+      "path": "./compatibility.json",
+      "status": "present"
+    },
+    "evaluations": {
+      "path": "./evaluations/route-cases.json",
+      "status": "present"
+    }
+  },
+  "knowledge": {
+    "retrievedAt": "2026-07-30",
+    "staleAfterDays": 30
+  }
+}
