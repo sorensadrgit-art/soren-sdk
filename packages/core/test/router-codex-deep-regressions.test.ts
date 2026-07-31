@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { routeCapabilities } from "../src/index.js";
+import { PHASE_4_POLICY, routeCapabilities } from "../src/index.js";
 import {
   MemoryCatalogFixture,
   manifestFixture,
@@ -137,6 +137,41 @@ describe("deep Codex routing regressions", () => {
     expect(plan.selectedProviders[0]?.providerId).toBe("motion");
   });
 
+  it("prefers workspace-local React over an incompatible root declaration", () => {
+    const project = projectFixture({ reactVersion: "17.0.2" });
+    project.workspace = {
+      isMonorepo: true,
+      packages: [{ name: "app", path: "apps/app", private: true }]
+    };
+    project.dependencies.push({
+      name: "react",
+      version: "19.0.0",
+      kind: "dependency",
+      workspace: "apps/app"
+    });
+    project.frameworks.push({
+      name: "react",
+      version: "19.0.0",
+      workspace: "apps/app"
+    });
+    const request = requestFixture({
+      required: ["motion.layout"],
+      projectSnapshotId: project.snapshotId
+    });
+    const capability = request.capabilities[0];
+    if (capability === undefined) throw new Error("Expected Motion capability.");
+    capability.quality = { workspace: "apps/app" };
+
+    const plan = routeCapabilities({
+      request,
+      project,
+      catalog: new MemoryCatalogFixture()
+    });
+
+    expect(plan.status).toBe("selected");
+    expect(plan.selectedProviders[0]?.providerId).toBe("motion");
+  });
+
   it("treats missing browser targets as unresolved for required WAAPI", () => {
     const project = projectFixture();
     project.targets.browsers = [];
@@ -168,6 +203,24 @@ describe("deep Codex routing regressions", () => {
     });
 
     expect(plan.status).toBe("native");
+  });
+
+  it("blocks runtime packages when a finite bundle limit cannot be proven", () => {
+    const project = projectFixture();
+    const policy = structuredClone(PHASE_4_POLICY);
+    policy.rules.maxBundleKilobytes = 0;
+    const plan = routeCapabilities({
+      request: requestFixture({
+        required: ["motion.layout"],
+        projectSnapshotId: project.snapshotId
+      }),
+      project,
+      catalog: new MemoryCatalogFixture(),
+      policy
+    });
+
+    expect(plan.status).toBe("blocked");
+    expect(plan.selectedProviders).toEqual([]);
   });
 
   it("blocks shared ownership when either provider is exclusive", () => {
@@ -226,5 +279,25 @@ describe("deep Codex routing regressions", () => {
     expect(plan.constraints).toContainEqual(
       expect.objectContaining({ code: "OWNERSHIP_CONFLICT" })
     );
+  });
+
+  it("inspects arbitrary SVG quality fields for plugin-dependent requirements", () => {
+    const project = projectFixture();
+    const request = requestFixture({
+      required: ["motion.svg"],
+      projectSnapshotId: project.snapshotId
+    });
+    const capability = request.capabilities[0];
+    if (capability === undefined) throw new Error("Expected SVG capability.");
+    capability.quality = { feature: "path-morph" };
+
+    const plan = routeCapabilities({
+      request,
+      project,
+      catalog: new MemoryCatalogFixture()
+    });
+
+    expect(plan.status).toBe("blocked");
+    expect(plan.selectedProviders).toEqual([]);
   });
 });
