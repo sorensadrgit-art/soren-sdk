@@ -143,6 +143,65 @@ describe("latest Codex routing regressions", () => {
     }
   );
 
+  it.each([
+    { feature: "shape morphing" },
+    { effect: "stroke drawing" }
+  ])(
+    "blocks inflected plugin-dependent SVG requirements: %j",
+    (quality) => {
+      const project = projectFixture();
+      const request = requestFixture({
+        required: ["motion.svg"],
+        projectSnapshotId: project.snapshotId
+      });
+      const capability = request.capabilities[0];
+      if (capability === undefined) throw new Error("Expected SVG capability.");
+      capability.quality = quality;
+
+      const plan = routeCapabilities({
+        request,
+        project,
+        catalog: new MemoryCatalogFixture()
+      });
+
+      expect(plan.status).toBe("blocked");
+      expect(plan.selectedProviders).toEqual([]);
+    }
+  );
+
+  it("does not reuse a runtime package installed only in a sibling workspace", () => {
+    const project = projectFixture();
+    project.workspace = {
+      isMonorepo: true,
+      packages: [
+        { name: "app", path: "packages/app", private: true },
+        { name: "admin", path: "packages/admin", private: true }
+      ]
+    };
+    project.dependencies.push({
+      name: "gsap",
+      version: "3.15.0",
+      kind: "dependency",
+      workspace: "packages/admin"
+    });
+    const request = requestFixture({
+      required: ["motion.timeline"],
+      projectSnapshotId: project.snapshotId
+    });
+    const capability = request.capabilities[0];
+    if (capability === undefined) throw new Error("Expected timeline capability.");
+    capability.quality = { workspace: "packages/app" };
+
+    const plan = routeCapabilities({
+      request,
+      project,
+      catalog: new MemoryCatalogFixture()
+    });
+
+    expect(plan.status).toBe("selected");
+    expect(plan.selectedProviders[0]?.reasonCode).toBe("CAPABILITY_MATCH");
+  });
+
   it.each(["1.2.3-01", "1.2.3-.."])(
     "rejects a runtime package with an invalid semantic version: %s",
     (version) => {
