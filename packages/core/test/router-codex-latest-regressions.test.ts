@@ -101,15 +101,11 @@ describe("latest Codex routing regressions", () => {
         version: "19.0.0",
         kind: "dependency",
         workspace: "apps/known"
-      },
-      {
-        name: "react",
-        version: null,
-        kind: "dependency",
-        workspace: "apps/unknown"
       }
     ];
-    project.frameworks = [];
+    project.frameworks = [
+      { name: "react", version: null, workspace: "apps/unknown" }
+    ];
 
     const plan = routeCapabilities({
       request: requestFixture({
