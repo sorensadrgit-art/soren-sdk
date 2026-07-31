@@ -1,18 +1,18 @@
 ---
 name: gsap
-description: Use when complex timelines, SVG choreography, FLIP, ScrollTrigger, or pinned storytelling require GSAP.
+description: Use when complex timelines, core SVG choreography, FLIP, ScrollTrigger, or pinned storytelling require GSAP.
 license: MIT
 compatibility: Soren SDK Phase 4; JavaScript framework runtimes; no executable scripts
 metadata:
   publisher: soren-sdk
-  version: 1.0.0
+  version: 1.0.1
 source: ./docs.sources.json
 source-digest: sha256:0cb05d30bb647ff15b646a32bab5963f28cb0b5f67b4a56d8385f2bc7ef89dec
 ---
 
 # GSAP Routing Skill
 
-Use GSAP for complex sequenced timelines, SVG choreography, FLIP transitions, ScrollTrigger-controlled animation, and pinned storytelling.
+Use GSAP for complex sequenced timelines, core SVG transform and numeric-attribute choreography, FLIP transitions, ScrollTrigger-controlled animation, and pinned storytelling.
 
 ## Supported capabilities
 
@@ -25,6 +25,8 @@ Use GSAP for complex sequenced timelines, SVG choreography, FLIP transitions, Sc
 ## Routing guidance
 
 Use the `gsap` runtime package. Reuse an installed approved GSAP dependency when its declared version includes the pinned runtime. Register required plugins explicitly and keep cleanup scoped to the owning component or lifecycle.
+
+`motion.svg` covers choreography available through the approved core runtime, including transforms, opacity, and numeric SVG attributes. Do not route path morphing, shape morphing, or stroke-drawing requests until separate approved MorphSVG or DrawSVG runtime artifacts are cataloged.
 
 Prefer browser-native CSS or WAAPI for simple effects and Motion for React presence, layout, spring, drag, or gesture requirements. Preserve reduced-motion behavior, responsive match-media cleanup, and explicit property ownership.
 
