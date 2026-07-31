@@ -1,6 +1,6 @@
 {
   "providerId": "gsap",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "runtime": {
     "package": "gsap",
     "version": "3.15.0",
@@ -9,6 +9,16 @@
     }
   },
   "rules": [
+    {
+      "id": "core-svg-only",
+      "appliesTo": [
+        "motion.svg"
+      ],
+      "requirements": [
+        "Use only transforms, opacity, and numeric SVG attributes available in the approved core runtime",
+        "Path morphing, shape morphing, and stroke drawing require separately approved plugin artifacts and are blocked in Phase 4"
+      ]
+    },
     {
       "id": "plugin-availability",
       "appliesTo": [
