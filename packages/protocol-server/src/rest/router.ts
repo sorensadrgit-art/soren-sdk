@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { isAbsolute, relative, resolve } from "node:path";
 
@@ -103,10 +104,22 @@ function protocolMeta(request: IncomingMessage): ProtocolMetadata {
 }
 
 function assertAllowedProjectRoot(path: string, allowedRoots: string[]): void {
-  const absolutePath = isAbsolute(path) ? resolve(path) : resolve(process.cwd(), path);
+  if (allowedRoots.length === 0) {
+    throw new ProtocolError("PROJECT_ROOT_DENIED", "Project inspection path is outside the configured allowlist.", undefined, 403);
+  }
+  let absolutePath: string;
+  try {
+    absolutePath = realpathSync(isAbsolute(path) ? path : resolve(process.cwd(), path));
+  } catch {
+    throw new ProtocolError("PROJECT_ROOT_DENIED", "Project inspection path is outside the configured allowlist.", undefined, 403);
+  }
   const allowed = allowedRoots.some((configuredRoot) => {
-    const contained = relative(resolve(configuredRoot), absolutePath);
-    return contained === "" || (!contained.startsWith("..") && !isAbsolute(contained));
+    try {
+      const contained = relative(realpathSync(resolve(configuredRoot)), absolutePath);
+      return contained === "" || (!contained.startsWith("..") && !isAbsolute(contained));
+    } catch {
+      return false;
+    }
   });
   if (!allowed) {
     throw new ProtocolError(
@@ -129,7 +142,7 @@ async function authorize(
   if (!decision.allowed) {
     throw new ProtocolError(
       "AUTHORIZATION_DENIED",
-      decision.reason ?? "Request is not authorized.",
+      "Request is not authorized.",
       undefined,
       403
     );
@@ -221,7 +234,11 @@ export function createRestHandler(options: RestServerOptions): RestHandler {
           if (typeof body !== "object" || body === null || Array.isArray(body)) {
             throw new ProtocolError("VALIDATION_FAILED", "Project inspection body must be an object.");
           }
-          const projectPath = String((body as { path?: unknown }).path ?? "");
+          const rawPath = (body as { path?: unknown }).path;
+          if (typeof rawPath !== "string" || rawPath.trim() === "") {
+            throw new ProtocolError("VALIDATION_FAILED", "Project inspection path must be a nonempty string.");
+          }
+          const projectPath = rawPath;
           assertAllowedProjectRoot(projectPath, allowedProjectRoots);
           return {
             status: 200,
