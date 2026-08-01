@@ -25,6 +25,7 @@
     "start": "node ./dist/bin.js"
   },
   "dependencies": {
+    "@soren-sdk/config": "workspace:*",
     "@soren-sdk/contracts": "workspace:*",
     "@soren-sdk/core": "workspace:*",
     "@soren-sdk/connectors": "workspace:*"
