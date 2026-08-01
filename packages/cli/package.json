@@ -27,7 +27,9 @@
   "dependencies": {
     "@soren-sdk/contracts": "workspace:*",
     "@soren-sdk/core": "workspace:*",
-    "@soren-sdk/connectors": "workspace:*"
+    "@soren-sdk/connectors": "workspace:*",
+    "@soren-sdk/planner": "workspace:*",
+    "@soren-sdk/evidence": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "24.13.3",

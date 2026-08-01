@@ -35,6 +35,12 @@ importers:
       '@soren-sdk/core':
         specifier: workspace:*
         version: link:../core
+      '@soren-sdk/evidence':
+        specifier: workspace:*
+        version: link:../evidence
+      '@soren-sdk/planner':
+        specifier: workspace:*
+        version: link:../planner
     devDependencies:
       '@types/node':
         specifier: 24.13.3
