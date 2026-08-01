@@ -4,6 +4,7 @@ import {
   type Digest,
   type JsonValue
 } from "@soren-sdk/contracts";
+import { InMemoryAuditSink, type AuditCode, type AuditEvent, type AuditSink } from "./audit-sink.js";
 
 export type ContextCategory =
   | "api"
@@ -77,16 +78,7 @@ export interface StoredGrantState {
   revokedAt?: string;
 }
 
-export interface AuditEvent {
-  code: string;
-  runId: string;
-  providerId: string;
-  toolId?: string;
-  callId?: string;
-  at: string;
-  /** Audit records intentionally exclude tool inputs, outputs, and revocation rationale. */
-  redacted: true;
-}
+export type { AuditEvent, AuditSink } from "./audit-sink.js";
 
 interface ActiveCall {
   grant: RunGrant;
@@ -213,7 +205,7 @@ export function createRunGrant(
 export class ReadOnlyToolGateway {
   #killed = false;
   #nextCallId = 0;
-  readonly #events: AuditEvent[] = [];
+  #eventSequence = 0;
   readonly #grantStates = new Map<Digest, StoredGrantState>();
   readonly #grants = new Map<Digest, RunGrant>();
   readonly #activeCalls = new Map<string, ActiveCall>();
@@ -221,7 +213,8 @@ export class ReadOnlyToolGateway {
 
   constructor(
     private readonly provider: ReadOnlyToolProvider,
-    private readonly auditTime: () => string
+    private readonly auditTime: () => string,
+    private readonly auditSink: AuditSink = new InMemoryAuditSink()
   ) {}
 
   registerGrant(grant: RunGrant): void {
@@ -277,6 +270,15 @@ export class ReadOnlyToolGateway {
     return true;
   }
 
+  /** The timeout controller must call this at its deadline. */
+  timeoutCall(callId: string): boolean {
+    const active = this.#activeCalls.get(callId);
+    if (active === undefined) return false;
+    this.event("CALL_TIMED_OUT", active.grant, active.toolId, callId);
+    this.cancelActiveCall(callId, active);
+    return true;
+  }
+
   cancelRun(runId: string): void {
     if (this.#cancelledRuns.has(runId)) return;
     this.#cancelledRuns.add(runId);
@@ -289,7 +291,7 @@ export class ReadOnlyToolGateway {
   }
 
   auditEvents(): readonly AuditEvent[] {
-    return this.#events.map((event) => ({ ...event }));
+    return this.auditSink instanceof InMemoryAuditSink ? this.auditSink.list() : [];
   }
 
   async call(
@@ -301,6 +303,7 @@ export class ReadOnlyToolGateway {
     const inventory = this.provider.inventory();
     const callId = `${grant.runId}:${++this.#nextCallId}`;
     this.registerGrantIfAbsent(grant);
+    this.event("CALL_REQUESTED", grant, toolId, callId);
 
     if (this.#killed) {
       this.event("KILL_SWITCH", grant, toolId, callId);
@@ -311,6 +314,7 @@ export class ReadOnlyToolGateway {
       throw new TypeError("Call cancelled.");
     }
     this.assertGrantUsable(grant, inventory, now, toolId, callId);
+    this.event("GRANT_ACCEPTED", grant, toolId, callId);
 
     const tool = inventory.tools.find((candidate) => candidate.id === toolId);
     if (
@@ -331,24 +335,32 @@ export class ReadOnlyToolGateway {
     };
     this.#activeCalls.set(callId, active);
     try {
+      this.event("PROVIDER_DISPATCH", grant, toolId, callId);
       const result = await this.provider.call(toolId, input, active.controller.signal);
       if (active.controller.signal.aborted) {
         this.cancelActiveCall(callId, active);
         throw new TypeError("Call cancelled.");
       }
       this.assertGrantUsable(grant, inventory, this.auditTime(), toolId, callId);
-      const responseBytes = new TextEncoder().encode(JSON.stringify(result)).byteLength;
+      let responseBytes: number;
+      try {
+        responseBytes = new TextEncoder().encode(JSON.stringify(result)).byteLength;
+      } catch {
+        this.event("SCHEMA_VIOLATION", grant, toolId, callId);
+        throw new TypeError("Tool response violates the JSON schema boundary.");
+      }
       if (responseBytes > 65_536) {
         this.event("RESPONSE_TOO_LARGE", grant, toolId, callId);
         throw new TypeError("Tool response exceeds limit.");
       }
-      this.event("TOOL_CALLED", grant, toolId, callId);
+      this.event("CALL_COMPLETED", grant, toolId, callId);
       return result;
     } catch (error) {
       if (active.controller.signal.aborted) {
         this.cancelActiveCall(callId, active);
         throw new TypeError("Call cancelled.");
       }
+      this.event("PROVIDER_FAILURE", grant, toolId, callId);
       throw error;
     } finally {
       this.#activeCalls.delete(callId);
@@ -398,20 +410,24 @@ export class ReadOnlyToolGateway {
   }
 
   private event(
-    code: string,
+    code: AuditCode,
     grant: RunGrant,
     toolId?: string,
     callId?: string,
     at = this.auditTime()
   ): void {
-    this.#events.push({
+    const event = {
+      sequence: ++this.#eventSequence,
       code,
       runId: grant.runId,
       providerId: grant.providerId,
+      grantDigest: grant.digest,
       ...(toolId === undefined ? {} : { toolId }),
       ...(callId === undefined ? {} : { callId }),
       at,
-      redacted: true
-    });
+      redacted: true as const
+    };
+    const complete = { ...event, id: digestJson(event as unknown as JsonValue) };
+    try { this.auditSink.append(complete); } catch { throw new TypeError("Audit sink unavailable."); }
   }
 }
