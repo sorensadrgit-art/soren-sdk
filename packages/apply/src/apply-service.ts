@@ -223,6 +223,20 @@ export class DefaultApplyService implements ApplyService {
     const rollbackContents = new Map<number, Uint8Array | null>();
     this.#rollbackContents.set(preparation.runId, rollbackContents);
     const errors: string[] = [];
+    const limits = stored.input.approval.limits;
+    const touchedPaths = new Set<string>();
+    let actualOperations = 0;
+    let actualBytes = 0;
+    const reserve = (operation: (typeof preparation.operations)[number], bytes: number) => {
+      const elapsed = this.#now() - Date.parse(startedAt);
+      const nextFiles = touchedPaths.has(operation.path) ? touchedPaths.size : touchedPaths.size + 1;
+      if (actualOperations + 1 > limits.maxOperations || nextFiles > limits.maxFiles || actualBytes + bytes > limits.maxBytes || elapsed > limits.maxDurationSeconds * 1000) {
+        throw new ApplyError("APPLY_RESOURCE_LIMIT", "Actual apply resource limit exceeded; mutation was not performed.", { path: operation.path });
+      }
+      actualOperations += 1;
+      actualBytes += bytes;
+      touchedPaths.add(operation.path);
+    };
 
     await this.#emit({
       kind: "apply.started",
@@ -297,6 +311,7 @@ export class DefaultApplyService implements ApplyService {
                 { path: operation.path }
               );
             }
+            reserve(operation, content.byteLength);
             recordRollback();
             await sandbox.write(operation.path, content);
             ops.push({
@@ -315,6 +330,7 @@ export class DefaultApplyService implements ApplyService {
                 { path: operation.path }
               );
             }
+            reserve(operation, 0);
             recordRollback();
             await sandbox.remove(operation.path);
             ops.push({
