@@ -20,10 +20,10 @@ Full-suite machine-readable count: 63 suites passed, 170 tests passed, 0 failed.
 ## Findings by severity
 
 - High: 1
-- Medium: 0
+- Medium: 1
 - Low: 0
 
-H-01 is documented in `PHASES-5-9-REVIEW-FINDINGS.md`: normal package barrels export test-only apply construction and fake ports. This defeats Phase 9 production export hardening.
+H-01 is documented in `PHASES-5-9-REVIEW-FINDINGS.md`: normal package barrels export test-only apply construction and fake ports. This defeats Phase 9 production export hardening. M-01: no dedicated runnable security-corpus, restart-recovery, or protocol-surface equivalence runner was discovered. Branch topology also does not verify integration or written rejection for multiple divergent Phase 5-9 implementation branches.
 
 ## Residual risks
 

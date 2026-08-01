@@ -24,7 +24,7 @@ A machine-readable full-suite count run on the same audited SHA reported 63/63 s
 
 All package test commands passed independently for `@soren-sdk/contracts`, `connectors`, `core`, `evidence`, `planner`, `sandbox`, `apply`, `verification`, and `cli`.
 
-A focused Vitest selection covering security, recovery/restart, concurrency-related, fixture, protocol and equivalence references passed with exit status 0.
+A focused Vitest selection covering matching security, recovery/restart, concurrency-related, fixture, protocol and equivalence references passed with exit status 0. This is not evidence that the required dedicated security corpus, restart-recovery, or protocol-surface equivalence suites executed: no dedicated runners were discovered. The security corpus JSON parses and declares 31 cases.
 
 ## Remote CI evidence
 

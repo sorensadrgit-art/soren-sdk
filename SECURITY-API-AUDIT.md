@@ -14,5 +14,6 @@ Audited implementation SHA: `1e22f21c47cf387a9d646f0fc3c0ab5f2d0866c8`
 | Duplicate contract models | No duplicate blocking model identified | Contracts package remains the canonical shared source examined for Phase 7/8/9 models. |
 | Temporary scripts/workflows | Pass | No temporary workflow or untracked script was introduced by the audited implementation diff. |
 | Public apply exposure | Fail | Package entrypoint exposes test-only apply construction even though the default factory is disabled. |
+| Security corpus execution | Not verified | The JSON corpus has 31 cases but no discovered runner consumes it. |
 
-Security conclusion: not merge-ready. H-01 must be remediated and independently reverified.
+Security conclusion: not merge-ready. H-01 and the missing runnable corpus evidence must be remediated and independently reverified.

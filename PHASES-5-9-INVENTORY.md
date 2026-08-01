@@ -10,7 +10,7 @@ PR: #32
 | 6 | Production service adapters | Connector filesystem, health, snapshot, memory and SQLite adapters and tests | Verified |
 | 7 | Grants, quotas, cancellation, negotiation, schemas, consent, bounded execution, audit, untrusted envelopes | Context gateway, contracts, sandbox and associated tests | Verified by source and suite |
 | 8 | Deterministic plans and evidence | Planner, verification and evidence packages and tests | Verified |
-| 9 | Preparation, approval, recovery, drift, limits, concurrency, fixtures, export hardening | Apply, sandbox, recovery/security and targeted suite | Blocked by public test-only mutation enablement finding |
+| 9 | Preparation, approval, recovery, drift, limits, concurrency, fixtures, export hardening | Apply, sandbox and targeted suite | Blocked by public apply export and missing runnable corpus/equivalence evidence |
 
 Workspace packages executed independently: contracts, connectors, core, evidence, planner, sandbox, apply, verification, cli.
 

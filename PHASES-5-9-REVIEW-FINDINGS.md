@@ -16,7 +16,11 @@ Required fix: move test-only factories/fakes under test-only paths excluded from
 
 ## Medium
 
-None identified.
+### M-01: Required security corpus and dedicated protocol-equivalence execution are not runnable
+
+`evaluations/phase-9-security/security-corpus.json` is present, but no package script or discovered test runner consumes it. The concurrency/recovery logic is covered inside apply tests, but no dedicated restart-recovery command was found. No dedicated protocol-surface equivalence command was found. A passing generic Vitest selection is not proof that these required corpus/surface checks executed.
+
+Required fix: add explicit runnable scripts that consume the 31-case security corpus, exercise restart recovery, and assert public protocol/export surface equivalence; retain machine-readable results in CI.
 
 ## Low
 

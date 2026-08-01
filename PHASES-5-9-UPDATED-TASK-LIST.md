@@ -6,7 +6,9 @@
 - [x] Run each Phase 5-9 workspace package test suite.
 - [x] Run specialized security, recovery/restart, concurrency, fixture and protocol/equivalence test selection.
 - [x] Audit security-sensitive surfaces and exports.
+- [ ] Record explicit integration or rejection rationale for every divergent Phase 5-9 branch.
 - [ ] Remove public test-only apply and fake-port exports.
 - [ ] Add negative production export-surface tests.
+- [ ] Add runnable 31-case security-corpus, restart-recovery, and protocol-equivalence scripts.
 - [ ] Rerun all checks against the remediation SHA.
 - [ ] Obtain independent final approval after H-01 is closed.
