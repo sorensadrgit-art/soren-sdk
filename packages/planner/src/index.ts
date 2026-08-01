@@ -111,7 +111,7 @@ function json(value: unknown): JsonValue {
 
 function assertSafe(value: unknown, path = "input"): void {
   if (typeof value === "string" && SENSITIVE_TEXT.test(value)) {
-    throw new Error(`Sensitive-looking data is forbidden at ${path}.`);
+    throw new Error(`Secret-like data is forbidden at ${path}.`);
   }
   if (Array.isArray(value)) {
     value.forEach((entry, index) => assertSafe(entry, `${path}[${index}]`));
@@ -222,8 +222,18 @@ function expectedPlanId(digest: Digest): string {
   return `plan_${digest.slice("sha256:".length, "sha256:".length + 24)}`;
 }
 
+function jsonForComparison(value: unknown): JsonValue | undefined {
+  if (value === undefined) return undefined;
+  return JSON.parse(JSON.stringify(value)) as JsonValue;
+}
+
 function sameJson(left: unknown, right: unknown): boolean {
-  return canonicalJson(json(left)) === canonicalJson(json(right));
+  const normalizedLeft = jsonForComparison(left);
+  const normalizedRight = jsonForComparison(right);
+  if (normalizedLeft === undefined || normalizedRight === undefined) {
+    return normalizedLeft === normalizedRight;
+  }
+  return canonicalJson(normalizedLeft) === canonicalJson(normalizedRight);
 }
 
 export class DeterministicExecutionPlanner
