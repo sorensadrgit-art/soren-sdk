@@ -6,6 +6,7 @@ The current package exposes two stable service areas:
 
 - Connector catalog service interfaces
 - Static read-only project inspection
+- Context selection returns immutable, provenance-bound untrusted-data envelopes with `instructionAuthority: "none"`
 
 ## Public project-inspector API
 

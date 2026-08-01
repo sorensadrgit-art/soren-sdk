@@ -18,6 +18,7 @@ export interface SourceRecord {
   origin: string;
   content: string;
   digest: Digest;
+  retrievedAt: string;
   expiresAt: string;
   reviewed: boolean;
 }
@@ -33,12 +34,25 @@ export interface ContextRequest {
 }
 
 export interface SelectedContext {
+  fragmentId: Digest;
   sourceId: string;
   connectorId: string;
-  category: ContextCategory;
+  sourceDigest: Digest;
+  contentDigest: Digest;
   origin: string;
-  digest: Digest;
+  retrievedAt: string;
+  expiresAt: string;
+  freshnessState: "fresh";
+  selectionReason: "reviewed-request-match";
+  byteSize: number;
+  provenanceDigest: Digest;
+  instructionAuthority: "none";
   content: string;
+}
+
+function validTimestamp(value: string): boolean {
+  const date = new Date(value);
+  return !Number.isNaN(date.getTime()) && date.toISOString() === value;
 }
 
 export interface ToolDefinition {
@@ -129,6 +143,9 @@ export function selectContext(
       ) {
         return false;
       }
+      if (!validTimestamp(source.retrievedAt) || !validTimestamp(source.expiresAt) || !validTimestamp(request.now) || source.retrievedAt > source.expiresAt || source.retrievedAt > request.now) {
+        throw new TypeError(`Invalid source timestamps: ${source.id}.`);
+      }
       if (source.expiresAt <= request.now) {
         throw new TypeError(`Source stale: ${source.id}.`);
       }
@@ -149,7 +166,9 @@ export function selectContext(
     const sourceBytes = new TextEncoder().encode(source.content).byteLength;
     if (request.maxBytes !== undefined && (sourceBytes > request.maxBytes || bytes + sourceBytes > request.maxBytes)) continue;
     bytes += sourceBytes;
-    selected.push({ sourceId: source.id, connectorId: source.connectorId, category: source.category, origin: source.origin, digest: source.digest, content: source.content });
+    const contentDigest = sha256Bytes(source.content);
+    const provenanceDigest = digestJson({ sourceId: source.id, connectorId: source.connectorId, sourceDigest: source.digest, contentDigest, origin: source.origin, retrievedAt: source.retrievedAt, expiresAt: source.expiresAt } as JsonValue);
+    selected.push(Object.freeze({ fragmentId: digestJson({ provenanceDigest, selectionReason: "reviewed-request-match" } as JsonValue), sourceId: source.id, connectorId: source.connectorId, sourceDigest: source.digest, contentDigest, origin: source.origin, retrievedAt: source.retrievedAt, expiresAt: source.expiresAt, freshnessState: "fresh", selectionReason: "reviewed-request-match", byteSize: sourceBytes, provenanceDigest, instructionAuthority: "none", content: source.content }));
   }
   return selected;
 }
