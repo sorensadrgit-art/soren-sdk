@@ -216,6 +216,31 @@ describe("Phase 7 revocation and cancellation", () => {
     );
   });
 
+  it("rejects a non-cooperative provider immediately when the kill switch cancels it", async () => {
+    const toolInventory = inventory();
+    const started = deferred<void>();
+    const gateway = new ReadOnlyToolGateway(
+      asyncProvider(toolInventory, async () => {
+        started.resolve();
+        return new Promise<{ ok: boolean }>(() => undefined);
+      }),
+      () => "2026-01-01T01:00:00Z"
+    );
+    const runGrant = grant(toolInventory);
+    gateway.registerGrant(runGrant);
+
+    const call = gateway.call(runGrant, "read", {}, "2026-01-01T01:00:00Z");
+    await started.promise;
+    gateway.kill();
+
+    await expect(call).rejects.toThrow("cancelled");
+    expect(gateway.auditEvents()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "CALL_CANCELLED", redacted: true })
+      ])
+    );
+  });
+
   it("makes concurrent revoke and call races fail closed without successful results", async () => {
     const toolInventory = inventory();
     const providerCalls: AbortSignal[] = [];

@@ -331,7 +331,17 @@ export class ReadOnlyToolGateway {
     };
     this.#activeCalls.set(callId, active);
     try {
-      const result = await this.provider.call(toolId, input, active.controller.signal);
+      const providerResult = Promise.resolve().then(() =>
+        this.provider.call(toolId, input, active.controller.signal)
+      );
+      const cancellation = new Promise<never>((_resolve, reject) => {
+        active.controller.signal.addEventListener(
+          "abort",
+          () => reject(new TypeError("Call cancelled.")),
+          { once: true }
+        );
+      });
+      const result = await Promise.race([providerResult, cancellation]);
       if (active.controller.signal.aborted) {
         this.cancelActiveCall(callId, active);
         throw new TypeError("Call cancelled.");
