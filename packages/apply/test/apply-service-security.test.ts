@@ -26,10 +26,26 @@ import {
 
 const encoder = new TextEncoder();
 
+function authoritativeState() {
+  const plan = sampleExecutionPlan();
+  const approval = sampleApproval();
+  const project = sampleProjectSnapshot();
+  const policy = { policyId: "policy_1", digest: "sha256:3333333333333333333333333333333333333333333333333333333333333333" as Digest };
+  const vcs = sampleVcsState();
+  const sandboxPolicy = sampleSandboxPolicy();
+  return {
+    approvedPlanProvider: { async getApprovedPlan() { return { executionPlan: plan, approval }; } },
+    projectSnapshotProvider: { async getCurrentProjectSnapshot() { return project; } },
+    resolvedPolicyProvider: { async getCurrentPolicySnapshot() { return { ...policy, document: {} }; } },
+    vcsStateProvider: { async getCurrentVcsState() { return vcs; } },
+    sandboxPolicyProvider: { async getCurrentSandboxPolicy() { return sandboxPolicy; } }
+  };
+}
+
 function makeService() {
   const evidence = new InMemoryEvidenceSink();
   const clockObj = fixedClock();
-  const service = new DefaultApplyService({ evidenceSink: evidence, clock: clockObj });
+  const service = new DefaultApplyService({ evidenceSink: evidence, clock: clockObj, authoritativeState: authoritativeState() });
   service.setEnabledForTesting(true);
   const sandboxProvider = new MemorySandboxProvider();
   registerSandboxFactory({
@@ -85,7 +101,7 @@ describe("Phase 9 apply security corpus", () => {
 
   it("throws APPLY_DISABLED when apply is not enabled", () => {
     const evidence = new InMemoryEvidenceSink();
-    const service = new DefaultApplyService({ evidenceSink: evidence });
+    const service = new DefaultApplyService({ evidenceSink: evidence, authoritativeState: authoritativeState() });
     expect(() => service.prepare(prepareInput())).toThrow(ApplyError);
     try {
       service.prepare(prepareInput());

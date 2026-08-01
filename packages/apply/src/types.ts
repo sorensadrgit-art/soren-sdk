@@ -64,10 +64,15 @@ export interface ApplyPreparation {
   executionPlanId: string;
   executionPlanDigest: Digest;
   projectSnapshotId: Digest;
+  projectRevision: { vcs: string; commit: string | null; dirty: boolean };
   policySnapshotId: Digest;
+  policyId: string;
   sandboxPolicyId: string;
+  sandboxPolicyDigest: Digest;
+  approvalIntegrityDigest: Digest;
   vcsState: VcsState;
   approvalNonce: string;
+  approvalId: string;
   gates: Array<{
     code: string;
     status: "passed" | "failed";
@@ -199,6 +204,7 @@ export class ApplyError extends Error {
     | "APPLY_APPROVAL_EXPIRED"
     | "APPLY_APPROVAL_MISSING"
     | "APPLY_APPROVAL_REPLAYED"
+    | "APPLY_APPROVAL_REVOKED"
     | "APPLY_APPROVAL_DIGEST_MISMATCH"
     | "APPLY_APPROVAL_OPERATION_DENIED"
     | "APPLY_APPROVAL_PATH_DENIED"

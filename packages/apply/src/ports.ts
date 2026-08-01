@@ -1,5 +1,5 @@
 import type { Digest, ExecutionPlan, ProjectSnapshot } from "@soren-sdk/contracts";
-import type { SandboxPolicy } from "@soren-sdk/sandbox";
+import type { SandboxPolicy, VcsState } from "@soren-sdk/sandbox";
 
 import type { ApplyApproval, ApplyEvidenceEvent } from "./types.js";
 
@@ -31,7 +31,7 @@ export interface ApplyEvidenceSink {
  * the policy snapshot digest.
  */
 export interface ResolvedPolicyProvider {
-  getPolicySnapshot(policyId: string): Promise<{
+  getCurrentPolicySnapshot(policyId: string): Promise<{
     policyId: string;
     digest: Digest;
     document: unknown;
@@ -39,18 +39,26 @@ export interface ResolvedPolicyProvider {
 }
 
 /**
- * Provider of project snapshots. In Phase 9 this is a local port backed by
- * fakes. Future mapping: Phase 3 project inspector will supply the current
- * project snapshot for drift checks.
+ * Provider of the current project snapshot at the mutation boundary.
  */
 export interface ProjectSnapshotProvider {
-  getProjectSnapshot(snapshotId: Digest): Promise<ProjectSnapshot | null>;
+  getCurrentProjectSnapshot(): Promise<ProjectSnapshot | null>;
 }
 
-/**
- * Provider of sandbox policies. In Phase 9 this is a local port backed by
- * fakes.
- */
+/** Provider of current VCS state at the mutation boundary. */
+export interface VcsStateProvider {
+  getCurrentVcsState(): Promise<VcsState | null>;
+}
+
+/** Provider of the current sandbox policy at the mutation boundary. */
 export interface SandboxPolicyProvider {
-  getSandboxPolicy(policyId: string): Promise<SandboxPolicy | null>;
+  getCurrentSandboxPolicy(policyId: string): Promise<SandboxPolicy | null>;
+}
+
+export interface AuthoritativeApplyStateProviders {
+  approvedPlanProvider: ApprovedPlanProvider;
+  projectSnapshotProvider: ProjectSnapshotProvider;
+  resolvedPolicyProvider: ResolvedPolicyProvider;
+  vcsStateProvider: VcsStateProvider;
+  sandboxPolicyProvider: SandboxPolicyProvider;
 }
