@@ -26,6 +26,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@soren-sdk/config':
+        specifier: workspace:*
+        version: link:../config
       '@soren-sdk/connectors':
         specifier: workspace:*
         version: link:../connectors
