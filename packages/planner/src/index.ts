@@ -209,13 +209,11 @@ function semanticPlan(input: CreateExecutionPlanInput): SemanticExecutionPlan {
 }
 
 function semanticPlanFromPlan(plan: ExecutionPlan): SemanticExecutionPlan {
-  const {
-    createdAt: _createdAt,
-    executionPlanId: _executionPlanId,
-    immutableDigest: _immutableDigest,
-    ...semantic
-  } = plan;
-  return semantic;
+  const semantic = { ...plan } as Partial<ExecutionPlan>;
+  delete semantic.createdAt;
+  delete semantic.executionPlanId;
+  delete semantic.immutableDigest;
+  return semantic as SemanticExecutionPlan;
 }
 
 function expectedPlanId(digest: Digest): string {
