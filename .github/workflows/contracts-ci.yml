@@ -6,10 +6,7 @@ on:
     paths:
       - ".github/workflows/contracts-ci.yml"
       - "capabilities/**"
-      - "packages/contracts/**"
-      - "packages/core/**"
-      - "packages/connectors/**"
-      - "packages/cli/**"
+      - "packages/**"
       - "schemas/**"
       - "sdk-connectors/**"
       - "package.json"
@@ -23,10 +20,7 @@ on:
     paths:
       - ".github/workflows/contracts-ci.yml"
       - "capabilities/**"
-      - "packages/contracts/**"
-      - "packages/core/**"
-      - "packages/connectors/**"
-      - "packages/cli/**"
+      - "packages/**"
       - "schemas/**"
       - "sdk-connectors/**"
       - "package.json"
