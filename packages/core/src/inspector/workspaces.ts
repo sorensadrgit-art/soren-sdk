@@ -128,10 +128,6 @@ function globToRegExp(pattern: string): RegExp {
   return new RegExp(`${expression}$`);
 }
 
-function matches(path: string, pattern: string): boolean {
-  return globToRegExp(normalizePattern(pattern)).test(path);
-}
-
 function packageName(
   manifest: PackageManifest,
   path: string,
@@ -166,14 +162,18 @@ export function detectWorkspaces(
     warnings.push("pnpm-workspace.yaml contains no readable package patterns.");
   }
 
+  // Pre-compile RegExp objects for performance (avoids recompiling O(N*M) times inside filter)
+  const includeRegExps = includes.map(pattern => globToRegExp(normalizePattern(pattern)));
+  const excludeRegExps = excludes.map(pattern => globToRegExp(normalizePattern(pattern)));
+
   const directories = findPackageDirectories(root);
   const selected = directories.filter((directory) => {
     const path = projectRelativePath(root, directory);
     if (path === ".") return true;
-    if (includes.length === 0) return false;
+    if (includeRegExps.length === 0) return false;
     return (
-      includes.some((pattern) => matches(path, pattern)) &&
-      !excludes.some((pattern) => matches(path, pattern))
+      includeRegExps.some((regExp) => regExp.test(path)) &&
+      !excludeRegExps.some((regExp) => regExp.test(path))
     );
   });
 
