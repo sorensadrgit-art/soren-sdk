@@ -2,7 +2,6 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { PolicyDocument } from "@soren-sdk/contracts";
 import {
-  BUILTIN_POLICY,
   MemoryFileSystem,
   PolicyResolutionError,
   PolicyResolver,

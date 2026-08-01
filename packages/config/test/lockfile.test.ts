@@ -86,7 +86,9 @@ describe("LockfileService.create", () => {
 
   it("computeLockDigest independently recomputed equals lock.digest", () => {
     const lock = service.create(validInput());
-    const { digest: _digest, ...rest } = lock;
+    const rest = Object.fromEntries(
+      Object.entries(lock).filter(([key]) => key !== "digest")
+    ) as unknown as Omit<SorenSdkLock, "digest">;
     expect(computeLockDigest(rest)).toBe(lock.digest);
   });
 
