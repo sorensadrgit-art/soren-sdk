@@ -19,6 +19,16 @@ import {
   sampleVcsState
 } from "./fixtures.js";
 
+let currentPlan = sampleExecutionPlan();
+let currentApproval = sampleApproval();
+let currentProject = sampleProjectSnapshot();
+let currentPolicy = {
+  policyId: "policy_1",
+  digest: "sha256:3333333333333333333333333333333333333333333333333333333333333333" as const
+};
+let currentSandboxPolicy = sampleSandboxPolicy();
+let currentVcs = sampleVcsState();
+
 function persistentSession(seed: Record<string, Uint8Array>): {
   session: SandboxSession;
   raw: MemorySandboxSession;
@@ -72,17 +82,22 @@ function preparation(service: DefaultApplyService) {
     allowedPaths: ["src"],
     allowedOperations: ["create-file", "replace-file", "delete-file"]
   });
+  currentPlan = plan;
+  currentApproval = approval;
+  currentProject = sampleProjectSnapshot();
+  currentPolicy = {
+    policyId: "policy_1",
+    digest: "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+  };
+  currentSandboxPolicy = sampleSandboxPolicy();
+  currentVcs = sampleVcsState();
   return service.prepare({
     executionPlan: plan,
     approval,
-    projectSnapshot: sampleProjectSnapshot(),
-    policySnapshot: {
-      policyId: "policy_1",
-      digest:
-        "sha256:3333333333333333333333333333333333333333333333333333333333333333"
-    },
-    sandboxPolicy: sampleSandboxPolicy(),
-    vcsState: sampleVcsState()
+    projectSnapshot: currentProject,
+    policySnapshot: currentPolicy,
+    sandboxPolicy: currentSandboxPolicy,
+    vcsState: currentVcs
   });
 }
 
@@ -91,7 +106,14 @@ describe("rollback restoration", () => {
     const evidence = new InMemoryEvidenceSink();
     const service = new DefaultApplyService({
       evidenceSink: evidence,
-      clock: fixedClock()
+      clock: fixedClock(),
+      authoritativeState: {
+        approvedPlanProvider: { async getApprovedPlan() { return { executionPlan: currentPlan, approval: currentApproval }; } },
+        projectSnapshotProvider: { async getCurrentProjectSnapshot() { return currentProject; } },
+        resolvedPolicyProvider: { async getCurrentPolicySnapshot() { return { ...currentPolicy, document: {} }; } },
+        vcsStateProvider: { async getCurrentVcsState() { return currentVcs; } },
+        sandboxPolicyProvider: { async getCurrentSandboxPolicy() { return currentSandboxPolicy; } }
+      }
     });
     service.setEnabledForTesting(true);
 

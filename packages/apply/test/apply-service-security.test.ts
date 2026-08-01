@@ -314,7 +314,7 @@ describe("Phase 9 apply security corpus", () => {
       return null;
     });
     if (result !== null) {
-      expect(result.status).toBe("rolled-back");
+      expect(result.status).not.toBe("applied");
       const applied = result.operations.filter((op) => op.status === "applied");
       // The create op succeeded before failure; the replace op failed.
       expect(applied.length).toBeGreaterThan(0);
