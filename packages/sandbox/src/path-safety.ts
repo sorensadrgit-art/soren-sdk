@@ -135,7 +135,7 @@ async function resolveReal(target: string, root: string): Promise<string> {
   let realTarget: string;
   try {
     realTarget = await fsp.realpath(target);
-  } catch (error) {
+  } catch {
     // The target may not exist yet (create operations). Resolve the deepest
     // existing ancestor and append the remaining segments, then recheck.
     realTarget = await resolveWithDeepestExistingAncestor(target, realRoot);

@@ -23,7 +23,7 @@ export class DeterministicVcsIsolationFake implements VcsIsolationProvider {
     this.#state = state;
   }
 
-  async inspect(_root: string): Promise<VcsState> {
+  async inspect(): Promise<VcsState> {
     return { ...this.#state, reasons: [...this.#state.reasons] };
   }
 
@@ -70,7 +70,7 @@ export class TempCopyIsolationFake implements VcsIsolationProvider {
     this.#seedTree = seedTree;
   }
 
-  async inspect(_root: string): Promise<VcsState> {
+  async inspect(): Promise<VcsState> {
     return { ...this.#state, reasons: [...this.#state.reasons] };
   }
 

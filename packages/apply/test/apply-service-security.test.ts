@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { Digest } from "@soren-sdk/contracts";
 import type { SandboxSession } from "@soren-sdk/sandbox";
 import { MemorySandboxProvider } from "@soren-sdk/sandbox";
 
@@ -7,7 +8,9 @@ import {
   APPLY_DISABLED,
   DefaultApplyService,
   InMemoryEvidenceSink,
-  registerSandboxFactory
+  registerSandboxFactory,
+  type ApplyApproval,
+  type PrepareApplyInput
 } from "../src/index.js";
 import { ApplyError } from "../src/types.js";
 import {
@@ -46,12 +49,12 @@ function prepareInput(
     approval?: ApplyApproval;
     plan?: ReturnType<typeof sampleExecutionPlan>;
     project?: ReturnType<typeof sampleProjectSnapshot>;
-    policy?: { policyId: string; digest: string };
+    policy?: { policyId: string; digest: Digest };
     sandboxPolicy?: ReturnType<typeof sampleSandboxPolicy>;
     vcs?: ReturnType<typeof sampleVcsState>;
     nonce?: string;
   } = {}
-) {
+): PrepareApplyInput {
   const nonce = overrides.nonce ?? "nonce-0000000000000001";
   const approval = overrides.approval ?? sampleApproval({ nonce });
   return {
@@ -150,7 +153,7 @@ describe("Phase 9 apply security corpus", () => {
   it("blocks project drift", () => {
     const { service } = makeService();
     const project = sampleProjectSnapshot();
-    const drifted = {
+    const drifted: ReturnType<typeof sampleProjectSnapshot> = {
       ...project,
       snapshotId: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     };
@@ -161,7 +164,7 @@ describe("Phase 9 apply security corpus", () => {
 
   it("blocks policy drift", () => {
     const { service } = makeService();
-    const policy = { policyId: "policy_1", digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" };
+    const policy: { policyId: string; digest: Digest } = { policyId: "policy_1", digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" };
     const preparation = service.prepare(prepareInput({ policy }));
     expect(preparation.ready).toBe(false);
     expect(preparation.gates.find((g) => g.code === "drift.policy")?.status).toBe("failed");

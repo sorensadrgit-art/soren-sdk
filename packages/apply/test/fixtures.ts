@@ -3,7 +3,6 @@ import type { ExecutionPlan, ProjectSnapshot } from "@soren-sdk/contracts";
 import type { SandboxPolicy, VcsState } from "@soren-sdk/sandbox";
 
 import { computeApprovalIntegrityDigest, type ApplyApproval } from "../src/index.js";
-import { digestJson } from "@soren-sdk/contracts";
 
 export const NOW_MS = 1_752_940_000_000; // Fixed deterministic timestamp.
 export const EXPIRES_MS = NOW_MS + 3_600_000;
