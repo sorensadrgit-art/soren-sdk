@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://soren.dev/schemas/protocol-envelope.schema.json",
+  "title": "Soren Protocol Envelope",
+  "type": "object",
+  "required": ["schemaVersion", "ok", "data", "meta"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0-draft.1"
+    },
+    "ok": {
+      "const": true
+    },
+    "data": true,
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "correlationId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "surface": {
+          "enum": ["application", "mcp", "rest", "sdk-http", "sdk-in-process"]
+        }
+      }
+    }
+  }
+}
