@@ -16,6 +16,20 @@
 - Parent directory cleanup for directory absent in before snapshot: PASS
 - Sandbox traversal, absolute path, NUL, symlink, and special-file corpus: package sandbox tests PASS
 
+## Critical independent Phase 7 review findings
+
+The independent review of `packages/core/src/context-gateway.ts` identified the following release blockers:
+
+1. `RunGrant.digest` is deterministic but forgeable. A canonical `RunGrantStore` with opaque grant ID, immutable stored grant, active/revoked state, and atomic accounting is required.
+2. Tool calls are synchronous and unbounded during dispatch. The provider port needs `AbortSignal`, deadline, per-grant max-call, and streaming/pre-materialization byte enforcement.
+3. Tool input/output schema descriptors and validation are absent.
+4. Protocol versions are not negotiated or bound to a session, and extensions are not bound to grants.
+5. Remote project-content permission is a provider/tool self-attestation rather than an authority-bound permission/consent record.
+6. Audit events are in-memory, unbounded, and miss failed provider calls. Replace them with a redacted durable sink port.
+7. Context data needs an immutable untrusted-content envelope with no instruction authority. Source timestamps and inventory provenance/freshness need canonical validation.
+
+These findings preserve, rather than weaken, the existing normalized-ID digest, provider identity, inventory description digest, UTF-8 measurement, kill switch, and read-only classification controls.
+
 ## Not yet complete, blocking ready status
 
 - Grant call count, explicit revocation, gateway cancellation, negotiated protocol contract, schema descriptors, and remote project-content consent
