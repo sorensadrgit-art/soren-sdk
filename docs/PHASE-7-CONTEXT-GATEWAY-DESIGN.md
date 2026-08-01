@@ -14,7 +14,9 @@ The only call boundary is a caller-supplied read-only provider fake or adapter. 
 
 `AgentSkillRecord` is parsed as data. It must have valid YAML frontmatter, a matching source digest, a nonempty declarative description, and no executable body or `allowed-tools` authority. Scripts and unpinned skills are rejected.
 
-`RunGrant` is immutable after construction. It binds run ID, provider ID, approved read-only tool IDs, permitted data exposure, inventory digest, issuance/expiry times, and a canonical digest. Grant requests cannot include mutation, shell, filesystem write, credentials, or remote project-content without both policy permission and explicit consent. The initial implementation rejects all remote project content and all non-read-only tool declarations.
+`RunGrant` is immutable after construction. It binds run ID, provider ID, approved read-only tool IDs, inventory digest, issuance/expiry times, and a canonical digest. It cannot authorize project content. The legacy `allowRemoteProjectContent` field is retained only for compatibility and is not consulted by the gateway.
+
+`ProjectContentConsent` is an immutable, digest-bound record issued by an injected `ProjectContentConsentProvider`. It binds a principal or run, project snapshot, provider and tool, allowed content scopes, policy snapshot, and expiration. The gateway obtains this record from the injected authority for each project-content call. It never accepts a caller-supplied consent record as proof of permission.
 
 ## Gateway
 
@@ -22,7 +24,7 @@ A `ReadOnlyToolProvider` interface exposes an inventory and a read-only call met
 
 The gateway snapshots the canonical tool inventory before use. A later inventory with a different digest is rejected and audited as `inventory-changed`; it is never silently accepted. Tool descriptions are retained only as untrusted metadata and do not grant permission.
 
-Before every call, the gateway checks: kill switch, grant digest, run ID/provider match, expiry, exact inventory digest, exact approved tool ID, read-only declaration, and project-content exposure policy. Calls have a maximum response byte length and produce redacted audit events. The gateway never logs inputs, raw outputs, credentials, or token-like values.
+Before every call, the gateway checks: kill switch, grant digest, run ID/provider match, expiry, exact inventory digest, exact approved tool ID, and read-only declaration. A call that carries project content additionally requires a current consent from the injected authority whose digest and bindings exactly match the run, project snapshot, provider, tool, requested scope, and policy snapshot. Tool metadata, including `exposesProjectContent`, is risk classification only and cannot grant or suppress this check. Calls have a maximum response byte length and produce redacted audit events. The gateway never logs inputs, raw outputs, credentials, or token-like values.
 
 The kill switch is in-memory and sticky. Once activated, no subsequent gateway call can reach a provider. The only fallback is a deterministic `blocked` result with a safe reason code.
 
@@ -32,4 +34,4 @@ Source text, skill markdown, registry data, and tool descriptions are data field
 
 ## Tests
 
-Deterministic fakes cover injection text, stale or digest-mismatched sources, skill validation, stable ordering, protocol mismatch, inventory change, self-grant attempts, expired grants, remote content denial, redacted audit entries, response limits, and the kill switch.
+Deterministic fakes cover injection text, stale or digest-mismatched sources, skill validation, stable ordering, protocol mismatch, inventory change, self-grant attempts, expired grants, forged consent, wrong run, project, provider, policy and scope bindings, tool-metadata manipulation, redacted audit entries, response limits, and the kill switch.
