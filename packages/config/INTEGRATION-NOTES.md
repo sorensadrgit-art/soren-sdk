@@ -81,6 +81,14 @@ program against this port.
    project layer *content* is assumed to be resolved by the caller before
    preloading; consumers must refresh snapshots when layer files change.
 
+8. **`CurrentResolutionInputs.connectors` is optional.** The plan's
+   `CurrentResolutionInputs` did not carry the current selected-connector set;
+   `LockfileService.compare` accepts an optional `connectors` field. When it is
+   omitted, connector/integration presence drift is skipped (only snapshot,
+   config, and route digests are compared). When provided (even empty), the
+   locked set is diffed against the current set: a locked connector missing
+   from current is `critical`, integration presence drift is `warning`.
+
 ## Provider-neutrality
 
 - No consumer in `packages/config` imports `node:fs` at module top level except
