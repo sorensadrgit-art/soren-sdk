@@ -5,6 +5,7 @@ import {
 } from "@soren-sdk/contracts";
 import type {
   Digest,
+  JsonValue,
   PolicyDocument,
   SorenConfig,
 } from "@soren-sdk/contracts";
@@ -40,6 +41,10 @@ export interface ConfigurationReaderOptions {
 
 function stableUnique(values: string[]): string[] {
   return Array.from(new Set(values)).sort();
+}
+
+function jsonValue(value: unknown): JsonValue {
+  return value as JsonValue;
 }
 
 /** Normalize a validated config: stable-unique lists, drop undefined optionals. */
@@ -121,7 +126,7 @@ export class ConfigurationReader {
     const config = normalizeSorenConfig(result.value);
     return {
       config,
-      digest: digestJson(config),
+      digest: digestJson(jsonValue(config)),
       source: { format: source.format, path: source.path },
     };
   }
