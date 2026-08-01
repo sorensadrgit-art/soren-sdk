@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { lstat, readdir, readFile, readlink, stat } from "node:fs/promises";
+import { lstat, readdir, readFile, readlink } from "node:fs/promises";
 import { join, relative } from "node:path";
 
 export type FixtureEntry = Readonly<{

@@ -38,8 +38,8 @@ import {
 export interface ApplyServiceOptions {
   clock?: { now(): number };
   evidenceSink: ApplyEvidenceSink;
-<<<<<<< HEAD
   sandboxProvider?: SandboxProvider;
+  authoritativeState: AuthoritativeApplyStateProviders;
   /** Internal test-only capability. Production construction never enables apply. */
   testCapability?: symbol;
 }
@@ -51,9 +51,6 @@ export function createApplyServiceForTesting(
   options: Omit<ApplyServiceOptions, "testCapability"> & Record<string, unknown>
 ): DefaultApplyService {
   return new DefaultApplyService({ ...options, testCapability: TEST_APPLY_CAPABILITY });
-=======
-  authoritativeState: AuthoritativeApplyStateProviders;
->>>>>>> 8e7bcf6 (fix(apply): recheck authoritative state before mutation)
 }
 
 /**
@@ -67,11 +64,8 @@ export function createApplyServiceForTesting(
  */
 export class DefaultApplyService implements ApplyService {
   readonly #evidenceSink: ApplyEvidenceSink;
-<<<<<<< HEAD
   readonly #sandboxProvider: SandboxProvider | undefined;
-=======
   readonly #authoritativeState: AuthoritativeApplyStateProviders;
->>>>>>> 8e7bcf6 (fix(apply): recheck authoritative state before mutation)
   readonly #now: () => number;
   readonly #preparations = new Map<string, { preparation: ApplyPreparation; input: PrepareApplyInput; consumed: boolean }>();
   readonly #usedApprovals = new Set<string>();
