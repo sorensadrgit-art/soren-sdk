@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
@@ -12,6 +12,8 @@ import {
   FileSystemConnectorCatalog,
   SqliteCatalogSnapshotStore
 } from "@soren-sdk/connectors";
+import { DeterministicExecutionPlanner, type CreateExecutionPlanInput } from "@soren-sdk/planner";
+import { DeterministicEvidenceService, type EvidenceEnvelope } from "@soren-sdk/evidence";
 
 import {
   formatConnector,
@@ -88,6 +90,9 @@ function parseSnapshotOptions(args: string[]): {
     : { json: parsed.values.json ?? false, database };
 }
 
+function readJson(path: string): unknown { return JSON.parse(readFileSync(path, "utf8")); }
+function atomicWrite(path: string, value: unknown): void { mkdirSync(dirname(path), { recursive: true }); const temporary = `${path}.tmp`; writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, "utf8"); renameSync(temporary, path); }
+
 function usage(): string {
   return [
     "Usage:",
@@ -102,6 +107,17 @@ function usage(): string {
 export function runCli(options: RunCliOptions): number {
   try {
     const [domain, action, identifier, ...rest] = options.argv;
+
+    if (domain === "plan" && action === "create") {
+      const requestIndex = options.argv.indexOf("--request"); const outputIndex = options.argv.indexOf("--output"); const requestPath = options.argv[requestIndex + 1]; const outputPath = options.argv[outputIndex + 1];
+      if (requestIndex < 0 || outputIndex < 0 || requestPath === undefined || outputPath === undefined) throw new CliUsageError("plan create requires --request and --output.");
+      const plan = new DeterministicExecutionPlanner().create(readJson(resolve(options.cwd, requestPath)) as CreateExecutionPlanInput);
+      atomicWrite(resolve(options.cwd, outputPath), plan); options.io.stdout(formatJson(plan)); return 0;
+    }
+    if (domain === "plan" && action === "inspect") { if (identifier === undefined) throw new CliUsageError("plan inspect requires a path."); options.io.stdout(formatJson(readJson(resolve(options.cwd, identifier)))); return 0; }
+    if (domain === "evidence" && (action === "inspect" || action === "verify" || action === "summarize")) {
+      if (identifier === undefined) throw new CliUsageError(`evidence ${action} requires a path.`); const evidence = readJson(resolve(options.cwd, identifier)) as EvidenceEnvelope; const service = new DeterministicEvidenceService(); const output = action === "verify" ? service.verify(evidence) : action === "summarize" ? service.summarize({ evidence }) : evidence; options.io.stdout(formatJson(output)); return action === "verify" && !service.verify(evidence).ok ? 1 : 0;
+    }
 
     if (domain === "inspect") {
       const parsed = parseInspectOptions(options.argv.slice(1));
