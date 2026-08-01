@@ -111,7 +111,7 @@ function json(value: unknown): JsonValue {
 
 function assertSafe(value: unknown, path = "input"): void {
   if (typeof value === "string" && SENSITIVE_TEXT.test(value)) {
-    throw new Error(`Sensitive-looking data is forbidden at ${path}.`);
+    throw new Error(`Secret-like data is forbidden at ${path}.`);
   }
   if (Array.isArray(value)) {
     value.forEach((entry, index) => assertSafe(entry, `${path}[${index}]`));
@@ -209,13 +209,11 @@ function semanticPlan(input: CreateExecutionPlanInput): SemanticExecutionPlan {
 }
 
 function semanticPlanFromPlan(plan: ExecutionPlan): SemanticExecutionPlan {
-  const {
-    createdAt: _createdAt,
-    executionPlanId: _executionPlanId,
-    immutableDigest: _immutableDigest,
-    ...semantic
-  } = plan;
-  return semantic;
+  const semantic: Partial<ExecutionPlan> = { ...plan };
+  delete semantic.createdAt;
+  delete semantic.executionPlanId;
+  delete semantic.immutableDigest;
+  return semantic as SemanticExecutionPlan;
 }
 
 function expectedPlanId(digest: Digest): string {
@@ -289,8 +287,10 @@ export class DeterministicExecutionPlanner
       contextReferences: plan.contextReferences,
       objective: plan.objective,
       constraints: plan.constraints,
-      lockfile: plan.lockfile,
-      runnerCapabilities: plan.runnerCapabilities
+      ...(plan.lockfile === undefined ? {} : { lockfile: plan.lockfile }),
+      ...(plan.runnerCapabilities === undefined
+        ? {}
+        : { runnerCapabilities: plan.runnerCapabilities })
     };
     const actual = {
       projectSnapshot: current.projectSnapshot,
@@ -303,8 +303,10 @@ export class DeterministicExecutionPlanner
       ),
       objective: current.objective,
       constraints: stableStrings(current.constraints),
-      lockfile: current.lockfile,
-      runnerCapabilities: current.runnerCapabilities
+      ...(current.lockfile === undefined ? {} : { lockfile: current.lockfile }),
+      ...(current.runnerCapabilities === undefined
+        ? {}
+        : { runnerCapabilities: current.runnerCapabilities })
     };
     const differences = Object.keys(expected).filter((key) => {
       const field = key as keyof typeof expected;

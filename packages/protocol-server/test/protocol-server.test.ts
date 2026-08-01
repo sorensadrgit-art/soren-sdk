@@ -24,6 +24,7 @@ interface RestJsonBody {
 async function restRequest(
   path: string,
   init: {
+    allowedProjectRoots?: string[];
     authorizer?: Authorizer;
     body?: string;
     headers?: Record<string, string>;
@@ -33,7 +34,7 @@ async function restRequest(
   const app = createDefaultSorenApplication(repoRoot);
   const handlerOptions = {
     application: app,
-    allowedProjectRoots: [repoRoot],
+    allowedProjectRoots: init.allowedProjectRoots ?? [repoRoot],
     maxBodyBytes: 128
   };
   const server = createServer(
@@ -88,6 +89,24 @@ describe("REST protocol surface", () => {
     });
     expect(response.status).toBe(403);
     expect(response.body.error?.code).toBe("PROJECT_ROOT_DENIED");
+  });
+
+  it("denies remote project inspection when no roots are configured and rejects sibling-prefix paths", async () => {
+    const noRoots = await restRequest("/v1/projects/inspect", {
+      allowedProjectRoots: [],
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path: repoRoot })
+    });
+    const sibling = await restRequest("/v1/projects/inspect", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path: `${repoRoot}-sibling` })
+    });
+    expect(noRoots.status).toBe(403);
+    expect(noRoots.body.error?.code).toBe("PROJECT_ROOT_DENIED");
+    expect(sibling.status).toBe(403);
+    expect(sibling.body.error?.code).toBe("PROJECT_ROOT_DENIED");
   });
 
   it("returns deterministic errors for unsupported endpoints and authorization denial", async () => {

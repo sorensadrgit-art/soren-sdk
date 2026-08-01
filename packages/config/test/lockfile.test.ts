@@ -212,23 +212,22 @@ describe("LockfileService.compare", () => {
     expect(connectorDrift?.severity).toBe("critical");
   });
 
-  it("reports a missing integration as a warning", () => {
-    const lock = service.create(
-      validInput({ connectors: [connector("web-platform")] })
-    );
-    const report = service.compare(lock, {
-      ...current(),
-      connectors: [
-        {
-          ...connector("web-platform"),
-          integrations: [],
-        },
-      ],
-    });
-    const integrationDrift = report.drifts.find((drift) =>
-      drift.field.startsWith("integrations.")
-    );
-    expect(integrationDrift?.severity).toBe("warning");
-    expect(report.inSync).toBe(true);
+  it("reports every selected connector and integration mutation as critical drift", () => {
+    const lock = service.create(validInput({ connectors: [connector("web-platform")] }));
+    const baseline = connector("web-platform");
+    const cases: SelectedConnector[] = [
+      { ...baseline, connectorVersion: "9.9.9" },
+      { ...baseline, digest: sha(99) },
+      { ...baseline, integrations: [{ ...baseline.integrations[0] ?? integration("missing"), version: "9.9.9" }] },
+      { ...baseline, integrations: [{ ...baseline.integrations[0] ?? integration("missing"), digest: sha(99) }] },
+      { ...baseline, integrations: [{ id: "web-platform-integration", versionStatus: "unresolved" }] },
+      { ...baseline, integrations: [] },
+      { ...baseline, integrations: [...baseline.integrations, integration("additional")] }
+    ];
+    for (const changed of cases) {
+      const report = service.compare(lock, { ...current(), connectors: [changed] });
+      expect(report.inSync).toBe(false);
+      expect(report.drifts.some((drift) => drift.severity === "critical")).toBe(true);
+    }
   });
 });

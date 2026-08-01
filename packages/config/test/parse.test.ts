@@ -53,6 +53,19 @@ describe("safe YAML/JSON parsing", () => {
     );
   });
 
+  it("treats quoted values, comments, and block scalar text containing YAML tokens as ordinary text", () => {
+    expect(
+      parseYamlText(
+        "quoted: '*name &name .inf'\ncomment: plain # *name &name .inf\nblock: |-\n  *name &name .inf\n",
+        "config.yaml"
+      )
+    ).toEqual({
+      quoted: "*name &name .inf",
+      comment: "plain",
+      block: "*name &name .inf"
+    });
+  });
+
   it("rejects alias bombs", () => {
     expect(codeOf(() => parseYamlText("a: &a [*a]\n", "config.yaml"))).toBe(
       "CONFIG_ALIAS"

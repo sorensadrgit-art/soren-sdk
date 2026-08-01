@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { isAbsolute, resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 
 import {
   AllowReadOnlyAuthorizer,
@@ -103,13 +103,11 @@ function protocolMeta(request: IncomingMessage): ProtocolMetadata {
 }
 
 function assertAllowedProjectRoot(path: string, allowedRoots: string[]): void {
-  if (allowedRoots.length === 0) {
-    return;
-  }
   const absolutePath = isAbsolute(path) ? resolve(path) : resolve(process.cwd(), path);
-  const allowed = allowedRoots
-    .map((root) => resolve(root))
-    .some((root) => absolutePath === root || absolutePath.startsWith(`${root}/`));
+  const allowed = allowedRoots.some((configuredRoot) => {
+    const contained = relative(resolve(configuredRoot), absolutePath);
+    return contained === "" || (!contained.startsWith("..") && !isAbsolute(contained));
+  });
   if (!allowed) {
     throw new ProtocolError(
       "PROJECT_ROOT_DENIED",
