@@ -89,6 +89,26 @@ program against this port.
    locked set is diffed against the current set: a locked connector missing
    from current is `critical`, integration presence drift is `warning`.
 
+9. **CLI fixture lock is git-state independent.** `inspectProject`'s revision
+   detection only inspects the project root's own `.git` marker (it does not
+   walk up), so the `config-project` fixture (which has no `.git`) resolves to
+   `vcs: "none"` and its project snapshot digest is stable across repo
+   commits. The fixture `soren-sdk.lock` binds an empty route plan
+   (`routePlanId: ""`, `routePlanDigest` = digest of `""`), matching what
+   `lock check` computes when `--route-plan` is omitted.
+
+10. **CLI catalog construction is lazy.** `runCli` only constructs
+    `FileSystemConnectorCatalog` for commands that need it (`catalog`,
+    `connector health`), so read-only commands (`config show`, `policy
+    resolve`, `lock inspect`, `lock check`) work from any cwd without a
+    connector catalog.
+
+11. **`lock create` binds no connectors in phase 5.** The CLI passes an empty
+    `connectors`/`unavailable` set; deriving `SelectedConnector`s from the
+    route plan's `selectedProviders` is deferred to the route/selection phase
+    (phase 6+). The route plan contributes only `planId` + `digest` to the
+    lock binding.
+
 ## Provider-neutrality
 
 - No consumer in `packages/config` imports `node:fs` at module top level except
