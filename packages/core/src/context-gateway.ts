@@ -79,6 +79,10 @@ export interface RunGrant {
   providerId: string;
   toolIds: string[];
   inventoryDigest: Digest;
+  /** Persisted negotiation binding. Optional only for input compatibility; issuance fills these. */
+  protocolVersion?: string;
+  extensions?: string[];
+  negotiationDigest?: Digest;
   issuedAt: string;
   expiresAt: string;
   allowRemoteProjectContent: boolean;
@@ -108,6 +112,7 @@ export function inventoryDigest(inventory: ToolInventory): Digest {
   return digestJson({
     providerId: inventory.providerId,
     protocolVersions: sorted(inventory.protocolVersions, (left, right) => left.localeCompare(right)),
+    extensions: sorted(inventory.extensions ?? [], (left, right) => left.localeCompare(right)),
     tools: sorted(inventory.tools, (left, right) => left.id.localeCompare(right.id)).map(({ id, description, readOnly, exposesProjectContent, inputSchema, outputSchema }) => ({ id, description, readOnly, exposesProjectContent, inputSchema: inputSchema ?? {}, outputSchema: outputSchema ?? {} }))
   } as JsonValue);
 }
@@ -216,9 +221,22 @@ export function createRunGrant(
     }
   }
 
+  const defaultProtocolVersion = sorted(inventory.protocolVersions, (left, right) => left.localeCompare(right, undefined, { numeric: true })).at(-1);
+  const protocolVersion = input.protocolVersion ?? defaultProtocolVersion;
+  if (protocolVersion === undefined || !inventory.protocolVersions.includes(protocolVersion)) {
+    throw new TypeError("Grant protocol is unavailable.");
+  }
+  const extensions = sorted([...(new Set(input.extensions ?? []))], (left, right) => left.localeCompare(right));
+  const negotiation = negotiateProtocol(inventory, [protocolVersion], extensions, input.issuedAt, input.expiresAt);
+  if (input.negotiationDigest !== undefined && input.negotiationDigest !== negotiation.digest) {
+    throw new TypeError("Invalid negotiation digest.");
+  }
   const normalized: Omit<RunGrant, "digest"> = {
     ...input,
-    toolIds
+    toolIds,
+    protocolVersion,
+    extensions,
+    negotiationDigest: negotiation.digest
   };
   return {
     ...normalized,
@@ -276,6 +294,15 @@ export class ReadOnlyToolGateway {
     if (grant.inventoryDigest !== inventoryDigest(inventory)) {
       event("INVENTORY_CHANGED");
       throw new TypeError("Tool inventory changed.");
+    }
+    if (
+      grant.protocolVersion === undefined ||
+      grant.negotiationDigest === undefined ||
+      !inventory.protocolVersions.includes(grant.protocolVersion) ||
+      grant.negotiationDigest !== negotiateProtocol(inventory, [grant.protocolVersion], grant.extensions ?? [], grant.issuedAt, grant.expiresAt).digest
+    ) {
+      event("NEGOTIATION_CHANGED");
+      throw new TypeError("Negotiated protocol changed.");
     }
 
     const tool = inventory.tools.find((candidate) => candidate.id === toolId);
