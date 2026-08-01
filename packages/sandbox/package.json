@@ -1,14 +1,11 @@
 {
-  "name": "@soren-sdk/cli",
+  "name": "@soren-sdk/sandbox",
   "version": "0.1.0",
   "private": true,
-  "description": "Read-only catalog CLI for Soren SDK.",
+  "description": "Provider-neutral isolated sandbox interfaces and implementations for Soren SDK apply.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": {
-    "soren-sdk": "./dist/bin.js"
-  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -21,18 +18,12 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run",
-    "start": "node ./dist/bin.js"
+    "test": "vitest run"
   },
   "dependencies": {
-    "@soren-sdk/contracts": "workspace:*",
-    "@soren-sdk/core": "workspace:*",
-    "@soren-sdk/connectors": "workspace:*",
-    "@soren-sdk/planner": "workspace:*",
-    "@soren-sdk/evidence": "workspace:*"
+    "@soren-sdk/contracts": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "24.13.3",
     "typescript": "6.0.3",
     "vitest": "4.1.10"
   }

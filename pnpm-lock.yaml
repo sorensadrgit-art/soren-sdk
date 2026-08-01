@@ -24,6 +24,22 @@ importers:
         specifier: 4.1.10
         version: 4.1.10(@types/node@24.13.3)(vite@8.1.5(@types/node@24.13.3))
 
+  packages/apply:
+    dependencies:
+      '@soren-sdk/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@soren-sdk/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox
+    devDependencies:
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.1.5(@types/node@24.13.3))
+
   packages/cli:
     dependencies:
       '@soren-sdk/connectors':
@@ -35,6 +51,12 @@ importers:
       '@soren-sdk/core':
         specifier: workspace:*
         version: link:../core
+      '@soren-sdk/evidence':
+        specifier: workspace:*
+        version: link:../evidence
+      '@soren-sdk/planner':
+        specifier: workspace:*
+        version: link:../planner
     devDependencies:
       '@types/node':
         specifier: 24.13.3
@@ -80,6 +102,76 @@ importers:
         specifier: workspace:*
         version: link:../contracts
     devDependencies:
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.1.5(@types/node@24.13.3))
+
+  packages/evidence:
+    dependencies:
+      '@soren-sdk/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@soren-sdk/planner':
+        specifier: workspace:*
+        version: link:../planner
+      '@soren-sdk/verification':
+        specifier: workspace:*
+        version: link:../verification
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.1.5(@types/node@24.13.3))
+
+  packages/planner:
+    dependencies:
+      '@soren-sdk/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.1.5(@types/node@24.13.3))
+
+  packages/sandbox:
+    dependencies:
+      '@soren-sdk/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.1.5(@types/node@24.13.3))
+
+  packages/verification:
+    dependencies:
+      '@soren-sdk/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@soren-sdk/planner':
+        specifier: workspace:*
+        version: link:../planner
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.3
+        version: 24.13.3
       typescript:
         specifier: 6.0.3
         version: 6.0.3
