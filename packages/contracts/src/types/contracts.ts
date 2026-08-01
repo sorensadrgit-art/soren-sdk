@@ -386,16 +386,24 @@ export interface SorenSdkLock {
   catalogSnapshotDigest: Digest;
   policySnapshotDigest: Digest;
   projectSnapshotDigest: Digest;
+  configDigest: Digest;
+  routePlanId: string;
+  routePlanDigest: Digest;
   connectors: Array<{
     id: string;
     connectorVersion: string;
     digest: Digest;
     integrations: Array<{
       id: string;
-      versionStatus: "not-applicable" | "resolved";
+      versionStatus: "not-applicable" | "resolved" | "unresolved";
       version?: string;
       digest?: string;
     }>;
+  }>;
+  unavailable: Array<{
+    id: string;
+    reasonCode: string;
+    reason: string;
   }>;
   protocolResolutions: Array<{
     name: string;
