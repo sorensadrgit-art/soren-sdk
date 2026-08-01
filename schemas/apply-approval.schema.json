@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/apply-approval.schema.json",
+  "title": "Soren SDK Apply Approval",
+  "description": "Explicit, single-use approval bound to an exact immutable execution plan, project snapshot, and policy snapshot.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contractKind",
+    "approvalId",
+    "executionPlanId",
+    "executionPlanDigest",
+    "projectSnapshotId",
+    "policySnapshotId",
+    "allowedOperations",
+    "allowedPaths",
+    "allowedCommandIds",
+    "allowedNetworkHosts",
+    "limits",
+    "expiresAt",
+    "approver",
+    "nonce",
+    "integrityDigest"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0-draft.1"
+    },
+    "contractKind": {
+      "const": "apply-approval"
+    },
+    "approvalId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "executionPlanId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "executionPlanDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "projectSnapshotId": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "policySnapshotId": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "allowedOperations": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "create-file",
+          "replace-file",
+          "delete-file",
+          "create-directory",
+          "remove-empty-directory"
+        ]
+      },
+      "uniqueItems": true,
+      "minItems": 0
+    },
+    "allowedPaths": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "allowedCommandIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "default": []
+    },
+    "allowedNetworkHosts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "default": []
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxFiles",
+        "maxBytes",
+        "maxOperations",
+        "maxDurationSeconds"
+      ],
+      "properties": {
+        "maxFiles": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxOperations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxDurationSeconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "approver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "agent",
+            "service",
+            "user"
+          ]
+        }
+      }
+    },
+    "nonce": {
+      "type": "string",
+      "minLength": 16,
+      "pattern": "^[A-Za-z0-9_-]{16,128}$"
+    },
+    "integrityDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
