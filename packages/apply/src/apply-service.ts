@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { SandboxSession, SandboxSnapshot } from "@soren-sdk/sandbox";
+import type { SandboxProvider, SandboxSession, SandboxSnapshot } from "@soren-sdk/sandbox";
 
 import {
   assertApprovalBindsPlan,
@@ -35,9 +35,20 @@ import {
 } from "./types.js";
 
 export interface ApplyServiceOptions {
-  /** Deterministic clock override for tests. */
   clock?: { now(): number };
   evidenceSink: ApplyEvidenceSink;
+  sandboxProvider?: SandboxProvider;
+  /** Internal test-only capability. Production construction never enables apply. */
+  testCapability?: symbol;
+}
+
+const TEST_APPLY_CAPABILITY = Symbol("soren-sdk.test-apply-capability");
+
+/** Creates an apply service for deterministic tests only. Public adapters stay disabled. */
+export function createApplyServiceForTesting(
+  options: Omit<ApplyServiceOptions, "testCapability"> & Record<string, unknown>
+): DefaultApplyService {
+  return new DefaultApplyService({ ...options, testCapability: TEST_APPLY_CAPABILITY });
 }
 
 /**
@@ -51,7 +62,9 @@ export interface ApplyServiceOptions {
  */
 export class DefaultApplyService implements ApplyService {
   readonly #evidenceSink: ApplyEvidenceSink;
+  readonly #sandboxProvider: SandboxProvider | undefined;
   readonly #now: () => number;
+  readonly #preparations = new Map<string, { preparation: ApplyPreparation; input: PrepareApplyInput; consumed: boolean }>();
   readonly #usedApprovals = new Set<string>();
   readonly #cancelledRuns = new Set<string>();
   readonly #crashStates = new Map<string, CrashStateRecord>();
@@ -63,12 +76,9 @@ export class DefaultApplyService implements ApplyService {
 
   constructor(options: ApplyServiceOptions) {
     this.#evidenceSink = options.evidenceSink;
+    this.#sandboxProvider = options.sandboxProvider;
     this.#now = options.clock?.now ?? Date.now;
-  }
-
-  /** Test hook: mark apply as enabled for internal evaluation only. */
-  setEnabledForTesting(enabled: boolean): void {
-    this.#applyDisabled = !enabled;
+    this.#applyDisabled = options.testCapability !== TEST_APPLY_CAPABILITY;
   }
 
   prepare(input: PrepareApplyInput): ApplyPreparation {
@@ -140,6 +150,13 @@ export class DefaultApplyService implements ApplyService {
       ready: failedGates.length === 0
     };
 
+    // Object identity is the preparation capability. Clones cannot authorize
+    // mutation and the stored object is immutable after all gates pass.
+    Object.freeze(preparation.gates);
+    Object.freeze(preparation.operations);
+    Object.freeze(preparation);
+    this.#preparations.set(runId, { preparation, input, consumed: false });
+
     void this.#emit({
       kind: "apply.prepared",
       recordedAt: preparation.preparedAt,
@@ -159,6 +176,28 @@ export class DefaultApplyService implements ApplyService {
   async apply(input: ApplyApprovedPlanInput): Promise<ApplyResult> {
     this.#assertApplyEnabled();
     const preparation = input.preparation;
+    const stored = this.#preparations.get(preparation.runId);
+    if (stored === undefined || stored.consumed || stored.preparation !== preparation) {
+      throw new ApplyError(
+        "APPLY_PREPARATION_INVALID",
+        "Apply preparation is unknown, modified, reused, or belongs to another service instance."
+      );
+    }
+    // Re-run all binding checks immediately before the first mutation using
+    // the internally retained input, never caller-supplied preparation data.
+    assertApprovalIntegrity(stored.input.approval);
+    assertApprovalNotExpired(stored.input.approval, this.#now());
+    assertPlanApplyMode(stored.input.executionPlan);
+    assertApprovalBindsPlan(stored.input.approval, stored.input.executionPlan);
+    assertApprovalBindsProject(stored.input.approval, stored.input.projectSnapshot);
+    assertApprovalBindsPolicy(stored.input.approval, stored.input.policySnapshot);
+    assertNoCommands(stored.input.approval);
+    assertNoNetwork(stored.input.approval);
+    assertLimitsWithinPolicy(stored.input.approval, stored.input.sandboxPolicy);
+    if (stored.input.vcsState.protectedBranch) {
+      throw new ApplyError("APPLY_DRIFT_PROJECT", "Protected workspace cannot be mutated.");
+    }
+    stored.consumed = true;
     if (!preparation.ready) {
       throw new ApplyError("APPLY_NOT_READY", `Run ${preparation.runId} is not ready to apply.`);
     }
@@ -193,7 +232,7 @@ export class DefaultApplyService implements ApplyService {
       detail: { executionPlanId: preparation.executionPlanId }
     });
 
-    const sandbox = await this.#createSandbox(input.sandboxId);
+    const sandbox = await this.#createSandbox(input.sandboxId, preparation.runId);
     let beforeSnapshot: SandboxSnapshot;
     try {
       beforeSnapshot = await sandbox.snapshot();
@@ -312,7 +351,7 @@ export class DefaultApplyService implements ApplyService {
         preparation.runId,
         sandbox,
         rollbackRecords,
-        beforeSnapshot.digest
+        beforeSnapshot
       );
       rollbackFailed = rollbackResult.status === "rollback-failed";
       if (rollbackFailed) errors.push(...rollbackResult.errors);
@@ -471,8 +510,14 @@ export class DefaultApplyService implements ApplyService {
     runId: string,
     sandbox: SandboxSession,
     records: RollbackRecordEntry[],
-    beforeSnapshotDigest: string
+    beforeSnapshot: SandboxSnapshot | string
   ): Promise<RollbackResult> {
+    const beforeSnapshotDigest = typeof beforeSnapshot === "string" ? beforeSnapshot : beforeSnapshot.digest;
+    const preExistingDirectories = new Set(
+      typeof beforeSnapshot === "string"
+        ? []
+        : beforeSnapshot.entries.filter((entry) => entry.type === "directory").map((entry) => entry.path)
+    );
     const ordered = [...records].sort(
       (left, right) => right.operationIndex - left.operationIndex
     );
@@ -496,6 +541,15 @@ export class DefaultApplyService implements ApplyService {
             // A create operation had no prior file. Removal is idempotent so a
             // failed pre-write operation does not make rollback fail.
             await sandbox.remove(record.path).catch(() => undefined);
+            // Remove only ancestors not represented in the before snapshot,
+            // deepest first. Pre-existing directories are never removed.
+            const parts = record.path.split("/");
+            for (let end = parts.length - 1; end > 0; end -= 1) {
+              const directory = parts.slice(0, end).join("/");
+              if (!preExistingDirectories.has(directory)) {
+                await sandbox.remove(directory).catch(() => undefined);
+              }
+            }
           } else {
             await sandbox.write(record.path, prior);
           }
@@ -542,33 +596,21 @@ export class DefaultApplyService implements ApplyService {
     return { runId, status, reverted, verified, failed, errors, verifiedDigest: verifiedDigest as `${string}` | null };
   }
 
-  async #createSandbox(sandboxId: string): Promise<SandboxSession> {
-    const factory = (globalThis as Record<string, unknown>)[
-      "__soren_sdk_phase9_sandbox_factory"
-    ] as SandboxFactory | undefined;
-    if (factory !== undefined) {
-      return factory.create(sandboxId);
+  async #createSandbox(sandboxId: string, runId?: string): Promise<SandboxSession> {
+    if (this.#sandboxProvider === undefined) {
+      throw new ApplyError("APPLY_INPUT_INVALID", `No sandbox provider configured for ${sandboxId}.`);
     }
-    throw new ApplyError(
-      "APPLY_INPUT_INVALID",
-      `No sandbox factory configured for sandbox ${sandboxId}.`
-    );
+    const stored = runId === undefined ? undefined : this.#preparations.get(runId);
+    const policy = stored?.input.sandboxPolicy;
+    if (policy === undefined) {
+      throw new ApplyError("APPLY_INPUT_INVALID", "Sandbox policy is unavailable.");
+    }
+    return this.#sandboxProvider.create({ policy, root: `/sandbox/${sandboxId}`, sandboxId });
   }
 
   async #emit(event: ApplyEvidenceEvent): Promise<void> {
     await this.#evidenceSink.record(event);
   }
-}
-
-/**
- * Sandbox factory hook used by tests and local adapters.
- */
-export interface SandboxFactory {
-  create(sandboxId: string): Promise<SandboxSession>;
-}
-
-export function registerSandboxFactory(factory: SandboxFactory): void {
-  (globalThis as Record<string, unknown>)["__soren_sdk_phase9_sandbox_factory"] = factory;
 }
 
 function assertOperationAllowedGate(

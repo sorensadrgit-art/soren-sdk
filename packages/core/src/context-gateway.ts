@@ -27,6 +27,8 @@ export interface ContextRequest {
   connectorIds: string[];
   categories: ContextCategory[];
   maxItems: number;
+  /** UTF-8 context budget. Omitted preserves the legacy item-only limit. */
+  maxBytes?: number;
   now: string;
 }
 
@@ -118,7 +120,7 @@ export function selectContext(
   }
   const ids = new Set(request.connectorIds);
   const categories = new Set(request.categories);
-  return sorted(
+  const candidates = sorted(
     sources.filter((source) => {
       if (
         !source.reviewed ||
@@ -139,16 +141,17 @@ export function selectContext(
       `${left.connectorId}\u0000${left.category}\u0000${left.id}`.localeCompare(
         `${right.connectorId}\u0000${right.category}\u0000${right.id}`
       )
-  )
-    .slice(0, request.maxItems)
-    .map(({ id, connectorId, category, origin, digest, content }) => ({
-      sourceId: id,
-      connectorId,
-      category,
-      origin,
-      digest,
-      content
-    }));
+  );
+  const selected: SelectedContext[] = [];
+  let bytes = 0;
+  for (const source of candidates) {
+    if (selected.length >= request.maxItems) break;
+    const sourceBytes = new TextEncoder().encode(source.content).byteLength;
+    if (request.maxBytes !== undefined && (sourceBytes > request.maxBytes || bytes + sourceBytes > request.maxBytes)) continue;
+    bytes += sourceBytes;
+    selected.push({ sourceId: source.id, connectorId: source.connectorId, category: source.category, origin: source.origin, digest: source.digest, content: source.content });
+  }
+  return selected;
 }
 
 export function createRunGrant(

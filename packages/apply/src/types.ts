@@ -210,6 +210,7 @@ export class ApplyError extends Error {
     | "APPLY_DRIFT_POLICY"
     | "APPLY_NOT_READY"
     | "APPLY_DISABLED"
+    | "APPLY_PREPARATION_INVALID"
     | "APPLY_ROLLBACK_FAILED"
     | "APPLY_CANCELLED"
     | "APPLY_CRASH_STATE"

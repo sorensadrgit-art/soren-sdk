@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 import type { SandboxSession } from "@soren-sdk/sandbox";
 import { MemorySandboxSession } from "@soren-sdk/sandbox";
 
+import type { DefaultApplyService } from "../src/index.js";
 import {
-  DefaultApplyService,
-  InMemoryEvidenceSink,
-  registerSandboxFactory
+  createApplyServiceForTesting,
+  InMemoryEvidenceSink
 } from "../src/index.js";
 import {
   digestContent,
@@ -89,20 +89,14 @@ function preparation(service: DefaultApplyService) {
 describe("rollback restoration", () => {
   it("restores replaced and deleted files and removes created files", async () => {
     const evidence = new InMemoryEvidenceSink();
-    const service = new DefaultApplyService({
-      evidenceSink: evidence,
-      clock: fixedClock()
-    });
-    service.setEnabledForTesting(true);
-
     const { session, raw } = persistentSession({
       "src/index.ts": encoder.encode("before index"),
       "src/old.ts": encoder.encode("before old")
     });
-    registerSandboxFactory({
-      async create() {
-        return session;
-      }
+    const service = createApplyServiceForTesting({
+      evidenceSink: evidence,
+      clock: fixedClock(),
+      sandboxProvider: { async create() { return session; } }
     });
 
     const prepared = preparation(service);
