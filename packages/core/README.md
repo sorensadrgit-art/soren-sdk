@@ -2,10 +2,11 @@
 
 Provider-neutral application services for Soren SDK.
 
-The current package exposes two stable service areas:
+The current package exposes three stable service areas:
 
 - Connector catalog service interfaces
 - Static read-only project inspection
+- Read-only context gateway with authoritative grant revocation and bounded cancellation
 
 ## Public project-inspector API
 
@@ -107,3 +108,18 @@ Stable error codes:
 - `PROJECT_ROOT_INVALID`
 - `PACKAGE_MANIFEST_INVALID`
 - `PROJECT_SNAPSHOT_INVALID`
+
+## Context gateway cancellation
+
+Register each validated `RunGrant` before use. `revokeGrant()` updates the
+gateway's authoritative grant state synchronously, blocks later dispatches, and
+aborts every active call for that grant. `cancelRun()` cancels a run before or
+during dispatch, and `kill()` aborts all active work. Providers receive an
+`AbortSignal` as the third `call()` argument and must bound their asynchronous
+cleanup.
+
+The gateway verifies the stored grant state, inventory digest, and expiration
+again after the provider resolves, before returning a result. Therefore a
+revoked, cancelled, or expired call never returns a successful result. Audit
+events are intentionally redacted and contain no tool input, output, or
+revocation reason.
