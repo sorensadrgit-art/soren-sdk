@@ -84,7 +84,7 @@ function sorted<T>(
 }
 
 function normalizedToolIds(toolIds: readonly string[]): string[] {
-  return sorted(new Set(toolIds), (left, right) => left.localeCompare(right));
+  return sorted([...new Set(toolIds)], (left, right) => left.localeCompare(right));
 }
 
 export function inventoryDigest(inventory: ToolInventory): Digest {
