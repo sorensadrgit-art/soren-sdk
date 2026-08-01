@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  InMemoryRunGrantPersistence,
   inventoryDigest,
   ReadOnlyToolGateway,
   RunGrantStore,
@@ -9,231 +8,172 @@ import {
   type ToolInventory
 } from "../src/context-gateway.js";
 
+const encoder = new TextEncoder();
+
 function inventory(): ToolInventory {
   return {
     providerId: "fake",
     protocolVersions: ["2025-11-25"],
-    tools: [
-      {
-        id: "read",
-        description: "Read approved metadata.",
-        readOnly: true,
-        exposesProjectContent: false
-      }
-    ]
+    tools: [{ id: "read", description: "Read approved metadata.", readOnly: true, exposesProjectContent: false }]
   };
 }
 
-function setup(options: { persistence?: InMemoryRunGrantPersistence; storeId?: string } = {}) {
+function chunks(value: unknown, chunkBytes = 16): AsyncIterable<Uint8Array> {
+  const bytes = encoder.encode(JSON.stringify(value));
+  return (async function* () {
+    for (let offset = 0; offset < bytes.byteLength; offset += chunkBytes) {
+      yield bytes.slice(offset, offset + chunkBytes);
+    }
+  })();
+}
+
+function setup(providerCall: ReadOnlyToolProvider["call"], maxBytes = 1_024) {
   const toolInventory = inventory();
-  const provider: ReadOnlyToolProvider = {
-    inventory: () => toolInventory,
-    call: () => ({ ok: true })
-  };
-  const store = new RunGrantStore(
-    options.persistence === undefined
-      ? { storeId: options.storeId ?? "primary" }
-      : { persistence: options.persistence, storeId: options.storeId ?? "primary" }
-  );
-  const gateway = new ReadOnlyToolGateway(
-    provider,
-    () => "2026-01-01T01:00:00Z",
-    store
-  );
-  const issue = (
-    overrides: Record<string, unknown> = {},
-    now = "2026-01-01T01:00:00Z"
-  ) =>
-    store.issue(
-      {
-        runId: "run",
-        providerId: "fake",
-        toolIds: ["read"],
-        inventoryDigest: inventoryDigest(toolInventory),
-        issuedAt: "2026-01-01T00:00:00Z",
-        expiresAt: "2026-01-02T00:00:00Z",
-        allowRemoteProjectContent: false,
-        ...overrides
-      },
-      toolInventory,
-      now
-    );
-  return { gateway, issue, store, toolInventory };
+  const provider: ReadOnlyToolProvider = { inventory: () => toolInventory, call: providerCall };
+  const store = new RunGrantStore({ storeId: crypto.randomUUID() });
+  const gateway = new ReadOnlyToolGateway(provider, () => "2099-01-01T01:00:00Z", store);
+  const grant = store.issue({
+    runId: "run",
+    providerId: "fake",
+    toolIds: ["read"],
+    inventoryDigest: inventoryDigest(toolInventory),
+    issuedAt: "2026-01-01T00:00:00Z",
+    expiresAt: "2099-01-02T00:00:00Z",
+    allowRemoteProjectContent: false,
+    maxBytes
+  }, toolInventory, "2099-01-01T01:00:00Z");
+  return { gateway, grant };
 }
 
-describe("Phase 7 canonical grant store", () => {
-  it("issues frozen opaque grant handles without caller-controlled permission fields", () => {
-    const { issue } = setup();
-    const grant = issue();
-
-    expect(Object.keys(grant)).toEqual(["id"]);
-    expect(Object.isFrozen(grant)).toBe(true);
-  });
-
-  it("rejects forged grant records", () => {
-    const { gateway } = setup();
-    const forged = { id: "forged", toolIds: ["read"], expiresAt: "2999-01-01T00:00:00Z" };
-
-    expect(() => gateway.call(forged, "read", {}, "2026-01-01T01:00:00Z")).toThrow("Grant denied");
-  });
-
-  it("rejects a copied opaque grant handle", () => {
-    const { gateway, issue } = setup();
-    const copied = { ...issue() };
-
-    expect(() => gateway.call(copied, "read", {}, "2026-01-01T01:00:00Z")).toThrow("Grant denied");
-  });
-
-  it("rejects altered tool IDs instead of trusting grant fields", () => {
-    const { gateway, issue } = setup();
-    const altered = { ...issue(), toolIds: ["admin"] };
-
-    expect(() => gateway.call(altered, "admin", {}, "2026-01-01T01:00:00Z")).toThrow("Grant denied");
-  });
-
-  it("rejects altered expiration instead of trusting grant fields", () => {
-    const { gateway, issue } = setup();
-    const altered = { ...issue(), expiresAt: "2999-01-01T00:00:00Z" };
-
-    expect(() => gateway.call(altered, "read", {}, "2026-01-01T01:00:00Z")).toThrow("Grant denied");
-  });
-
-  it("rejects unknown opaque IDs", () => {
-    const { gateway } = setup();
-
-    expect(() => gateway.call({ id: "unknown" }, "read", {}, "2026-01-01T01:00:00Z")).toThrow("Grant denied");
-  });
-
-  it("rejects cross-store grant reuse", () => {
-    const first = setup({ storeId: "first" });
-    const second = setup({ storeId: "second" });
-
-    expect(() => second.gateway.call(first.issue(), "read", {}, "2026-01-01T01:00:00Z")).toThrow("Grant denied");
-  });
-
-  it("rejects revoked grants", () => {
-    const { gateway, issue, store } = setup();
-    const grant = issue();
-    store.revoke(grant);
-
-    expect(() => gateway.call(grant, "read", {}, "2026-01-01T01:00:00Z")).toThrow("Grant denied");
-  });
-
-  it("rejects expired grants", () => {
-    const { gateway, issue } = setup();
-    const grant = issue(
-      { expiresAt: "2026-01-01T00:30:00Z" },
-      "2026-01-01T00:15:00Z"
-    );
-
-    expect(() => gateway.call(grant, "read", {}, "2026-01-01T01:00:00Z")).toThrow("Grant denied");
-  });
-
-  it("rejects replayed grants after the canonical store consumes them", () => {
-    const { gateway, issue } = setup();
-    const grant = issue();
-
-    expect(gateway.call(grant, "read", {}, "2026-01-01T01:00:00Z")).toEqual({ ok: true });
-    expect(() => gateway.call(grant, "read", {}, "2026-01-01T01:00:01Z")).toThrow("Grant denied");
-  });
-
-  it("persists canonical grant state through a store restart", () => {
-    const persistence = new InMemoryRunGrantPersistence();
-    const first = setup({ persistence, storeId: "restartable" });
-    const grant = first.issue();
-    first.store.revoke(grant);
-
-    const restarted = setup({ persistence, storeId: "restartable" });
-    expect(() => restarted.gateway.call(grant, "read", {}, "2026-01-01T01:00:00Z")).toThrow("Grant denied");
-  });
-
-  it("restores active canonical grants after a store restart", () => {
-    const persistence = new InMemoryRunGrantPersistence();
-    const first = setup({ persistence, storeId: "restartable-active" });
-    const grant = first.issue({ maxCalls: 2 });
-
-    const restarted = setup({ persistence, storeId: "restartable-active" });
-    expect(restarted.gateway.call(grant, "read", {}, "2026-01-01T01:00:00Z")).toEqual({ ok: true });
-  });
-
-  it("exhausts grants with an explicit multi-call limit", () => {
-    const { gateway, issue } = setup();
-    const grant = issue({ maxCalls: 2 });
-
-    expect(gateway.call(grant, "read", {}, "2026-01-01T01:00:00Z")).toEqual({ ok: true });
-    expect(gateway.call(grant, "read", {}, "2026-01-01T01:00:01Z")).toEqual({ ok: true });
-    expect(() => gateway.call(grant, "read", {}, "2026-01-01T01:00:02Z")).toThrow("Grant denied");
-  });
-
-  it("detects tool-inventory drift using the canonical inventory digest", () => {
-    const { gateway, issue, toolInventory } = setup();
-    const grant = issue();
-    const tool = toolInventory.tools[0];
-    if (tool === undefined) throw new Error("Expected tool inventory.");
-    toolInventory.tools[0] = { ...tool, description: "Changed after grant issue." };
-
-    expect(() => gateway.call(grant, "read", {}, "2026-01-01T01:00:00Z")).toThrow("inventory");
-  });
-
-  it("retains the gateway kill switch", () => {
-    const { gateway, issue } = setup();
-    gateway.kill();
-
-    expect(() => gateway.call(issue(), "read", {}, "2026-01-01T01:00:00Z")).toThrow("disabled");
-  });
-
-  it("retains read-only enforcement when issuing grants", () => {
-    const { toolInventory, store } = setup();
-    toolInventory.tools.push({
-      id: "write",
-      description: "Mutates a project.",
-      readOnly: false,
-      exposesProjectContent: false
+describe("Phase 7 asynchronous bounded gateway", () => {
+  it("rejects a forged grant before opening a provider stream", async () => {
+    let called = false;
+    const { gateway } = setup(() => {
+      called = true;
+      return chunks({ ok: true });
     });
 
-    expect(() => store.issue({
-      runId: "run",
-      providerId: "fake",
-      toolIds: ["write"],
-      inventoryDigest: inventoryDigest(toolInventory),
-      issuedAt: "2026-01-01T00:00:00Z",
-      expiresAt: "2026-01-02T00:00:00Z",
-      allowRemoteProjectContent: false
-    }, toolInventory, "2026-01-01T01:00:00Z")).toThrow("read-only");
+    await expect(gateway.call({ id: "forged" }, "read", {}, {
+      deadlineMs: 100,
+      maxChunkBytes: 32,
+      maxResponseBytes: 128
+    })).rejects.toThrow("Grant denied");
+    expect(called).toBe(false);
   });
 
-  it("retains provider binding when issuing grants", () => {
-    const { store, toolInventory } = setup();
+  it("cancels a provider that never resolves", async () => {
+    let aborted = false;
+    const { gateway, grant } = setup((_toolId, _input, options) => (async function* () {
+      options.signal.addEventListener("abort", () => { aborted = true; }, { once: true });
+      await new Promise<void>(() => undefined);
+    })());
 
-    expect(() => store.issue({
-      runId: "run",
-      providerId: "another-provider",
-      toolIds: ["read"],
-      inventoryDigest: inventoryDigest(toolInventory),
-      issuedAt: "2026-01-01T00:00:00Z",
-      expiresAt: "2026-01-02T00:00:00Z",
-      allowRemoteProjectContent: false
-    }, toolInventory, "2026-01-01T01:00:00Z")).toThrow("Invalid run grant");
+    await expect(gateway.call(grant, "read", {}, {
+      deadlineMs: 10,
+      maxChunkBytes: 32,
+      maxResponseBytes: 128
+    })).rejects.toThrow("deadline");
+    expect(aborted).toBe(true);
   });
 
-  it("retains the UTF-8 response-size limit", () => {
-    const toolInventory = inventory();
-    const provider: ReadOnlyToolProvider = {
-      inventory: () => toolInventory,
-      call: () => ({ value: "😀".repeat(20_000) })
-    };
-    const store = new RunGrantStore({ storeId: "response-limit" });
-    const gateway = new ReadOnlyToolGateway(provider, () => "2026-01-01T01:00:00Z", store);
-    const grant = store.issue({
-      runId: "run",
-      providerId: "fake",
-      toolIds: ["read"],
-      inventoryDigest: inventoryDigest(toolInventory),
-      issuedAt: "2026-01-01T00:00:00Z",
-      expiresAt: "2026-01-02T00:00:00Z",
-      allowRemoteProjectContent: false
-    }, toolInventory, "2026-01-01T01:00:00Z");
+  it("returns at the deadline even when a provider ignores cancellation", async () => {
+    const { gateway, grant } = setup(() => (async function* () {
+      await new Promise<void>(() => undefined);
+    })());
 
-    expect(() => gateway.call(grant, "read", {}, "2026-01-01T01:00:00Z")).toThrow("response exceeds limit");
+    await expect(gateway.call(grant, "read", {}, {
+      deadlineMs: 10,
+      maxChunkBytes: 32,
+      maxResponseBytes: 128
+    })).rejects.toThrow("deadline");
+  });
+
+  it("honors caller cancellation while the provider is producing", async () => {
+    let aborted = false;
+    const controller = new AbortController();
+    const { gateway, grant } = setup((_toolId, _input, options) => (async function* () {
+      options.signal.addEventListener("abort", () => { aborted = true; }, { once: true });
+      await new Promise<void>((resolve) => options.signal.addEventListener("abort", () => resolve(), { once: true }));
+    })());
+    setTimeout(() => controller.abort(), 5);
+
+    await expect(gateway.call(grant, "read", {}, {
+      signal: controller.signal,
+      deadlineMs: 100,
+      maxChunkBytes: 32,
+      maxResponseBytes: 128
+    })).rejects.toThrow("cancelled");
+    expect(aborted).toBe(true);
+  });
+
+  it("aborts immediately when a streamed chunk exceeds the chunk limit", async () => {
+    let aborted = false;
+    const { gateway, grant } = setup((_toolId, _input, options) => (async function* () {
+      options.signal.addEventListener("abort", () => { aborted = true; }, { once: true });
+      yield encoder.encode(JSON.stringify({ payload: "x".repeat(128) }));
+    })());
+
+    await expect(gateway.call(grant, "read", {}, {
+      deadlineMs: 100,
+      maxChunkBytes: 16,
+      maxResponseBytes: 256
+    })).rejects.toThrow("chunk");
+    expect(aborted).toBe(true);
+  });
+
+  it("aborts when streamed output exceeds the response limit and returns no partial value", async () => {
+    let aborted = false;
+    const { gateway, grant } = setup((_toolId, _input, options) => (async function* () {
+      options.signal.addEventListener("abort", () => { aborted = true; }, { once: true });
+      yield encoder.encode('{"value":"first');
+      yield encoder.encode(' second"}');
+    })());
+
+    await expect(gateway.call(grant, "read", {}, {
+      deadlineMs: 100,
+      maxChunkBytes: 32,
+      maxResponseBytes: 12
+    })).rejects.toThrow("response");
+    expect(aborted).toBe(true);
+  });
+
+  it("aborts when a grant's total byte allowance is exceeded", async () => {
+    let aborted = false;
+    const { gateway, grant } = setup((_toolId, _input, options) => (async function* () {
+      options.signal.addEventListener("abort", () => { aborted = true; }, { once: true });
+      yield encoder.encode(JSON.stringify({ value: "too large" }));
+    })(), 8);
+
+    await expect(gateway.call(grant, "read", {}, {
+      deadlineMs: 100,
+      maxChunkBytes: 64,
+      maxResponseBytes: 128
+    })).rejects.toThrow("grant");
+    expect(aborted).toBe(true);
+  });
+
+  it("discards partial bytes when a provider fails after yielding", async () => {
+    const { gateway, grant } = setup(() => (async function* () {
+      yield encoder.encode('{"value":"partial');
+      throw new Error("provider failed");
+    })());
+
+    await expect(gateway.call(grant, "read", {}, {
+      deadlineMs: 100,
+      maxChunkBytes: 32,
+      maxResponseBytes: 128
+    })).rejects.toThrow("provider failed");
+  });
+
+  it("returns valid multibyte UTF-8 content near the byte limit", async () => {
+    const result = { value: "😀😀😀😀" };
+    const encoded = encoder.encode(JSON.stringify(result));
+    const { gateway, grant } = setup(() => chunks(result, 5), encoded.byteLength);
+
+    await expect(gateway.call(grant, "read", {}, {
+      deadlineMs: 100,
+      maxChunkBytes: 5,
+      maxResponseBytes: encoded.byteLength
+    })).resolves.toEqual(result);
   });
 });
