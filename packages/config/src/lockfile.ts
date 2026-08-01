@@ -129,7 +129,9 @@ function normalizeLock(lock: Omit<SorenSdkLock, "digest">): Omit<SorenSdkLock, "
  */
 export function computeLockDigest(lock: Omit<SorenSdkLock, "digest">): Digest {
   const normalized = normalizeLock(lock);
-  const { generatedAt: _generatedAt, ...payload } = normalized;
+  const payload = Object.fromEntries(
+    Object.entries(normalized).filter(([key]) => key !== "generatedAt")
+  );
   return digestJson(jsonValue(payload));
 }
 
