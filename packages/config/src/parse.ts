@@ -129,9 +129,10 @@ export function parseYamlText(text: string, source: string): JsonValue {
   }
   let parsed: unknown;
   try {
+    // NOTE: js-yaml 4.x removed `maxAliasCount` (no-op at runtime); alias and
+    // anchor tokens are rejected by the YAML_ALIAS_TOKEN pre-scan above.
     parsed = yamlLoad(text, {
       schema: JSON_SCHEMA,
-      maxAliasCount: 0,
       filename: source,
     });
   } catch (error) {
