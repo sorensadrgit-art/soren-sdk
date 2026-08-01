@@ -88,6 +88,19 @@ describe("ContractValidator", () => {
     }
   });
 
+  it("rejects a soren-sdk-lock missing the routePlanDigest", () => {
+    const validator = new ContractValidator();
+    const result = validator.validate(
+      "soren-sdk-lock",
+      fixture("invalid", "soren-sdk-lock-missing-route-plan-digest.json")
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues.some((issue) => issue.keyword === "required")).toBe(true);
+    }
+  });
+
   it("validates the capability catalog through its public helper", () => {
     expect(
       validateCapabilityCatalog(fixture("valid", "capability-catalog.json")).ok

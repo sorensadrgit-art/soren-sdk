@@ -12,7 +12,11 @@
     "catalogSnapshotDigest",
     "policySnapshotDigest",
     "projectSnapshotDigest",
+    "configDigest",
+    "routePlanId",
+    "routePlanDigest",
     "connectors",
+    "unavailable",
     "protocolResolutions",
     "runtimeResolutions",
     "digest"
@@ -42,6 +46,40 @@
     "projectSnapshotDigest": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "configDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "routePlanId": {
+      "type": "string"
+    },
+    "routePlanDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "unavailable": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "reasonCode",
+          "reason"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
     },
     "connectors": {
       "type": "array",
@@ -82,7 +120,8 @@
                 "versionStatus": {
                   "enum": [
                     "resolved",
-                    "not-applicable"
+                    "not-applicable",
+                    "unresolved"
                   ]
                 },
                 "version": {
