@@ -235,6 +235,17 @@ export interface PolicyDocument {
   };
 }
 
+export interface SorenConfig {
+  schemaVersion: "1.0.0-draft.1";
+  contractKind: "soren-config";
+  configId: string;
+  preferences?: {
+    preferredProviders?: string[];
+    forbiddenProviders?: string[];
+    maxProviders?: number;
+  };
+}
+
 export interface RouteRequest {
   schemaVersion: "1.0.0-draft.1";
   contractKind: "route-request";

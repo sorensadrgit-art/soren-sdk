@@ -13,6 +13,7 @@ export const CONTRACT_SCHEMA_FILES = {
   "project-snapshot": "project-snapshot.schema.json",
   "route-plan": "route-plan.schema.json",
   "route-request": "route-request.schema.json",
+  "soren-config": "soren-config.schema.json",
   "soren-sdk-lock": "soren-sdk-lock.schema.json"
 } as const;
 

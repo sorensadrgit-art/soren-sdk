@@ -33,6 +33,7 @@ const validFixtures: Array<[ContractSchemaName, string]> = [
   ["project-snapshot", "project-snapshot.json"],
   ["route-plan", "route-plan.json"],
   ["route-request", "route-request.json"],
+  ["soren-config", "soren-config.json"],
   ["soren-sdk-lock", "soren-sdk-lock.json"]
 ];
 
@@ -69,6 +70,21 @@ describe("ContractValidator", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.issues.some((issue) => issue.keyword === "const")).toBe(true);
+    }
+  });
+
+  it("rejects unknown fields in soren-config", () => {
+    const validator = new ContractValidator();
+    const result = validator.validate(
+      "soren-config",
+      fixture("invalid", "soren-config-unknown-field.json")
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(
+        result.issues.some((issue) => issue.keyword === "additionalProperties")
+      ).toBe(true);
     }
   });
 
