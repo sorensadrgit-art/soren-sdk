@@ -230,17 +230,19 @@ export class DefaultApplyService implements ApplyService {
         assertOperationAllowedGate(preparation, operation);
 
         const prior = await this.#captureBefore(sandbox, operation.path);
-        rollbackContents.set(
-          operation.index,
-          prior === null ? null : new Uint8Array(prior)
-        );
-        rollbackRecords.push({
-          operationIndex: operation.index,
-          path: operation.path,
-          reverted: false,
-          verified: false,
-          error: null
-        });
+        const recordRollback = () => {
+          rollbackContents.set(
+            operation.index,
+            prior === null ? null : new Uint8Array(prior)
+          );
+          rollbackRecords.push({
+            operationIndex: operation.index,
+            path: operation.path,
+            reverted: false,
+            verified: false,
+            error: null
+          });
+        };
 
         switch (operation.operation) {
           case "create-file":
@@ -256,6 +258,7 @@ export class DefaultApplyService implements ApplyService {
                 { path: operation.path }
               );
             }
+            recordRollback();
             await sandbox.write(operation.path, content);
             ops.push({
               index: operation.index,
@@ -273,6 +276,7 @@ export class DefaultApplyService implements ApplyService {
                 { path: operation.path }
               );
             }
+            recordRollback();
             await sandbox.remove(operation.path);
             ops.push({
               index: operation.index,
