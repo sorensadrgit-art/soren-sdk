@@ -1,14 +1,7 @@
-# Phases 5-9 Updated Task List
+# Updated Task List
 
-- [x] Fetch and audit exact implementation SHA `1e22f21c47cf387a9d646f0fc3c0ab5f2d0866c8`.
-- [x] Run clean Node 24 frozen install.
-- [x] Run required top-level verification twice.
-- [x] Run each Phase 5-9 workspace package test suite.
-- [x] Run specialized security, recovery/restart, concurrency, fixture and protocol/equivalence test selection.
-- [x] Audit security-sensitive surfaces and exports.
-- [ ] Record explicit integration or rejection rationale for every divergent Phase 5-9 branch.
-- [ ] Remove public test-only apply and fake-port exports.
-- [ ] Add negative production export-surface tests.
-- [ ] Add runnable 31-case security-corpus, restart-recovery, and protocol-equivalence scripts.
-- [ ] Rerun all checks against the remediation SHA.
-- [ ] Obtain independent final approval after H-01 is closed.
+- [ ] Reimplement Phase 7 candidate concepts on #38 baseline with one canonical contract set.
+- [ ] Replace application fake defaults with reviewed adapters and typed unavailable errors.
+- [ ] Port Phase 9 runtime limits and authoritative rechecks with secure test construction.
+- [ ] Design and implement durable atomic Phase 9 ports and restart recovery.
+- [ ] Run targeted suites and two clean Node 24 full verification runs on one final SHA.

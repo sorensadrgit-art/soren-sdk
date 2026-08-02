@@ -1,17 +1,11 @@
 # Phases 5-9 Inventory
 
-Verification target implementation SHA: `1e22f21c47cf387a9d646f0fc3c0ab5f2d0866c8`
-Branch: `review/phases-5-9-master-antigravity`
-PR: #32
+Audited 2026-08-02 against `review/phases-5-9-master-antigravity` at `e077cf9378b6cf277ffacd436d7d37b542565668`.
 
-| Phase | Reviewed scope | Evidence inspected | Status |
+| PR | Head | Decision | Notes |
 |---|---|---|---|
-| 5 | Configuration, policy, lockfile behavior | Core inspector, policy and repository validation tests, frozen install | Verified |
-| 6 | Production service adapters | Connector filesystem, health, snapshot, memory and SQLite adapters and tests | Verified |
-| 7 | Grants, quotas, cancellation, negotiation, schemas, consent, bounded execution, audit, untrusted envelopes | Context gateway, contracts, sandbox and associated tests | Verified by source and suite |
-| 8 | Deterministic plans and evidence | Planner, verification and evidence packages and tests | Verified |
-| 9 | Preparation, approval, recovery, drift, limits, concurrency, fixtures, export hardening | Apply, sandbox and targeted suite | Blocked by public apply export and missing runnable corpus/equivalence evidence |
-
-Workspace packages executed independently: contracts, connectors, core, evidence, planner, sandbox, apply, verification, cli.
-
-The implementation SHA above is the exact remote branch head fetched before audit. Documentation added by this review is intentionally separate from the audited implementation.
+| #24 | e636d35a78e132e6344ec6cca9f294fa22afa3ae | selectively reused / incomplete | Phase 5, 6, and 8 work exists but production application composition still uses fake providers. |
+| #32 | e077cf9378b6cf277ffacd436d7d37b542565668 | blocked | Draft integration branch. |
+| #37 | c76fd63b30e8d76756d20d46a52ec95a649f5669 | selectively reused only | Runtime limits and fixture integrity concepts are useful; durable recovery was reverted and final repair leaves stale test API migration. |
+| #38 | 5bc69ec365500872d585e2ab0870976ce2fa0f93 | integrated baseline | Protocol negotiation and schema validation are represented by current head. |
+| #27/#28/#26/#33/#34/#25/#29 | divergent Phase 7 candidates | blocked pending reconciliation | Each collides in `packages/core/src/context-gateway.ts`; none may be wholesale cherry-picked. |
