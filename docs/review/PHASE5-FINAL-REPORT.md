@@ -14,4 +14,4 @@ Lock drift coverage includes project, catalog, configuration, policy, route plan
 
 Node 24.13.0 verification passed: frozen install; contracts/config/CLI focused tests; config typecheck; lint; typecheck; full tests; build; repository validation; CLI smoke. The full repository sequence was run twice after implementation validation.
 
-Remaining limitation: external CI run ID is recorded in the draft PR after push. No production credential sources are read by Phase 5 services.
+CI: GitHub Actions Contracts CI run `30771638285` completed successfully. No production credential sources are read by Phase 5 services.
