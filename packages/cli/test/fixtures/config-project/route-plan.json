@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0.0-draft.1",
+  "contractKind": "route-plan",
+  "planId": "config-project-route",
+  "createdAt": "2026-08-01T00:00:00.000Z",
+  "status": "approved",
+  "requestId": "config-project-request",
+  "projectSnapshotId": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "catalogSnapshotId": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "policySnapshotId": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "requestedCapabilities": ["css-animation"],
+  "selectedProviders": [],
+  "rejectedProviders": [],
+  "ownership": [],
+  "constraints": [],
+  "uncertainty": 0,
+  "requiredInput": [],
+  "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+}
