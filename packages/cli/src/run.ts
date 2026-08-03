@@ -417,29 +417,22 @@ export function runCli(options: RunCliOptions): number {
         configDigest: current.configDigest,
         routePlanId: current.routePlanId,
         routePlanDigest: current.routePlanDigest,
-        catalogDigest: current.catalogSnapshotId,
-        policyDigest: current.policySnapshotId,
-        routeDigest: current.routePlanDigest,
+        capabilityOntologyVersion: "1.0.0-draft.1",
         connectors: [],
-        integrations: [],
-        unavailable: [],
-        selectedConnectors: [],
-        selectedIntegrations: [],
-        generatedAt: new Date().toISOString()
+        unavailable: []
       });
-      new LockfileService().writeAtomic(fs, outputPath, lock, parsed.force);
-      options.io.stdout(
-        parsed.json
-          ? formatJson(lock)
-          : `Created lock ${lock.digest} at ${outputPath}\n`
-      );
+      mkdirSync(dirname(outputPath), { recursive: true });
+      fs.writeFileAtomic(outputPath, JSON.stringify(lock, null, 2));
+      options.io.stdout(parsed.json ? formatJson(lock) : formatLock(lock));
       return 0;
     }
 
     throw new CliUsageError(usage());
   } catch (error) {
-    if (error instanceof CliUsageError) {
-      options.io.stderr(`${error.message}\n`);
+    if (error instanceof CliUsageError || error instanceof TypeError) {
+      options.io.stderr(
+        `${error instanceof Error ? error.message : "Invalid arguments."}\n${usage()}\n`
+      );
       return 2;
     }
     if (error instanceof ProjectInspectionError) {
