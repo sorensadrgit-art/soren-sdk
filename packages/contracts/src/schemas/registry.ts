@@ -15,6 +15,7 @@ export const CONTRACT_SCHEMA_FILES = {
   "route-plan": "route-plan.schema.json",
   "route-request": "route-request.schema.json",
   "runner-result": "runner-result.schema.json",
+  "soren-config": "soren-config.schema.json",
   "soren-sdk-lock": "soren-sdk-lock.schema.json",
   "verification-plan": "verification-plan.schema.json"
 } as const;
