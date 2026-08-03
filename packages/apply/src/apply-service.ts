@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import type { SandboxProvider, SandboxSession, SandboxSnapshot } from "@soren-sdk/sandbox";
+import { digestJson, type JsonValue } from "@soren-sdk/contracts";
+import type { SandboxProvider, SandboxPolicy, SandboxSession, SandboxSnapshot, VcsState } from "@soren-sdk/sandbox";
 
 import {
   assertApprovalBindsPlan,
@@ -17,7 +18,7 @@ import {
   assertOperationAllowed,
   assertPathAllowedByApproval
 } from "./approval-validation.js";
-import type { ApplyEvidenceSink } from "./ports.js";
+import type { ApplyEvidenceSink, AuthoritativeApplyStateProviders } from "./ports.js";
 import {
   ApplyError,
   type ApplyApprovedPlanInput,
@@ -38,6 +39,7 @@ export interface ApplyServiceOptions {
   clock?: { now(): number };
   evidenceSink: ApplyEvidenceSink;
   sandboxProvider?: SandboxProvider;
+  authoritativeState: AuthoritativeApplyStateProviders;
   /** Internal test-only capability. Production construction never enables apply. */
   testCapability?: symbol;
 }
@@ -63,6 +65,7 @@ export function createApplyServiceForTesting(
 export class DefaultApplyService implements ApplyService {
   readonly #evidenceSink: ApplyEvidenceSink;
   readonly #sandboxProvider: SandboxProvider | undefined;
+  readonly #authoritativeState: AuthoritativeApplyStateProviders;
   readonly #now: () => number;
   readonly #preparations = new Map<string, { preparation: ApplyPreparation; input: PrepareApplyInput; consumed: boolean }>();
   readonly #usedApprovals = new Set<string>();
@@ -77,6 +80,7 @@ export class DefaultApplyService implements ApplyService {
   constructor(options: ApplyServiceOptions) {
     this.#evidenceSink = options.evidenceSink;
     this.#sandboxProvider = options.sandboxProvider;
+    this.#authoritativeState = options.authoritativeState;
     this.#now = options.clock?.now ?? Date.now;
     this.#applyDisabled = options.testCapability !== TEST_APPLY_CAPABILITY;
   }
@@ -141,10 +145,15 @@ export class DefaultApplyService implements ApplyService {
       executionPlanId: input.executionPlan.executionPlanId,
       executionPlanDigest: input.executionPlan.immutableDigest,
       projectSnapshotId: input.projectSnapshot.snapshotId,
+      projectRevision: input.projectSnapshot.revision,
       policySnapshotId: input.policySnapshot.digest,
+      policyId: input.policySnapshot.policyId,
       sandboxPolicyId: input.sandboxPolicy.policyId,
+      sandboxPolicyDigest: sandboxPolicyDigest(input.sandboxPolicy),
+      approvalIntegrityDigest: input.approval.integrityDigest,
       vcsState: input.vcsState,
       approvalNonce: input.approval.nonce,
+      approvalId: input.approval.approvalId,
       gates,
       operations,
       ready: failedGates.length === 0
@@ -213,16 +222,26 @@ export class DefaultApplyService implements ApplyService {
         `Approval nonce ${preparation.approvalNonce} has already been used.`
       );
     }
-    // Reserve the one-time approval before any asynchronous mutation work so
-    // concurrent apply calls cannot race with the same preparation.
-    this.#usedApprovals.add(preparation.approvalNonce);
-
     const startedAt = new Date(this.#now()).toISOString();
     const ops: ApplyOperationEvent[] = [];
     const rollbackRecords: RollbackRecordEntry[] = [];
     const rollbackContents = new Map<number, Uint8Array | null>();
     this.#rollbackContents.set(preparation.runId, rollbackContents);
     const errors: string[] = [];
+    const limits = stored.input.approval.limits;
+    const touchedPaths = new Set<string>();
+    let actualOperations = 0;
+    let actualBytes = 0;
+    const reserve = (operation: (typeof preparation.operations)[number], bytes: number) => {
+      const elapsed = this.#now() - Date.parse(startedAt);
+      const nextFiles = touchedPaths.has(operation.path) ? touchedPaths.size : touchedPaths.size + 1;
+      if (actualOperations + 1 > limits.maxOperations || nextFiles > limits.maxFiles || actualBytes + bytes > limits.maxBytes || elapsed > limits.maxDurationSeconds * 1000) {
+        throw new ApplyError("APPLY_RESOURCE_LIMIT", "Actual apply resource limit exceeded; mutation was not performed.", { path: operation.path });
+      }
+      actualOperations += 1;
+      actualBytes += bytes;
+      touchedPaths.add(operation.path);
+    };
 
     await this.#emit({
       kind: "apply.started",
@@ -251,6 +270,10 @@ export class DefaultApplyService implements ApplyService {
       redacted: true,
       detail: { beforeSnapshotDigest: beforeSnapshot.digest, sandboxId: input.sandboxId }
     });
+
+    await this.#assertFreshAuthoritativeState(preparation);
+    // Reservation happens only after all fresh state checks and before mutation.
+    this.#usedApprovals.add(preparation.approvalNonce);
 
     let failed = false;
     try {
@@ -297,6 +320,7 @@ export class DefaultApplyService implements ApplyService {
                 { path: operation.path }
               );
             }
+            reserve(operation, content.byteLength);
             recordRollback();
             await sandbox.write(operation.path, content);
             ops.push({
@@ -315,6 +339,7 @@ export class DefaultApplyService implements ApplyService {
                 { path: operation.path }
               );
             }
+            reserve(operation, 0);
             recordRollback();
             await sandbox.remove(operation.path);
             ops.push({
@@ -458,6 +483,78 @@ export class DefaultApplyService implements ApplyService {
         status: "failed",
         message: error instanceof Error ? error.message : `Gate "${code}" failed.`
       });
+    }
+  }
+
+  async #assertFreshAuthoritativeState(
+    preparation: ApplyPreparation
+  ): Promise<void> {
+    const state = this.#authoritativeState;
+    const approved = await state.approvedPlanProvider.getApprovedPlan(
+      preparation.executionPlanId
+    );
+    if (
+      approved === null ||
+      approved.executionPlan.immutableDigest !== preparation.executionPlanDigest ||
+      approved.approval.approvalId !== preparation.approvalId
+    ) {
+      throw new ApplyError("APPLY_APPROVAL_REVOKED", "Approval was revoked or replaced.");
+    }
+    assertApprovalIntegrity(approved.approval);
+    assertApprovalNotExpired(approved.approval, this.#now());
+    if (this.#usedApprovals.has(approved.approval.nonce)) {
+      throw new ApplyError("APPLY_APPROVAL_REPLAYED", "Approval was already consumed.");
+    }
+    assertPlanApplyMode(approved.executionPlan);
+    assertApprovalBindsPlan(approved.approval, approved.executionPlan);
+
+    const project = await state.projectSnapshotProvider.getCurrentProjectSnapshot();
+    if (
+      project === null ||
+      project.snapshotId !== preparation.projectSnapshotId ||
+      project.revision.vcs !== preparation.projectRevision.vcs ||
+      project.revision.commit !== preparation.projectRevision.commit ||
+      project.revision.dirty !== preparation.projectRevision.dirty
+    ) {
+      throw new ApplyError("APPLY_DRIFT_PROJECT", "Project snapshot or revision changed.");
+    }
+    assertApprovalBindsProject(approved.approval, project);
+
+    const policy = await state.resolvedPolicyProvider.getCurrentPolicySnapshot(
+      preparation.policyId
+    );
+    if (policy === null || policy.digest !== preparation.policySnapshotId) {
+      throw new ApplyError("APPLY_DRIFT_POLICY", "Resolved policy snapshot changed.");
+    }
+    assertApprovalBindsPolicy(approved.approval, policy);
+
+    const vcs = await state.vcsStateProvider.getCurrentVcsState();
+    this.#assertCurrentVcsState(vcs, preparation.vcsState);
+
+    const sandboxPolicy = await state.sandboxPolicyProvider.getCurrentSandboxPolicy(
+      preparation.sandboxPolicyId
+    );
+    if (
+      sandboxPolicy === null ||
+      sandboxPolicyDigest(sandboxPolicy) !== preparation.sandboxPolicyDigest
+    ) {
+      throw new ApplyError("APPLY_DRIFT_POLICY", "Sandbox policy changed.");
+    }
+    assertLimitsWithinPolicy(approved.approval, sandboxPolicy);
+  }
+
+  #assertCurrentVcsState(
+    current: VcsState | null,
+    prepared: VcsState
+  ): void {
+    if (
+      current === null ||
+      current.protectedBranch ||
+      current.dirty ||
+      current.branch !== prepared.branch ||
+      current.commit !== prepared.commit
+    ) {
+      throw new ApplyError("APPLY_DRIFT_PROJECT", "VCS state changed or is unsafe.");
     }
   }
 
@@ -626,6 +723,10 @@ function assertOperationAllowedGate(
       `Operation gate for ${operation.path} is not passed.`
     );
   }
+}
+
+function sandboxPolicyDigest(policy: SandboxPolicy): `sha256:${string}` {
+  return digestJson(policy as unknown as JsonValue);
 }
 
 function digestBytes(content: Uint8Array): string {
