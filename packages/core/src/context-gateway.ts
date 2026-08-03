@@ -44,11 +44,14 @@ export interface ToolDefinition {
   description: string;
   readOnly: boolean;
   exposesProjectContent: boolean;
+  inputSchema?: JsonValue;
+  outputSchema?: JsonValue;
 }
 
 export interface ToolInventory {
   providerId: string;
   protocolVersions: string[];
+  extensions?: string[];
   tools: ToolDefinition[];
 }
 
@@ -94,14 +97,29 @@ export function inventoryDigest(inventory: ToolInventory): Digest {
       inventory.protocolVersions,
       (left, right) => left.localeCompare(right)
     ),
+    extensions: sorted(
+      inventory.extensions ?? [],
+      (left, right) => left.localeCompare(right)
+    ),
     tools: sorted(inventory.tools, (left, right) =>
       left.id.localeCompare(right.id)
-    ).map(({ id, description, readOnly, exposesProjectContent }) => ({
-      id,
-      description,
-      readOnly,
-      exposesProjectContent
-    }))
+    ).map(
+      ({
+        id,
+        description,
+        readOnly,
+        exposesProjectContent,
+        inputSchema,
+        outputSchema
+      }) => ({
+        id,
+        description,
+        readOnly,
+        exposesProjectContent,
+        inputSchema: inputSchema ?? null,
+        outputSchema: outputSchema ?? null
+      })
+    )
   } as JsonValue);
 }
 
