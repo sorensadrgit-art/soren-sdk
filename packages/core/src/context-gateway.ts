@@ -75,21 +75,14 @@ export interface ProviderCallOptions {
 /** Providers yield encoded JSON chunks. The gateway owns decoding and all limits. */
 export interface ReadOnlyToolProvider {
   inventory(): ToolInventory;
-  call(
-    toolId: string,
-    input: JsonValue,
-    options: ProviderCallOptions
-  ): AsyncIterable<Uint8Array>;
+  call(toolId: string, input: JsonValue): JsonValue | Promise<JsonValue>;
 }
 
-export interface GatewayCallOptions {
-  signal?: AbortSignal;
-  deadlineMs: number;
-  maxChunkBytes: number;
-  maxResponseBytes: number;
-}
-
-/** A process-bound, opaque handle. Permissions never leave the grant store. */
+/**
+ * A signed-at-creation grant definition. Its quotas are copied into the
+ * authoritative RunGrantStore before any provider call and never read from a
+ * request object during accounting.
+ */
 export interface RunGrant {
   readonly id: string;
 }
@@ -107,12 +100,16 @@ export interface RunGrantRequest {
   toolIds: readonly string[];
   inventoryDigest: Digest;
   issuedAt: string;
-  expiresAt: string;
+  /** Optional deadline. An omitted deadline does not expire the grant. */
+  expiresAt?: string;
   allowRemoteProjectContent: boolean;
-  /** Defaults to one, making each grant non-replayable. */
+  /** Maximum provider invocations. Omitted means no grant-specific cap. */
   maxCalls?: number;
-  /** Defaults to 65,536 UTF-8 bytes across all provider output for this grant. */
-  maxBytes?: number;
+  /** Maximum committed UTF-8 JSON response bytes. */
+  maxTotalResponseBytes?: number;
+  /** Maximum UTF-8 JSON bytes for one response, capped by the gateway limit. */
+  maxResponseBytes?: number;
+  digest: Digest;
 }
 
 /** Immutable canonical data held only by the persistence port and grant store. */
@@ -141,22 +138,33 @@ function copyStoredGrant(grant: StoredRunGrant): StoredRunGrant {
   return Object.freeze({ ...grant, toolIds: Object.freeze([...grant.toolIds]) });
 }
 
-/** Test and local adapter. Production storage can implement the same narrow port. */
-export class InMemoryRunGrantPersistence implements RunGrantPersistence {
-  readonly #stores = new Map<string, Map<string, StoredRunGrant>>();
-
-  load(storeId: string): readonly StoredRunGrant[] {
-    return [...(this.#stores.get(storeId)?.values() ?? [])].map(copyStoredGrant);
-  }
-
-  save(storeId: string, grant: StoredRunGrant): void {
-    const records = this.#stores.get(storeId) ?? new Map<string, StoredRunGrant>();
-    records.set(grant.id, copyStoredGrant(grant));
-    this.#stores.set(storeId, records);
-  }
+export interface GrantSnapshot {
+  grantId: string;
+  runId: string;
+  providerId: string;
+  revoked: boolean;
+  callsUsed: number;
+  responseBytesUsed: number;
+  responseBytesReserved: number;
 }
 
-const handleStores = new WeakMap<RunGrant, string>();
+interface GrantRecord {
+  readonly grant: RunGrant;
+  revoked: boolean;
+  callsUsed: number;
+  responseBytesUsed: number;
+  responseBytesReserved: number;
+  readonly reservations: Map<string, number>;
+}
+
+interface GrantReservation {
+  grantId: string;
+  reservationId: string;
+  responseBytesReserved: number;
+}
+
+const MAX_RESPONSE_BYTES = 65_536;
+const MAX_COUNTER = Number.MAX_SAFE_INTEGER;
 
 function sorted<T>(
   values: readonly T[],
@@ -169,8 +177,21 @@ function normalizedToolIds(toolIds: readonly string[]): string[] {
   return sorted([...new Set(toolIds)], (left, right) => left.localeCompare(right));
 }
 
-function validTimestamp(value: string): boolean {
-  return Number.isFinite(Date.parse(value));
+function requireNonNegativeSafeInteger(value: number | undefined, name: string): void {
+  if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
+    throw new TypeError(`${name} limit must be a non-negative safe integer.`);
+  }
+}
+
+function safeAdd(left: number, right: number, name: string): number {
+  if (left > MAX_COUNTER - right) {
+    throw new TypeError(`${name} counter overflow.`);
+  }
+  return left + right;
+}
+
+function cloneGrant(grant: RunGrant): RunGrant {
+  return { ...grant, toolIds: [...grant.toolIds] };
 }
 
 export function inventoryDigest(inventory: ToolInventory): Digest {
@@ -191,6 +212,13 @@ export function inventoryDigest(inventory: ToolInventory): Digest {
   } as JsonValue);
 }
 
+function grantDigest(value: Omit<RunGrant, "digest">): Digest {
+  const definedFields = Object.fromEntries(
+    Object.entries(value).filter(([, fieldValue]) => fieldValue !== undefined)
+  );
+  return digestJson(definedFields as JsonValue);
+}
+
 export function selectContext(
   request: ContextRequest,
   sources: readonly SourceRecord[]
@@ -198,6 +226,7 @@ export function selectContext(
   if (!Number.isInteger(request.maxItems) || request.maxItems < 0) {
     throw new TypeError("maxItems must be a non-negative integer.");
   }
+  requireNonNegativeSafeInteger(request.maxBytes, "maxBytes");
   const ids = new Set(request.connectorIds);
   const categories = new Set(request.categories);
   return sorted(
@@ -254,57 +283,18 @@ export class RunGrantStore {
       this.#records.set(record.id, copyStoredGrant(record));
     }
   }
-
-  issue(input: RunGrantRequest, inventory: ToolInventory, now: string): RunGrant {
-    if (
-      input.providerId !== inventory.providerId ||
-      !validTimestamp(input.issuedAt) ||
-      !validTimestamp(input.expiresAt) ||
-      !validTimestamp(now) ||
-      Date.parse(input.expiresAt) <= Date.parse(now) ||
-      Date.parse(input.issuedAt) > Date.parse(now) ||
-      input.inventoryDigest !== inventoryDigest(inventory)
-    ) {
-      throw new TypeError("Invalid run grant.");
-    }
-    const maxCalls = input.maxCalls ?? 1;
-    const maxBytes = input.maxBytes ?? 65_536;
-    if (!Number.isInteger(maxCalls) || maxCalls < 1) {
-      throw new TypeError("Grant maxCalls must be a positive integer.");
-    }
-    if (!Number.isInteger(maxBytes) || maxBytes < 1) {
-      throw new TypeError("Grant maxBytes must be a positive integer.");
-    }
-    const tools = new Map(inventory.tools.map((tool) => [tool.id, tool]));
-    const toolIds = normalizedToolIds(input.toolIds);
-    for (const id of toolIds) {
-      const tool = tools.get(id);
-      if (
-        tool === undefined ||
-        !tool.readOnly ||
-        (tool.exposesProjectContent && !input.allowRemoteProjectContent)
-      ) {
-        throw new TypeError("Grant exceeds read-only policy.");
-      }
-    }
-    const record = copyStoredGrant({
-      id: randomUUID(),
-      runId: input.runId,
-      providerId: input.providerId,
-      toolIds,
-      inventoryDigest: input.inventoryDigest,
-      issuedAt: input.issuedAt,
-      expiresAt: input.expiresAt,
-      allowRemoteProjectContent: input.allowRemoteProjectContent,
-      maxCalls,
-      calls: 0,
-      maxBytes,
-      bytes: 0,
-      state: "active"
-    });
-    this.#records.set(record.id, record);
-    this.#persist(record);
-    return this.#createHandle(record.id);
+  if (
+    (input.expiresAt !== undefined && input.expiresAt <= now) ||
+    input.issuedAt > now ||
+    input.inventoryDigest !== inventoryDigest(inventory)
+  ) {
+    throw new TypeError("Invalid run grant.");
+  }
+  requireNonNegativeSafeInteger(input.maxCalls, "maxCalls");
+  requireNonNegativeSafeInteger(input.maxTotalResponseBytes, "maxTotalResponseBytes");
+  requireNonNegativeSafeInteger(input.maxResponseBytes, "maxResponseBytes");
+  if (input.maxResponseBytes !== undefined && input.maxResponseBytes > MAX_RESPONSE_BYTES) {
+    throw new TypeError(`maxResponseBytes limit must not exceed ${MAX_RESPONSE_BYTES}.`);
   }
 
   revoke(grant: RunGrant): void {
@@ -387,18 +377,149 @@ export interface AuditEvent {
   at: string;
 }
 
+/** In-memory reference store. Production storage must provide equivalent atomic transitions. */
+export class RunGrantStore {
+  readonly #records = new Map<string, GrantRecord>();
+
+  issue(grant: RunGrant): string {
+    const { digest, ...grantBase } = grant;
+    if (digest !== grantDigest(grantBase)) {
+      throw new TypeError("Invalid run grant.");
+    }
+    const grantId = randomUUID();
+    this.#records.set(grantId, {
+      grant: cloneGrant(grant),
+      revoked: false,
+      callsUsed: 0,
+      responseBytesUsed: 0,
+      responseBytesReserved: 0,
+      reservations: new Map()
+    });
+    return grantId;
+  }
+
+  revoke(grantId: string): void {
+    const record = this.#records.get(grantId);
+    if (record === undefined) throw new TypeError("Unknown grant.");
+    record.revoked = true;
+  }
+
+  snapshot(grantId: string): GrantSnapshot | undefined {
+    const record = this.#records.get(grantId);
+    if (record === undefined) return undefined;
+    return {
+      grantId,
+      runId: record.grant.runId,
+      providerId: record.grant.providerId,
+      revoked: record.revoked,
+      callsUsed: record.callsUsed,
+      responseBytesUsed: record.responseBytesUsed,
+      responseBytesReserved: record.responseBytesReserved
+    };
+  }
+
+  grant(grantId: string): RunGrant {
+    const record = this.#records.get(grantId);
+    if (record === undefined) throw new TypeError("Unknown grant.");
+    return cloneGrant(record.grant);
+  }
+
+  reserve(grantId: string, now: string): GrantReservation {
+    const record = this.#records.get(grantId);
+    if (record === undefined) throw new TypeError("Grant denied.");
+    if (record.revoked) throw new TypeError("Grant revoked.");
+    if (record.grant.expiresAt !== undefined && record.grant.expiresAt <= now) {
+      throw new TypeError("Grant expired.");
+    }
+    if (
+      (record.grant.maxCalls !== undefined && record.callsUsed >= record.grant.maxCalls) ||
+      record.callsUsed >= MAX_COUNTER
+    ) {
+      throw new TypeError("Grant quota exhausted.");
+    }
+
+    const maxResponseBytes = record.grant.maxResponseBytes ?? MAX_RESPONSE_BYTES;
+    const availableResponseBytes = record.grant.maxTotalResponseBytes === undefined
+      ? maxResponseBytes
+      : record.grant.maxTotalResponseBytes - record.responseBytesUsed - record.responseBytesReserved;
+    const responseBytesReserved = Math.min(maxResponseBytes, availableResponseBytes);
+    if (responseBytesReserved <= 0) {
+      throw new TypeError("Grant quota exhausted.");
+    }
+
+    record.callsUsed = safeAdd(record.callsUsed, 1, "Grant calls");
+    record.responseBytesReserved = safeAdd(
+      record.responseBytesReserved,
+      responseBytesReserved,
+      "Grant response bytes"
+    );
+    const reservationId = randomUUID();
+    record.reservations.set(reservationId, responseBytesReserved);
+    return { grantId, reservationId, responseBytesReserved };
+  }
+
+  commitResponse(reservation: GrantReservation, responseBytes: number): void {
+    const record = this.requireReservation(reservation);
+    if (!Number.isSafeInteger(responseBytes) || responseBytes < 0) {
+      this.releaseReservation(record, reservation.reservationId);
+      throw new TypeError("Tool response byte count is invalid.");
+    }
+    if (responseBytes > reservation.responseBytesReserved) {
+      this.releaseReservation(record, reservation.reservationId);
+      throw new TypeError("Tool response exceeds limit.");
+    }
+    this.releaseReservation(record, reservation.reservationId);
+    record.responseBytesUsed = safeAdd(record.responseBytesUsed, responseBytes, "Grant response bytes");
+  }
+
+  releaseFailedCall(reservation: GrantReservation): void {
+    const record = this.requireReservation(reservation);
+    this.releaseReservation(record, reservation.reservationId);
+  }
+
+  private requireReservation(reservation: GrantReservation): GrantRecord {
+    const record = this.#records.get(reservation.grantId);
+    if (record === undefined || !record.reservations.has(reservation.reservationId)) {
+      throw new TypeError("Unknown grant reservation.");
+    }
+    return record;
+  }
+
+  private releaseReservation(record: GrantRecord, reservationId: string): void {
+    const reservedBytes = record.reservations.get(reservationId);
+    if (reservedBytes === undefined) throw new TypeError("Unknown grant reservation.");
+    record.reservations.delete(reservationId);
+    record.responseBytesReserved -= reservedBytes;
+  }
+}
+
 export class ReadOnlyToolGateway {
   #killed = false;
   readonly #events: AuditEvent[] = [];
+  readonly #grants: RunGrantStore;
 
   constructor(
     private readonly provider: ReadOnlyToolProvider,
     private readonly auditTime: () => string,
-    private readonly grants: RunGrantStore
-  ) {}
+    grantStore = new RunGrantStore()
+  ) {
+    this.#grants = grantStore;
+  }
 
   kill(): void {
     this.#killed = true;
+  }
+
+  issueGrant(grant: RunGrant): string {
+    return this.#grants.issue(grant);
+  }
+
+  revokeGrant(grantId: string): void {
+    this.#grants.revoke(grantId);
+  }
+
+  grantSnapshot(grantId: string): GrantSnapshot | undefined {
+    return this.#grants.snapshot(grantId);
   }
 
   auditEvents(): readonly AuditEvent[] {
@@ -406,16 +527,39 @@ export class ReadOnlyToolGateway {
   }
 
   async call(
-    grant: RunGrant,
+    grantId: string,
     toolId: string,
     input: JsonValue,
-    options: GatewayCallOptions
+    now: string
   ): Promise<JsonValue> {
+    const grant = this.#grants.grant(grantId);
     const inventory = this.provider.inventory();
-    const event = (code: string, record?: StoredRunGrant) =>
-      this.#events.push({ code, runId: record?.runId ?? "unknown", providerId: record?.providerId ?? inventory.providerId, toolId, at: this.auditTime() });
-    if (!Number.isInteger(options.deadlineMs) || options.deadlineMs < 1 || !Number.isInteger(options.maxChunkBytes) || options.maxChunkBytes < 1 || !Number.isInteger(options.maxResponseBytes) || options.maxResponseBytes < 1) {
-      throw new TypeError("Invalid gateway limits.");
+    const event = (code: string) =>
+      this.#events.push({
+        code,
+        runId: grant.runId,
+        providerId: grant.providerId,
+        toolId,
+        at: this.auditTime()
+      });
+
+    if (this.#killed) {
+      event("KILL_SWITCH");
+      throw new TypeError("Gateway disabled.");
+    }
+
+    const { digest, ...grantBase } = grant;
+    if (
+      grant.providerId !== inventory.providerId ||
+      (grant.expiresAt !== undefined && grant.expiresAt <= now) ||
+      digest !== grantDigest(grantBase)
+    ) {
+      event("GRANT_DENIED");
+      throw new TypeError("Grant denied.");
+    }
+    if (grant.inventoryDigest !== inventoryDigest(inventory)) {
+      event("INVENTORY_CHANGED");
+      throw new TypeError("Tool inventory changed.");
     }
     if (this.#killed) { event("KILL_SWITCH"); throw new TypeError("Gateway disabled."); }
     const canonical = this.grants.authorize(grant, new Date().toISOString());
@@ -425,42 +569,37 @@ export class ReadOnlyToolGateway {
     if (!canonical.toolIds.includes(toolId) || tool === undefined || !tool.readOnly || (tool.exposesProjectContent && !canonical.allowRemoteProjectContent)) { event("TOOL_DENIED", canonical); throw new TypeError("Tool denied."); }
     if (this.grants.consume(grant) === undefined) { event("GRANT_DENIED", canonical); throw new TypeError("Grant denied."); }
 
-    const controller = new AbortController();
-    let reason: "cancelled" | "deadline" | "limit" | undefined;
-    const abort = (value: typeof reason) => { if (!controller.signal.aborted) { reason = value; controller.abort(); } };
-    const timer = setTimeout(() => abort("deadline"), options.deadlineMs);
-    const cancel = () => abort("cancelled");
-    options.signal?.addEventListener("abort", cancel, { once: true });
-    const iterator = this.provider.call(toolId, input, { signal: controller.signal })[Symbol.asyncIterator]();
-    const waitForAbort = new Promise<never>((_resolve, reject) => controller.signal.addEventListener("abort", () => reject(new TypeError(reason === "deadline" ? "Gateway deadline exceeded." : reason === "cancelled" ? "Gateway cancelled." : "Gateway limit exceeded.")), { once: true }));
-    const parts: Uint8Array[] = [];
-    let bytes = 0;
+    let reservation: GrantReservation;
     try {
-      while (true) {
-        const next = iterator.next();
-        const step = await Promise.race([next, waitForAbort]);
-        if (step.done) break;
-        const chunk = step.value;
-        if (!(chunk instanceof Uint8Array) || chunk.byteLength > options.maxChunkBytes) { abort("limit"); throw new TypeError("Gateway chunk limit exceeded."); }
-        if (bytes + chunk.byteLength > options.maxResponseBytes) { abort("limit"); throw new TypeError("Gateway response limit exceeded."); }
-        if (this.grants.chargeBytes(grant, chunk.byteLength) === undefined) { abort("limit"); throw new TypeError("Gateway grant byte limit exceeded."); }
-        bytes += chunk.byteLength;
-        parts.push(chunk);
-      }
-      const output = new Uint8Array(bytes);
-      let offset = 0;
-      for (const part of parts) { output.set(part, offset); offset += part.byteLength; }
-      const result = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(output)) as JsonValue;
-      event("TOOL_CALLED", canonical);
-      return result;
+      reservation = this.#grants.reserve(grantId, now);
     } catch (error) {
-      abort(reason ?? "limit");
-      event(reason === "deadline" ? "DEADLINE_EXCEEDED" : reason === "cancelled" ? "CANCELLED" : "TOOL_FAILED", canonical);
+      event("GRANT_QUOTA_DENIED");
       throw error;
-    } finally {
-      clearTimeout(timer);
-      options.signal?.removeEventListener("abort", cancel);
-      if (controller.signal.aborted) void iterator.return?.();
+    }
+
+    let result: JsonValue;
+    try {
+      result = await this.provider.call(toolId, input);
+    } catch (error) {
+      this.#grants.releaseFailedCall(reservation);
+      event("PROVIDER_FAILED");
+      throw error;
+    }
+
+    let responseBytes: number;
+    try {
+      responseBytes = new TextEncoder().encode(JSON.stringify(result)).byteLength;
+    } catch (error) {
+      this.#grants.releaseFailedCall(reservation);
+      event("RESPONSE_INVALID");
+      throw error;
+    }
+
+    try {
+      this.#grants.commitResponse(reservation, responseBytes);
+    } catch (error) {
+      event("RESPONSE_TOO_LARGE");
+      throw error;
     }
   }
 }
