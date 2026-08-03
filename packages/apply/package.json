@@ -4,12 +4,12 @@
   "private": true,
   "description": "Isolated mutation boundary for explicitly approved immutable plans: approval validation, drift checks, orchestration, rollback, cancellation, and audit evidence.",
   "type": "module",
-  "main": "./dist/public.js",
-  "types": "./dist/public.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/public.d.ts",
-      "import": "./dist/public.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "files": [

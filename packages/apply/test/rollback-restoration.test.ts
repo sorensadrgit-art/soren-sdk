@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 import type { SandboxSession } from "@soren-sdk/sandbox";
 import { MemorySandboxSession } from "@soren-sdk/sandbox";
 
-import type { DefaultApplyService } from "../src/index.js";
 import {
-  createApplyServiceForTesting,
-  InMemoryEvidenceSink
+  DefaultApplyService,
+  InMemoryEvidenceSink,
+  registerSandboxFactory
 } from "../src/index.js";
 import {
   digestContent,
@@ -18,6 +18,16 @@ import {
   sampleSandboxPolicy,
   sampleVcsState
 } from "./fixtures.js";
+
+let currentPlan = sampleExecutionPlan();
+let currentApproval = sampleApproval();
+let currentProject = sampleProjectSnapshot();
+let currentPolicy = {
+  policyId: "policy_1",
+  digest: "sha256:3333333333333333333333333333333333333333333333333333333333333333" as const
+};
+let currentSandboxPolicy = sampleSandboxPolicy();
+let currentVcs = sampleVcsState();
 
 function persistentSession(seed: Record<string, Uint8Array>): {
   session: SandboxSession;
@@ -72,31 +82,49 @@ function preparation(service: DefaultApplyService) {
     allowedPaths: ["src"],
     allowedOperations: ["create-file", "replace-file", "delete-file"]
   });
+  currentPlan = plan;
+  currentApproval = approval;
+  currentProject = sampleProjectSnapshot();
+  currentPolicy = {
+    policyId: "policy_1",
+    digest: "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+  };
+  currentSandboxPolicy = sampleSandboxPolicy();
+  currentVcs = sampleVcsState();
   return service.prepare({
     executionPlan: plan,
     approval,
-    projectSnapshot: sampleProjectSnapshot(),
-    policySnapshot: {
-      policyId: "policy_1",
-      digest:
-        "sha256:3333333333333333333333333333333333333333333333333333333333333333"
-    },
-    sandboxPolicy: sampleSandboxPolicy(),
-    vcsState: sampleVcsState()
+    projectSnapshot: currentProject,
+    policySnapshot: currentPolicy,
+    sandboxPolicy: currentSandboxPolicy,
+    vcsState: currentVcs
   });
 }
 
 describe("rollback restoration", () => {
   it("restores replaced and deleted files and removes created files", async () => {
     const evidence = new InMemoryEvidenceSink();
+    const service = new DefaultApplyService({
+      evidenceSink: evidence,
+      clock: fixedClock(),
+      authoritativeState: {
+        approvedPlanProvider: { async getApprovedPlan() { return { executionPlan: currentPlan, approval: currentApproval }; } },
+        projectSnapshotProvider: { async getCurrentProjectSnapshot() { return currentProject; } },
+        resolvedPolicyProvider: { async getCurrentPolicySnapshot() { return { ...currentPolicy, document: {} }; } },
+        vcsStateProvider: { async getCurrentVcsState() { return currentVcs; } },
+        sandboxPolicyProvider: { async getCurrentSandboxPolicy() { return currentSandboxPolicy; } }
+      }
+    });
+    service.setEnabledForTesting(true);
+
     const { session, raw } = persistentSession({
       "src/index.ts": encoder.encode("before index"),
       "src/old.ts": encoder.encode("before old")
     });
-    const service = createApplyServiceForTesting({
-      evidenceSink: evidence,
-      clock: fixedClock(),
-      sandboxProvider: { async create() { return session; } }
+    registerSandboxFactory({
+      async create() {
+        return session;
+      }
     });
 
     const prepared = preparation(service);

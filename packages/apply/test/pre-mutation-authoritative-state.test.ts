@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { Digest } from "@soren-sdk/contracts";
+
 import type { SandboxSession } from "@soren-sdk/sandbox";
 
 import {
@@ -36,7 +38,7 @@ function makeState() {
     policy: {
       policyId: "policy_1",
       digest:
-        "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+        "sha256:3333333333333333333333333333333333333333333333333333333333333333" as Digest
     },
     vcs: sampleVcsState(),
     sandboxPolicy: sampleSandboxPolicy(),

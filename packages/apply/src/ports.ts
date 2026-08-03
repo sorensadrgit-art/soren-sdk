@@ -1,13 +1,7 @@
 import type { Digest, ExecutionPlan, ProjectSnapshot } from "@soren-sdk/contracts";
 import type { SandboxPolicy, VcsState } from "@soren-sdk/sandbox";
 
-import type { ApplyApproval, ApplyEvidenceEvent, ApplyPreparation, PrepareApplyInput } from "./types.js";
-
-export interface PreparationStore {
-  put(preparation: ApplyPreparation, input: PrepareApplyInput): void;
-  get(runId: string): { preparation: ApplyPreparation; input: PrepareApplyInput } | null;
-  consume(runId: string): void;
-}
+import type { ApplyApproval, ApplyEvidenceEvent } from "./types.js";
 
 /**
  * Provider of approved plans. In Phase 9 this is a local port backed by
