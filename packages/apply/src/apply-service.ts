@@ -321,6 +321,7 @@ export class DefaultApplyService implements ApplyService {
               );
             }
             reserve(operation, content.byteLength);
+            await this.#assertFreshAuthoritativeState(preparation, true);
             recordRollback();
             await sandbox.write(operation.path, content);
             ops.push({
@@ -340,6 +341,7 @@ export class DefaultApplyService implements ApplyService {
               );
             }
             reserve(operation, 0);
+            await this.#assertFreshAuthoritativeState(preparation, true);
             recordRollback();
             await sandbox.remove(operation.path);
             ops.push({
@@ -487,7 +489,8 @@ export class DefaultApplyService implements ApplyService {
   }
 
   async #assertFreshAuthoritativeState(
-    preparation: ApplyPreparation
+    preparation: ApplyPreparation,
+    approvalAlreadyReserved = false
   ): Promise<void> {
     const state = this.#authoritativeState;
     const approved = await state.approvedPlanProvider.getApprovedPlan(
@@ -496,13 +499,18 @@ export class DefaultApplyService implements ApplyService {
     if (
       approved === null ||
       approved.executionPlan.immutableDigest !== preparation.executionPlanDigest ||
-      approved.approval.approvalId !== preparation.approvalId
+      approved.approval.approvalId !== preparation.approvalId ||
+      approved.approval.integrityDigest !== preparation.approvalIntegrityDigest ||
+      approved.approval.nonce !== preparation.approvalNonce
     ) {
       throw new ApplyError("APPLY_APPROVAL_REVOKED", "Approval was revoked or replaced.");
     }
     assertApprovalIntegrity(approved.approval);
     assertApprovalNotExpired(approved.approval, this.#now());
-    if (this.#usedApprovals.has(approved.approval.nonce)) {
+    if (
+      !approvalAlreadyReserved &&
+      this.#usedApprovals.has(approved.approval.nonce)
+    ) {
       throw new ApplyError("APPLY_APPROVAL_REPLAYED", "Approval was already consumed.");
     }
     assertPlanApplyMode(approved.executionPlan);
