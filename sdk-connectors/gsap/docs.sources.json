@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "providerId": "gsap",
+  "retrievedAt": "2026-07-30",
+  "productVersion": "3.15.0",
+  "sources": [
+    { "url": "https://gsap.com/docs/v3/Installation/", "type": "documentation", "authority": "official", "allowedUse": ["link", "summarize"], "license": "LicenseRef-GSAP-Documentation" },
+    { "url": "https://gsap.com/docs/v3/GSAP/", "type": "documentation", "authority": "official", "allowedUse": ["link", "summarize"], "license": "LicenseRef-GSAP-Documentation" },
+    { "url": "https://gsap.com/docs/v3/Plugins/", "type": "documentation", "authority": "official", "allowedUse": ["link", "summarize"], "license": "LicenseRef-GSAP-Documentation" },
+    { "url": "https://www.npmjs.com/package/gsap", "type": "registry", "authority": "official", "allowedUse": ["link", "summarize"], "license": "LicenseRef-GSAP-Standard" },
+    { "url": "https://github.com/greensock/GSAP", "type": "repository", "authority": "official", "allowedUse": ["link", "summarize"], "license": "LicenseRef-GSAP-Standard" },
+    { "url": "https://github.com/greensock/gsap-skills", "type": "repository", "authority": "official", "allowedUse": ["link", "summarize"], "license": "MIT" }
+  ]
+}

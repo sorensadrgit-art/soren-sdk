@@ -1,0 +1,296 @@
+{
+  "schemaVersion": "1.0.0",
+  "cases": [
+    {
+      "id": "native-css-transition",
+      "category": "native",
+      "capabilities": [{ "id": "platform.css-transition", "required": true }],
+      "project": {},
+      "expected": { "status": "native", "selectedProviders": [], "reasonCodes": ["NATIVE_CAPABILITY_MATCH"] }
+    },
+    {
+      "id": "native-css-animation",
+      "category": "native",
+      "capabilities": [{ "id": "platform.css-animation", "required": true }],
+      "project": {},
+      "expected": { "status": "native", "selectedProviders": [], "reasonCodes": ["NATIVE_CAPABILITY_MATCH"] }
+    },
+    {
+      "id": "native-waapi",
+      "category": "native",
+      "capabilities": [{ "id": "platform.waapi-animation", "required": true }],
+      "project": {},
+      "expected": { "status": "native", "selectedProviders": [], "reasonCodes": ["NATIVE_CAPABILITY_MATCH"] }
+    },
+    {
+      "id": "native-while-motion-forbidden",
+      "category": "native",
+      "capabilities": [{ "id": "platform.css-transition", "required": true }],
+      "preferences": { "forbiddenProviders": ["motion"] },
+      "project": {},
+      "expected": { "status": "native", "selectedProviders": [], "reasonCodes": ["NATIVE_CAPABILITY_MATCH", "FORBIDDEN_PROVIDER"] }
+    },
+    {
+      "id": "native-with-zero-third-party-limit",
+      "category": "native",
+      "capabilities": [{ "id": "platform.css-animation", "required": true }],
+      "preferences": { "maxProviders": 0 },
+      "project": {},
+      "expected": { "status": "native", "selectedProviders": [], "reasonCodes": ["NATIVE_CAPABILITY_MATCH"] }
+    },
+    {
+      "id": "native-plus-unknown-optional",
+      "category": "native",
+      "capabilities": [
+        { "id": "platform.waapi-animation", "required": true },
+        { "id": "unknown.optional", "required": false }
+      ],
+      "project": {},
+      "expected": { "status": "native", "selectedProviders": [], "reasonCodes": ["NATIVE_CAPABILITY_MATCH", "OPTIONAL_CAPABILITY_OMITTED"] }
+    },
+
+    {
+      "id": "motion-presence",
+      "category": "motion",
+      "capabilities": [{ "id": "motion.presence", "required": true }],
+      "project": { "react": "19.2.0" },
+      "expected": { "status": "selected", "selectedProviders": ["motion"], "reasonCodes": ["CAPABILITY_MATCH"] }
+    },
+    {
+      "id": "motion-layout",
+      "category": "motion",
+      "capabilities": [{ "id": "motion.layout", "required": true }],
+      "project": { "react": "^19.0.0" },
+      "expected": { "status": "selected", "selectedProviders": ["motion"], "reasonCodes": ["CAPABILITY_MATCH"] }
+    },
+    {
+      "id": "motion-shared-layout",
+      "category": "motion",
+      "capabilities": [{ "id": "motion.shared-layout", "required": true }],
+      "project": { "react": ">=18.2" },
+      "expected": { "status": "selected", "selectedProviders": ["motion"], "reasonCodes": ["CAPABILITY_MATCH"] }
+    },
+    {
+      "id": "motion-spring",
+      "category": "motion",
+      "capabilities": [{ "id": "motion.spring", "required": true }],
+      "project": { "react": "18.2.0" },
+      "expected": { "status": "selected", "selectedProviders": ["motion"], "reasonCodes": ["CAPABILITY_MATCH"] }
+    },
+    {
+      "id": "motion-drag",
+      "category": "motion",
+      "capabilities": [{ "id": "interaction.drag", "required": true }],
+      "project": { "react": "19" },
+      "expected": { "status": "selected", "selectedProviders": ["motion"], "reasonCodes": ["CAPABILITY_MATCH"] }
+    },
+    {
+      "id": "motion-gesture",
+      "category": "motion",
+      "capabilities": [{ "id": "interaction.gesture", "required": true }],
+      "project": { "react": "19.2" },
+      "expected": { "status": "selected", "selectedProviders": ["motion"], "reasonCodes": ["CAPABILITY_MATCH"] }
+    },
+    {
+      "id": "motion-installed-reuse",
+      "category": "motion",
+      "capabilities": [{ "id": "motion.layout", "required": true }],
+      "project": { "react": "19.2.0", "dependencies": ["motion"] },
+      "expected": { "status": "selected", "selectedProviders": ["motion"], "reasonCodes": ["EXISTING_DEPENDENCY_REUSE"] }
+    },
+    {
+      "id": "motion-preferred",
+      "category": "motion",
+      "capabilities": [{ "id": "motion.presence", "required": true }],
+      "preferences": { "preferredProviders": ["motion"] },
+      "project": { "react": "19.2.0" },
+      "expected": { "status": "selected", "selectedProviders": ["motion"], "reasonCodes": ["PREFERRED_PROVIDER"] }
+    },
+
+    {
+      "id": "gsap-timeline",
+      "category": "gsap",
+      "capabilities": [{ "id": "motion.timeline", "required": true }],
+      "project": {},
+      "expected": { "status": "selected", "selectedProviders": ["gsap"], "reasonCodes": ["CAPABILITY_MATCH"] }
+    },
+    {
+      "id": "gsap-svg",
+      "category": "gsap",
+      "capabilities": [{ "id": "motion.svg", "required": true }],
+      "project": {},
+      "expected": { "status": "selected", "selectedProviders": ["gsap"], "reasonCodes": ["CAPABILITY_MATCH"] }
+    },
+    {
+      "id": "gsap-flip",
+      "category": "gsap",
+      "capabilities": [{ "id": "motion.flip", "required": true }],
+      "project": {},
+      "expected": { "status": "selected", "selectedProviders": ["gsap"], "reasonCodes": ["CAPABILITY_MATCH"] }
+    },
+    {
+      "id": "gsap-scroll-trigger",
+      "category": "gsap",
+      "capabilities": [{ "id": "scroll.triggered-animation", "required": true }],
+      "project": {},
+      "expected": { "status": "selected", "selectedProviders": ["gsap"], "reasonCodes": ["CAPABILITY_MATCH"] }
+    },
+    {
+      "id": "gsap-pinned-sequence",
+      "category": "gsap",
+      "capabilities": [{ "id": "scroll.pinned-sequence", "required": true }],
+      "project": {},
+      "expected": { "status": "selected", "selectedProviders": ["gsap"], "reasonCodes": ["CAPABILITY_MATCH"] }
+    },
+    {
+      "id": "gsap-installed-reuse",
+      "category": "gsap",
+      "capabilities": [{ "id": "motion.timeline", "required": true }],
+      "project": { "dependencies": ["gsap"] },
+      "expected": { "status": "selected", "selectedProviders": ["gsap"], "reasonCodes": ["EXISTING_DEPENDENCY_REUSE"] }
+    },
+    {
+      "id": "gsap-preferred",
+      "category": "gsap",
+      "capabilities": [{ "id": "motion.timeline", "required": true }],
+      "preferences": { "preferredProviders": ["gsap"] },
+      "project": {},
+      "expected": { "status": "selected", "selectedProviders": ["gsap"], "reasonCodes": ["PREFERRED_PROVIDER"] }
+    },
+
+    {
+      "id": "composition-separate-scopes",
+      "category": "composition",
+      "capabilities": [
+        { "id": "motion.layout", "required": true, "quality": { "scope": "cards", "property": "layout" } },
+        { "id": "motion.timeline", "required": true, "quality": { "scope": "hero", "property": "transform" } }
+      ],
+      "project": { "react": "19.2.0" },
+      "expected": { "status": "selected", "selectedProviders": ["gsap", "motion"], "reasonCodes": ["MINIMAL_PROVIDER_SET"] }
+    },
+    {
+      "id": "composition-default-safe-scopes",
+      "category": "composition",
+      "capabilities": [
+        { "id": "motion.presence", "required": true },
+        { "id": "motion.timeline", "required": true }
+      ],
+      "project": { "react": "19.2.0" },
+      "expected": { "status": "selected", "selectedProviders": ["gsap", "motion"], "reasonCodes": ["CAPABILITY_MATCH"] }
+    },
+    {
+      "id": "composition-native-and-motion",
+      "category": "composition",
+      "capabilities": [
+        { "id": "platform.css-transition", "required": true },
+        { "id": "motion.presence", "required": true }
+      ],
+      "project": { "react": "19.2.0" },
+      "expected": { "status": "selected", "selectedProviders": ["motion"], "reasonCodes": ["NATIVE_CAPABILITY_MATCH", "CAPABILITY_MATCH"] }
+    },
+    {
+      "id": "composition-native-and-gsap",
+      "category": "composition",
+      "capabilities": [
+        { "id": "platform.waapi-animation", "required": true },
+        { "id": "motion.timeline", "required": true }
+      ],
+      "project": {},
+      "expected": { "status": "selected", "selectedProviders": ["gsap"], "reasonCodes": ["NATIVE_CAPABILITY_MATCH", "CAPABILITY_MATCH"] }
+    },
+    {
+      "id": "composition-same-scope-different-properties",
+      "category": "composition",
+      "capabilities": [
+        { "id": "motion.layout", "required": true, "quality": { "scope": "hero", "property": "layout" } },
+        { "id": "motion.timeline", "required": true, "quality": { "scope": "hero", "property": "opacity" } }
+      ],
+      "project": { "react": "19.2.0" },
+      "expected": { "status": "selected", "selectedProviders": ["gsap", "motion"], "reasonCodes": ["MINIMAL_PROVIDER_SET"] }
+    },
+    {
+      "id": "composition-ownership-conflict",
+      "category": "composition",
+      "capabilities": [
+        { "id": "motion.layout", "required": true, "quality": { "scope": "hero", "property": "transform" } },
+        { "id": "motion.timeline", "required": true, "quality": { "scope": "hero", "property": "transform" } }
+      ],
+      "project": { "react": "19.2.0" },
+      "expected": { "status": "blocked", "selectedProviders": [], "reasonCodes": ["OWNERSHIP_CONFLICT"] }
+    },
+    {
+      "id": "composition-provider-limit",
+      "category": "composition",
+      "capabilities": [
+        { "id": "motion.layout", "required": true },
+        { "id": "motion.timeline", "required": true }
+      ],
+      "preferences": { "maxProviders": 1 },
+      "project": { "react": "19.2.0" },
+      "expected": { "status": "blocked", "selectedProviders": [], "reasonCodes": ["PROVIDER_LIMIT_EXCEEDED"] }
+    },
+
+    {
+      "id": "negative-unknown-required",
+      "category": "negative",
+      "capabilities": [{ "id": "unknown.required", "required": true }],
+      "project": {},
+      "expected": { "status": "blocked", "selectedProviders": [], "reasonCodes": ["CAPABILITY_NOT_SUPPORTED"] }
+    },
+    {
+      "id": "negative-unknown-optional",
+      "category": "negative",
+      "capabilities": [{ "id": "unknown.optional", "required": false }],
+      "project": {},
+      "expected": { "status": "no-sdk", "selectedProviders": [], "reasonCodes": ["OPTIONAL_CAPABILITY_OMITTED"] }
+    },
+    {
+      "id": "negative-motion-react-17",
+      "category": "negative",
+      "capabilities": [{ "id": "motion.presence", "required": true }],
+      "project": { "react": "^17.0.0" },
+      "expected": { "status": "blocked", "selectedProviders": [], "reasonCodes": ["ENVIRONMENT_UNSUPPORTED"] }
+    },
+    {
+      "id": "negative-motion-no-react",
+      "category": "negative",
+      "capabilities": [{ "id": "motion.layout", "required": true }],
+      "project": {},
+      "expected": { "status": "blocked", "selectedProviders": [], "reasonCodes": ["ENVIRONMENT_UNSUPPORTED"] }
+    },
+    {
+      "id": "negative-motion-forbidden",
+      "category": "negative",
+      "capabilities": [{ "id": "motion.presence", "required": true }],
+      "preferences": { "forbiddenProviders": ["motion"] },
+      "project": { "react": "19.2.0" },
+      "expected": { "status": "blocked", "selectedProviders": [], "reasonCodes": ["FORBIDDEN_PROVIDER"] }
+    },
+    {
+      "id": "negative-gsap-forbidden",
+      "category": "negative",
+      "capabilities": [{ "id": "motion.timeline", "required": true }],
+      "preferences": { "forbiddenProviders": ["gsap"] },
+      "project": {},
+      "expected": { "status": "blocked", "selectedProviders": [], "reasonCodes": ["FORBIDDEN_PROVIDER"] }
+    },
+    {
+      "id": "negative-ownership-ambiguous",
+      "category": "negative",
+      "capabilities": [
+        { "id": "motion.layout", "required": true, "quality": { "scope": "hero" } },
+        { "id": "motion.flip", "required": true, "quality": { "scope": "hero" } }
+      ],
+      "project": { "react": "19.2.0" },
+      "expected": { "status": "needs-input", "selectedProviders": [], "reasonCodes": ["OWNERSHIP_AMBIGUOUS"] }
+    },
+    {
+      "id": "negative-zero-provider-limit",
+      "category": "negative",
+      "capabilities": [{ "id": "motion.timeline", "required": true }],
+      "preferences": { "maxProviders": 0 },
+      "project": {},
+      "expected": { "status": "blocked", "selectedProviders": [], "reasonCodes": ["PROVIDER_LIMIT_EXCEEDED"] }
+    }
+  ]
+}
