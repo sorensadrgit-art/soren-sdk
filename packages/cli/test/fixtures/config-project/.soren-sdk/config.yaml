@@ -1,0 +1,7 @@
+schemaVersion: "1.0.0-draft.1"
+contractKind: soren-config
+configId: config-project
+preferences:
+  preferredProviders: [web-platform]
+  forbiddenProviders: []
+  maxProviders: 2

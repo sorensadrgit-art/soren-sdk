@@ -1,0 +1,21 @@
+schemaVersion: "1.0.0-draft.1"
+contractKind: policy
+policyId: config-project-policy
+version: "1.0.0"
+scope: project
+rules:
+  allowedConnectors: [web-platform]
+  deniedConnectors: []
+  allowExperimental: false
+  allowedLicenses: [MIT]
+  allowPaidServices: false
+  network:
+    mode: deny
+    allowedHosts: []
+  filesystem:
+    read: []
+    write: []
+  allowRemoteProjectContent: false
+  maxBundleKilobytes: 1024
+  requireReducedMotion: true
+  requiredApprovals: []

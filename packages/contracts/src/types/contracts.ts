@@ -235,6 +235,17 @@ export interface PolicyDocument {
   };
 }
 
+export interface SorenConfig {
+  schemaVersion: "1.0.0-draft.1";
+  contractKind: "soren-config";
+  configId: string;
+  preferences?: {
+    preferredProviders?: string[];
+    forbiddenProviders?: string[];
+    maxProviders?: number;
+  };
+}
+
 export interface RouteRequest {
   schemaVersion: "1.0.0-draft.1";
   contractKind: "route-request";
@@ -375,16 +386,24 @@ export interface SorenSdkLock {
   catalogSnapshotDigest: Digest;
   policySnapshotDigest: Digest;
   projectSnapshotDigest: Digest;
+  configDigest: Digest;
+  routePlanId: string;
+  routePlanDigest: Digest;
   connectors: Array<{
     id: string;
     connectorVersion: string;
     digest: Digest;
     integrations: Array<{
       id: string;
-      versionStatus: "not-applicable" | "resolved";
+      versionStatus: "not-applicable" | "resolved" | "unresolved";
       version?: string;
       digest?: string;
     }>;
+  }>;
+  unavailable: Array<{
+    id: string;
+    reasonCode: string;
+    reason: string;
   }>;
   protocolResolutions: Array<{
     name: string;
