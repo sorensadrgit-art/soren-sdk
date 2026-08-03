@@ -6,7 +6,7 @@ The current package exposes three stable service areas:
 
 - Connector catalog interfaces
 - Static read-only project inspection
-- Read-only context gateway with authoritative grant revocation and bounded cancellation
+- Context selection returns immutable, provenance-bound untrusted-data envelopes with `instructionAuthority: "none"`
 
 ## Project inspector
 

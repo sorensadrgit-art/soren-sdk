@@ -20,6 +20,7 @@ export interface SourceRecord {
   origin: string;
   content: string;
   digest: Digest;
+  retrievedAt: string;
   expiresAt: string;
   reviewed: boolean;
 }
@@ -33,12 +34,25 @@ export interface ContextRequest {
 }
 
 export interface SelectedContext {
+  fragmentId: Digest;
   sourceId: string;
   connectorId: string;
-  category: ContextCategory;
+  sourceDigest: Digest;
+  contentDigest: Digest;
   origin: string;
-  digest: Digest;
+  retrievedAt: string;
+  expiresAt: string;
+  freshnessState: "fresh";
+  selectionReason: "reviewed-request-match";
+  byteSize: number;
+  provenanceDigest: Digest;
+  instructionAuthority: "none";
   content: string;
+}
+
+function validTimestamp(value: string): boolean {
+  const date = new Date(value);
+  return !Number.isNaN(date.getTime()) && date.toISOString() === value;
 }
 
 export interface ToolDefinition {
@@ -68,7 +82,6 @@ export interface ReadOnlyToolProvider {
   ): AsyncIterable<Uint8Array>;
 }
 
-<<<<<<< review/phase7-async-bounded-gateway
 export interface GatewayCallOptions {
   signal?: AbortSignal;
   deadlineMs: number;
@@ -77,54 +90,6 @@ export interface GatewayCallOptions {
 }
 
 /** A process-bound, opaque handle. Permissions never leave the grant store. */
-=======
-export type ProjectContentScope =
-  | "source"
-  | "configuration"
-  | "dependencies"
-  | "lockfile";
-
-export interface ProjectContentRequest {
-  projectSnapshot: Digest;
-  policySnapshot: Digest;
-  scopes: readonly ProjectContentScope[];
-}
-
-export interface ConsentSubject {
-  readonly kind: "principal" | "run";
-  readonly id: string;
-}
-
-/** Immutable record issued by the injected authorization authority. */
-export interface ProjectContentConsent {
-  readonly subject: ConsentSubject;
-  readonly projectSnapshot: Digest;
-  readonly providerId: string;
-  readonly toolId: string;
-  readonly allowedContentScope: readonly ProjectContentScope[];
-  readonly policySnapshot: Digest;
-  readonly expiresAt: string;
-  readonly digest: Digest;
-}
-
-export interface ProjectContentConsentLookup {
-  readonly subject: ConsentSubject;
-  readonly projectSnapshot: Digest;
-  readonly providerId: string;
-  readonly toolId: string;
-  readonly requestedContentScope: readonly ProjectContentScope[];
-  readonly policySnapshot: Digest;
-}
-
-/**
- * The sole authority for remote project-content permission. Tool inventories
- * are untrusted metadata and cannot substitute for this provider.
- */
-export interface ProjectContentConsentProvider {
-  findConsent(lookup: ProjectContentConsentLookup): ProjectContentConsent | undefined;
-}
-
->>>>>>> review/phases-5-9-master-antigravity
 export interface RunGrant {
   readonly id: string;
 }
@@ -226,68 +191,6 @@ export function inventoryDigest(inventory: ToolInventory): Digest {
   } as JsonValue);
 }
 
-<<<<<<< review/phase7-async-bounded-gateway
-=======
-function grantDigest(value: Omit<RunGrant, "digest">): Digest {
-  return digestJson(value as unknown as JsonValue);
-}
-
-function normalizedScopes(
-  scopes: readonly ProjectContentScope[]
-): ProjectContentScope[] {
-  return sorted([...new Set(scopes)], (left, right) => left.localeCompare(right));
-}
-
-function consentDigest(value: Omit<ProjectContentConsent, "digest">): Digest {
-  return digestJson(value as unknown as JsonValue);
-}
-
-export function createProjectContentConsent(
-  input: Omit<ProjectContentConsent, "digest">
-): ProjectContentConsent {
-  const allowedContentScope = normalizedScopes(input.allowedContentScope);
-  if (
-    input.subject.id.length === 0 ||
-    input.providerId.length === 0 ||
-    input.toolId.length === 0 ||
-    allowedContentScope.length === 0
-  ) {
-    throw new TypeError("Invalid project-content consent.");
-  }
-  const subject = Object.freeze({ ...input.subject });
-  const normalized: Omit<ProjectContentConsent, "digest"> = {
-    ...input,
-    subject,
-    allowedContentScope: Object.freeze(allowedContentScope)
-  };
-  return Object.freeze({
-    ...normalized,
-    digest: consentDigest(normalized)
-  });
-}
-
-function consentMatches(
-  consent: ProjectContentConsent,
-  lookup: ProjectContentConsentLookup,
-  now: string
-): boolean {
-  const { digest, ...base } = consent;
-  return (
-    digest === consentDigest(base) &&
-    consent.expiresAt > now &&
-    consent.subject.kind === lookup.subject.kind &&
-    consent.subject.id === lookup.subject.id &&
-    consent.projectSnapshot === lookup.projectSnapshot &&
-    consent.providerId === lookup.providerId &&
-    consent.toolId === lookup.toolId &&
-    consent.policySnapshot === lookup.policySnapshot &&
-    lookup.requestedContentScope.every((scope) =>
-      consent.allowedContentScope.includes(scope)
-    )
-  );
-}
-
->>>>>>> review/phases-5-9-master-antigravity
 export function selectContext(
   request: ContextRequest,
   sources: readonly SourceRecord[]
@@ -306,6 +209,9 @@ export function selectContext(
       ) {
         return false;
       }
+      if (!validTimestamp(source.retrievedAt) || !validTimestamp(source.expiresAt) || !validTimestamp(request.now) || source.retrievedAt > source.expiresAt || source.retrievedAt > request.now) {
+        throw new TypeError(`Invalid source timestamps: ${source.id}.`);
+      }
       if (source.expiresAt <= request.now) {
         throw new TypeError(`Source stale: ${source.id}.`);
       }
@@ -318,16 +224,19 @@ export function selectContext(
       `${left.connectorId}\u0000${left.category}\u0000${left.id}`.localeCompare(
         `${right.connectorId}\u0000${right.category}\u0000${right.id}`
       )
-  )
-    .slice(0, request.maxItems)
-    .map(({ id, connectorId, category, origin, digest, content }) => ({
-      sourceId: id,
-      connectorId,
-      category,
-      origin,
-      digest,
-      content
-    }));
+  );
+  const selected: SelectedContext[] = [];
+  let bytes = 0;
+  for (const source of candidates) {
+    if (selected.length >= request.maxItems) break;
+    const sourceBytes = new TextEncoder().encode(source.content).byteLength;
+    if (request.maxBytes !== undefined && (sourceBytes > request.maxBytes || bytes + sourceBytes > request.maxBytes)) continue;
+    bytes += sourceBytes;
+    const contentDigest = sha256Bytes(source.content);
+    const provenanceDigest = digestJson({ sourceId: source.id, connectorId: source.connectorId, sourceDigest: source.digest, contentDigest, origin: source.origin, retrievedAt: source.retrievedAt, expiresAt: source.expiresAt } as JsonValue);
+    selected.push(Object.freeze({ fragmentId: digestJson({ provenanceDigest, selectionReason: "reviewed-request-match" } as JsonValue), sourceId: source.id, connectorId: source.connectorId, sourceDigest: source.digest, contentDigest, origin: source.origin, retrievedAt: source.retrievedAt, expiresAt: source.expiresAt, freshnessState: "fresh", selectionReason: "reviewed-request-match", byteSize: sourceBytes, provenanceDigest, instructionAuthority: "none", content: source.content }));
+  }
+  return selected;
 }
 
 export class RunGrantStore {
@@ -404,7 +313,6 @@ export class RunGrantStore {
     this.#replace({ ...record, state: "revoked" });
   }
 
-<<<<<<< review/phase7-async-bounded-gateway
   authorize(grant: RunGrant, now: string): StoredRunGrant | undefined {
     const record = this.#ownedRecord(grant);
     if (record === undefined || !validTimestamp(now)) return undefined;
@@ -455,14 +363,6 @@ export class RunGrantStore {
   #ownedRecord(grant: RunGrant): StoredRunGrant | undefined {
     if (typeof grant !== "object" || grant === null || handleStores.get(grant) !== this.#storeId) {
       return undefined;
-=======
-  const tools = new Map(inventory.tools.map((tool) => [tool.id, tool]));
-  const toolIds = normalizedToolIds(input.toolIds);
-  for (const id of toolIds) {
-    const tool = tools.get(id);
-    if (tool === undefined || !tool.readOnly) {
-      throw new TypeError("Grant exceeds read-only policy.");
->>>>>>> review/phases-5-9-master-antigravity
     }
     return this.#records.get(grant.id);
   }
