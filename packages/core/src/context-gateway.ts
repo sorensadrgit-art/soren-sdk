@@ -4,6 +4,7 @@ import {
   type Digest,
   type JsonValue
 } from "@soren-sdk/contracts";
+import { InMemoryAuditSink, type AuditCode, type AuditEvent, type AuditSink } from "./audit-sink.js";
 
 export type ContextCategory =
   | "api"
@@ -59,19 +60,10 @@ export interface ToolInventory {
   tools: ToolDefinition[];
 }
 
-export interface NegotiationResult {
-  providerId: string;
-  protocolVersion: string;
-  extensions: string[];
-  inventoryDigest: Digest;
-  digest: Digest;
-  createdAt: string;
-  expiresAt: string;
-}
-
+/** Providers must observe the signal and stop work within their own bounded timeout. */
 export interface ReadOnlyToolProvider {
   inventory(): ToolInventory;
-  call(toolId: string, input: JsonValue): JsonValue;
+  call(toolId: string, input: JsonValue, signal: AbortSignal): JsonValue | Promise<JsonValue>;
 }
 
 export interface RunGrant {
@@ -89,12 +81,19 @@ export interface RunGrant {
   digest: Digest;
 }
 
-export interface AuditEvent {
-  code: string;
-  runId: string;
-  providerId: string;
-  toolId?: string;
-  at: string;
+export interface StoredGrantState {
+  grantDigest: Digest;
+  status: "active" | "revoked";
+  revokedAt?: string;
+}
+
+export type { AuditEvent, AuditSink } from "./audit-sink.js";
+
+interface ActiveCall {
+  grant: RunGrant;
+  toolId: string;
+  controller: AbortController;
+  cancellationAudited: boolean;
 }
 
 function sorted<T>(
@@ -246,64 +245,117 @@ export function createRunGrant(
 
 export class ReadOnlyToolGateway {
   #killed = false;
-  readonly #events: AuditEvent[] = [];
+  #nextCallId = 0;
+  #eventSequence = 0;
+  readonly #grantStates = new Map<Digest, StoredGrantState>();
+  readonly #grants = new Map<Digest, RunGrant>();
+  readonly #activeCalls = new Map<string, ActiveCall>();
+  readonly #cancelledRuns = new Set<string>();
 
   constructor(
     private readonly provider: ReadOnlyToolProvider,
-    private readonly auditTime: () => string
+    private readonly auditTime: () => string,
+    private readonly auditSink: AuditSink = new InMemoryAuditSink()
   ) {}
 
+  registerGrant(grant: RunGrant): void {
+    const { digest, ...grantBase } = grant;
+    if (digest !== grantDigest(grantBase)) {
+      throw new TypeError("Invalid run grant.");
+    }
+    const existing = this.#grantStates.get(grant.digest);
+    if (existing?.status === "revoked") {
+      throw new TypeError("Grant revoked.");
+    }
+    this.#grants.set(grant.digest, { ...grant, toolIds: [...grant.toolIds] });
+    this.#grantStates.set(grant.digest, { grantDigest: grant.digest, status: "active" });
+  }
+
+  grantState(grant: RunGrant): StoredGrantState | undefined {
+    const state = this.#grantStates.get(grant.digest);
+    return state === undefined ? undefined : { ...state };
+  }
+
+  revokeGrant(grant: RunGrant, reason: string): void {
+    // Reasons influence neither authorization nor redacted audit content.
+    void reason;
+    this.registerGrantIfAbsent(grant);
+    const revokedAt = this.auditTime();
+    this.#grantStates.set(grant.digest, {
+      grantDigest: grant.digest,
+      status: "revoked",
+      revokedAt
+    });
+    this.event("GRANT_REVOKED", grant, undefined, undefined, revokedAt);
+    for (const [callId, active] of this.#activeCalls) {
+      if (active.grant.digest === grant.digest) {
+        this.cancelActiveCall(callId, active);
+      }
+    }
+  }
+
   kill(): void {
+    if (this.#killed) return;
     this.#killed = true;
+    const killedAt = this.auditTime();
+    for (const [callId, active] of this.#activeCalls) {
+      this.event("KILL_SWITCH", active.grant, active.toolId, callId, killedAt);
+      this.cancelActiveCall(callId, active);
+    }
+  }
+
+  cancelCall(callId: string): boolean {
+    const active = this.#activeCalls.get(callId);
+    if (active === undefined) return false;
+    this.cancelActiveCall(callId, active);
+    return true;
+  }
+
+  /** The timeout controller must call this at its deadline. */
+  timeoutCall(callId: string): boolean {
+    const active = this.#activeCalls.get(callId);
+    if (active === undefined) return false;
+    this.event("CALL_TIMED_OUT", active.grant, active.toolId, callId);
+    this.cancelActiveCall(callId, active);
+    return true;
+  }
+
+  cancelRun(runId: string): void {
+    if (this.#cancelledRuns.has(runId)) return;
+    this.#cancelledRuns.add(runId);
+    for (const grant of this.#grants.values()) {
+      if (grant.runId === runId) this.event("CALL_CANCELLED", grant);
+    }
+    for (const [callId, active] of this.#activeCalls) {
+      if (active.grant.runId === runId) this.cancelActiveCall(callId, active);
+    }
   }
 
   auditEvents(): readonly AuditEvent[] {
-    return this.#events.map((event) => ({ ...event }));
+    return this.auditSink instanceof InMemoryAuditSink ? this.auditSink.list() : [];
   }
 
-  call(
+  async call(
     grant: RunGrant,
     toolId: string,
     input: JsonValue,
     now: string
-  ): JsonValue {
+  ): Promise<JsonValue> {
     const inventory = this.provider.inventory();
-    const event = (code: string) =>
-      this.#events.push({
-        code,
-        runId: grant.runId,
-        providerId: grant.providerId,
-        toolId,
-        at: this.auditTime()
-      });
+    const callId = `${grant.runId}:${++this.#nextCallId}`;
+    this.registerGrantIfAbsent(grant);
+    this.event("CALL_REQUESTED", grant, toolId, callId);
 
     if (this.#killed) {
-      event("KILL_SWITCH");
+      this.event("KILL_SWITCH", grant, toolId, callId);
       throw new TypeError("Gateway disabled.");
     }
-
-    const { digest, ...grantBase } = grant;
-    if (
-      grant.providerId !== inventory.providerId ||
-      grant.expiresAt <= now ||
-      digest !== grantDigest(grantBase)
-    ) {
-      event("GRANT_DENIED");
-      throw new TypeError("Grant denied.");
+    if (this.#cancelledRuns.has(grant.runId)) {
+      this.event("CALL_CANCELLED", grant, toolId, callId);
+      throw new TypeError("Call cancelled.");
     }
-    if (grant.inventoryDigest !== inventoryDigest(inventory)) {
-      event("INVENTORY_CHANGED");
-      throw new TypeError("Tool inventory changed.");
-    }
-    if (
-      grant.protocolVersion === undefined ||
-      grant.negotiationDigest === undefined ||
-      !inventory.protocolVersions.includes(grant.protocolVersion) ||
-      grant.negotiationDigest !== negotiateProtocol(inventory, [grant.protocolVersion], grant.extensions ?? [], grant.issuedAt, grant.expiresAt).digest
-    ) {
-      event("NEGOTIATION_CHANGED");
-      throw new TypeError("Negotiated protocol changed.");
-    }
+    this.assertGrantUsable(grant, inventory, now, toolId, callId);
+    this.event("GRANT_ACCEPTED", grant, toolId, callId);
 
     const tool = inventory.tools.find((candidate) => candidate.id === toolId);
     if (
@@ -312,29 +364,111 @@ export class ReadOnlyToolGateway {
       !tool.readOnly ||
       (tool.exposesProjectContent && !grant.allowRemoteProjectContent)
     ) {
-      event("TOOL_DENIED");
+      this.event("TOOL_DENIED", grant, toolId, callId);
       throw new TypeError("Tool denied.");
     }
 
+    const active: ActiveCall = {
+      grant,
+      toolId,
+      controller: new AbortController(),
+      cancellationAudited: false
+    };
+    this.#activeCalls.set(callId, active);
     try {
-      validateJson(input, tool.inputSchema);
+      this.event("PROVIDER_DISPATCH", grant, toolId, callId);
+      const result = await this.provider.call(toolId, input, active.controller.signal);
+      if (active.controller.signal.aborted) {
+        this.cancelActiveCall(callId, active);
+        throw new TypeError("Call cancelled.");
+      }
+      this.assertGrantUsable(grant, inventory, this.auditTime(), toolId, callId);
+      let responseBytes: number;
+      try {
+        responseBytes = new TextEncoder().encode(JSON.stringify(result)).byteLength;
+      } catch {
+        this.event("SCHEMA_VIOLATION", grant, toolId, callId);
+        throw new TypeError("Tool response violates the JSON schema boundary.");
+      }
+      if (responseBytes > 65_536) {
+        this.event("RESPONSE_TOO_LARGE", grant, toolId, callId);
+        throw new TypeError("Tool response exceeds limit.");
+      }
+      this.event("CALL_COMPLETED", grant, toolId, callId);
+      return result;
     } catch (error) {
-      event("INPUT_SCHEMA_FAILED");
+      if (active.controller.signal.aborted) {
+        this.cancelActiveCall(callId, active);
+        throw new TypeError("Call cancelled.");
+      }
+      this.event("PROVIDER_FAILURE", grant, toolId, callId);
       throw error;
+    } finally {
+      this.#activeCalls.delete(callId);
     }
-    const result = this.provider.call(toolId, input);
-    try {
-      validateJson(result, tool.outputSchema);
-    } catch (error) {
-      event("OUTPUT_SCHEMA_FAILED");
-      throw error;
+  }
+
+  private registerGrantIfAbsent(grant: RunGrant): void {
+    if (!this.#grantStates.has(grant.digest)) this.registerGrant(grant);
+  }
+
+  private assertGrantUsable(
+    grant: RunGrant,
+    inventory: ToolInventory,
+    now: string,
+    toolId: string,
+    callId: string
+  ): void {
+    const { digest, ...grantBase } = grant;
+    const state = this.#grantStates.get(grant.digest);
+    if (state?.status === "revoked") {
+      this.event("GRANT_REVOKED", grant, toolId, callId);
+      throw new TypeError("Grant revoked.");
     }
-    const responseBytes = new TextEncoder().encode(JSON.stringify(result)).byteLength;
-    if (responseBytes > 65_536) {
-      event("RESPONSE_TOO_LARGE");
-      throw new TypeError("Tool response exceeds limit.");
+    if (
+      grant.providerId !== inventory.providerId ||
+      digest !== grantDigest(grantBase)
+    ) {
+      this.event("GRANT_DENIED", grant, toolId, callId);
+      throw new TypeError("Grant denied.");
     }
-    event("TOOL_CALLED");
-    return result;
+    if (grant.expiresAt <= now) {
+      this.event("GRANT_EXPIRED", grant, toolId, callId);
+      throw new TypeError("Grant expired.");
+    }
+    if (grant.inventoryDigest !== inventoryDigest(inventory)) {
+      this.event("INVENTORY_CHANGED", grant, toolId, callId);
+      throw new TypeError("Tool inventory changed.");
+    }
+  }
+
+  private cancelActiveCall(callId: string, active: ActiveCall): void {
+    if (!active.cancellationAudited) {
+      active.cancellationAudited = true;
+      this.event("CALL_CANCELLED", active.grant, active.toolId, callId);
+    }
+    active.controller.abort();
+  }
+
+  private event(
+    code: AuditCode,
+    grant: RunGrant,
+    toolId?: string,
+    callId?: string,
+    at = this.auditTime()
+  ): void {
+    const event = {
+      sequence: ++this.#eventSequence,
+      code,
+      runId: grant.runId,
+      providerId: grant.providerId,
+      grantDigest: grant.digest,
+      ...(toolId === undefined ? {} : { toolId }),
+      ...(callId === undefined ? {} : { callId }),
+      at,
+      redacted: true as const
+    };
+    const complete = { ...event, id: digestJson(event as unknown as JsonValue) };
+    try { this.auditSink.append(complete); } catch { throw new TypeError("Audit sink unavailable."); }
   }
 }
