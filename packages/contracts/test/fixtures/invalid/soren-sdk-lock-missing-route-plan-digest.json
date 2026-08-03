@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "1.0.0-draft.1",
+  "contractKind": "soren-sdk-lock",
+  "generatedAt": "2026-07-27T12:00:00Z",
+  "capabilityOntologyVersion": "1.0.0-draft.1",
+  "catalogSnapshotDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "policySnapshotDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "projectSnapshotDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "configDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+  "routePlanId": "route-plan-web-platform-example",
+  "connectors": [
+    {
+      "id": "web-platform",
+      "connectorVersion": "0.2.0",
+      "digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "integrations": [
+        {
+          "id": "web-platform-built-in",
+          "versionStatus": "resolved",
+          "version": "0.2.0",
+          "digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+        }
+      ]
+    }
+  ],
+  "unavailable": [],
+  "protocolResolutions": [],
+  "runtimeResolutions": [],
+  "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+}

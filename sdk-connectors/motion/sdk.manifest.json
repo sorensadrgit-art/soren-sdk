@@ -1,98 +1,147 @@
 {
-  "schemaVersion": "1.0.0",
-  "connectorVersion": "0.1.0",
-  "id": "motion",
-  "name": "Motion",
-  "status": "experimental",
-  "trust": "official",
-  "categories": [
-    "motion",
-    "interaction",
-    "react"
-  ],
-  "aliases": [
-    "motion-one",
-    "framer-motion"
-  ],
-  "capabilities": [
-    "motion.presence",
-    "motion.layout",
-    "motion.shared-layout",
-    "motion.spring",
-    "interaction.drag",
-    "interaction.gesture",
-    "motion.component-scroll"
-  ],
-  "connectionMethods": [
+  "$schema": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/connector.schema.json",
+  "schemaVersion": "2.0.0-draft.1",
+  "connectorVersion": "0.3.0",
+  "connector": {
+    "id": "motion",
+    "name": "Motion connector",
+    "publisher": "soren-sdk",
+    "reviewStatus": "approved",
+    "selectable": true,
+    "blockers": []
+  },
+  "product": {
+    "canonicalName": "Motion",
+    "homepage": "https://motion.dev/",
+    "aliases": ["framer-motion", "motion-one"],
+    "categories": ["interaction", "motion", "react"]
+  },
+  "sourceTrust": {
+    "sourceAuthority": "official",
+    "integrityLevel": "version-pinned",
+    "reviewedAt": "2026-07-30",
+    "reviewer": "soren-sdk"
+  },
+  "capabilityClaims": [
     {
-      "type": "official-mcp",
-      "status": "available",
-      "requiresAuth": true,
-      "requiresPaidPlan": true,
-      "fallback": "official-docs"
+      "capability": "motion.presence",
+      "support": "primary",
+      "confidence": 1,
+      "conditions": ["React 18.2 or newer is available."],
+      "limitations": ["Do not share property ownership with GSAP on the same scope."]
     },
     {
-      "type": "official-skill",
-      "status": "available"
+      "capability": "motion.layout",
+      "support": "primary",
+      "confidence": 1,
+      "conditions": ["React 18.2 or newer is available."],
+      "limitations": ["Transform/layout ownership must be exclusive per scope."]
     },
     {
-      "type": "official-docs",
-      "status": "available"
+      "capability": "motion.shared-layout",
+      "support": "primary",
+      "confidence": 0.98,
+      "conditions": ["React 18.2 or newer is available."],
+      "limitations": ["Requires coordinated layout identity and lifecycle."]
+    },
+    {
+      "capability": "motion.spring",
+      "support": "primary",
+      "confidence": 0.98,
+      "conditions": ["React 18.2 or newer is available."],
+      "limitations": ["Use CSS for simple non-interactive easing when sufficient."]
+    },
+    {
+      "capability": "interaction.drag",
+      "support": "primary",
+      "confidence": 0.98,
+      "conditions": ["React 18.2 or newer is available."],
+      "limitations": ["Pointer and transform ownership must be coordinated."]
+    },
+    {
+      "capability": "interaction.gesture",
+      "support": "primary",
+      "confidence": 0.98,
+      "conditions": ["React 18.2 or newer is available."],
+      "limitations": ["Avoid duplicate gesture ownership on the same element."]
     }
   ],
-  "runtime": {
-    "packages": [
-      "motion"
-    ],
-    "imports": {
-      "react": "motion/react",
-      "javascript": "motion"
+  "integrations": [
+    {
+      "id": "motion-runtime",
+      "kind": "runtime-package",
+      "mode": "runtime",
+      "status": "available",
+      "source": "https://www.npmjs.com/package/motion",
+      "version": { "status": "resolved", "value": "12.42.2" },
+      "authorization": { "required": false, "method": "none", "paidPlan": false },
+      "executionRisk": "read-only",
+      "dataExposure": "local-only",
+      "permissions": { "filesystem": "project-read", "network": [], "projectWrite": false },
+      "licenseExpression": "MIT",
+      "fallback": "web-platform",
+      "packageName": "motion",
+      "importPaths": { "javascript": "motion", "react": "motion/react" }
     },
-    "supportedVersions": [
-      "define during implementation"
-    ]
+    {
+      "id": "motion-docs",
+      "kind": "documentation",
+      "mode": "knowledge",
+      "status": "available",
+      "source": "https://motion.dev/docs/react",
+      "version": { "status": "resolved", "value": "12.42.2" },
+      "authorization": { "required": false, "method": "none", "paidPlan": false },
+      "executionRisk": "none",
+      "dataExposure": "none",
+      "permissions": { "filesystem": "none", "network": [], "projectWrite": false },
+      "licenseExpression": "LicenseRef-Motion-Documentation",
+      "fallback": null
+    },
+    {
+      "id": "motion-agent-skill",
+      "kind": "agent-skill",
+      "mode": "knowledge",
+      "status": "available",
+      "source": "https://motion.dev/docs/ai-kit-install",
+      "version": { "status": "resolved", "value": "12.42.2" },
+      "authorization": { "required": true, "method": "api-key", "paidPlan": true },
+      "executionRisk": "read-only",
+      "dataExposure": "remote-source",
+      "permissions": { "filesystem": "project-read", "network": ["motion.dev"], "projectWrite": false },
+      "licenseExpression": "LicenseRef-Motion-Plus-Terms",
+      "fallback": "motion-docs"
+    },
+    {
+      "id": "motion-ai-kit",
+      "kind": "mcp-server",
+      "mode": "tool",
+      "status": "available",
+      "source": "https://motion.dev/docs/ai-kit-install",
+      "version": { "status": "resolved", "value": "12.42.2" },
+      "protocol": { "name": "mcp", "supportedVersions": ["2025-11-25"], "extensions": [] },
+      "authorization": { "required": true, "method": "api-key", "paidPlan": true },
+      "executionRisk": "read-only",
+      "dataExposure": "remote-source",
+      "permissions": { "filesystem": "project-read", "network": ["motion.dev"], "projectWrite": false },
+      "licenseExpression": "LicenseRef-Motion-Plus-Terms",
+      "fallback": "motion-docs"
+    }
+  ],
+  "ownershipClaims": [
+    { "domain": "presence", "scope": "selected-elements", "exclusive": true, "properties": ["presence"] },
+    { "domain": "layout", "scope": "selected-elements", "exclusive": true, "properties": ["layout", "transform"] },
+    { "domain": "interaction", "scope": "selected-elements", "exclusive": true, "properties": ["pointer", "transform"] },
+    { "domain": "timing", "scope": "selected-elements", "exclusive": true, "properties": ["timing"] }
+  ],
+  "verification": {
+    "requiredChecks": ["animation-performance", "cleanup", "property-ownership", "reduced-motion"],
+    "hardGates": ["connector-schema-valid", "license-policy-resolved", "no-ownership-conflict", "no-unauthorized-permission", "version-policy-resolved"]
   },
-  "frameworks": [
-    "react",
-    "javascript",
-    "vue"
-  ],
-  "bestFor": [
-    "React state-driven animation",
-    "Presence and exit animation",
-    "Layout transitions",
-    "Drag and gesture interactions",
-    "Spring-based UI motion"
-  ],
-  "avoidFor": [
-    "Smooth-scroll transport",
-    "WebGL rendering",
-    "A property on an element already owned by GSAP"
-  ],
-  "owns": [
-    "component-state",
-    "presence",
-    "layout",
-    "gesture",
-    "selected-dom-properties"
-  ],
-  "requiredChecks": [
-    "reduced-motion",
-    "cleanup",
-    "property-ownership",
-    "animation-performance"
-  ],
-  "security": {
-    "requiresAuth": true,
-    "requiresPaidPlan": true,
-    "remoteData": true
+  "relatedFiles": {
+    "skill": { "path": "./SKILL.md", "status": "present" },
+    "sources": { "path": "./docs.sources.json", "status": "present" },
+    "compatibility": { "path": "./compatibility.json", "status": "present" },
+    "evaluations": { "path": "./evaluations/", "status": "present" }
   },
-  "knowledge": {
-    "retrievedAt": "2026-07-27",
-    "officialSources": [
-      "https://motion.dev/docs/ai-kit-context",
-      "https://motion.dev/docs/ai-kit-install",
-      "https://motion.dev/docs/react"
-    ]
-  }
+  "knowledge": { "retrievedAt": "2026-07-30", "staleAfterDays": 30 }
 }
