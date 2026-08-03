@@ -111,7 +111,7 @@ function json(value: unknown): JsonValue {
 
 function assertSafe(value: unknown, path = "input"): void {
   if (typeof value === "string" && SENSITIVE_TEXT.test(value)) {
-    throw new Error(`Secret-like data is forbidden at ${path}.`);
+    throw new Error(`Sensitive-looking data is forbidden at ${path}.`);
   }
   if (Array.isArray(value)) {
     value.forEach((entry, index) => assertSafe(entry, `${path}[${index}]`));
@@ -209,29 +209,21 @@ function semanticPlan(input: CreateExecutionPlanInput): SemanticExecutionPlan {
 }
 
 function semanticPlanFromPlan(plan: ExecutionPlan): SemanticExecutionPlan {
-  const semantic = { ...plan } as Partial<ExecutionPlan>;
-  delete semantic.createdAt;
-  delete semantic.executionPlanId;
-  delete semantic.immutableDigest;
-  return semantic as SemanticExecutionPlan;
+  const {
+    createdAt: _createdAt,
+    executionPlanId: _executionPlanId,
+    immutableDigest: _immutableDigest,
+    ...semantic
+  } = plan;
+  return semantic;
 }
 
 function expectedPlanId(digest: Digest): string {
   return `plan_${digest.slice("sha256:".length, "sha256:".length + 24)}`;
 }
 
-function jsonForComparison(value: unknown): JsonValue | undefined {
-  if (value === undefined) return undefined;
-  return JSON.parse(JSON.stringify(value)) as JsonValue;
-}
-
 function sameJson(left: unknown, right: unknown): boolean {
-  const normalizedLeft = jsonForComparison(left);
-  const normalizedRight = jsonForComparison(right);
-  if (normalizedLeft === undefined || normalizedRight === undefined) {
-    return normalizedLeft === normalizedRight;
-  }
-  return canonicalJson(normalizedLeft) === canonicalJson(normalizedRight);
+  return canonicalJson(json(left)) === canonicalJson(json(right));
 }
 
 export class DeterministicExecutionPlanner
