@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0.0",
+  "providerId": "web-platform",
+  "cases": [
+    { "id": "css-transition-native", "capability": "platform.css-transition", "expected": "native" },
+    { "id": "css-animation-native", "capability": "platform.css-animation", "expected": "native" },
+    { "id": "waapi-native", "capability": "platform.waapi-animation", "expected": "native" },
+    { "id": "timeline-not-native", "capability": "motion.timeline", "expected": "not-selected" },
+    { "id": "ownership-separate-scope", "capability": "platform.css-transition", "scope": "nav", "property": "color", "expected": "compatible" }
+  ]
+}

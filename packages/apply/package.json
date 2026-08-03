@@ -1,0 +1,31 @@
+{
+  "name": "@soren-sdk/apply",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Isolated mutation boundary for explicitly approved immutable plans: approval validation, drift checks, orchestration, rollback, cancellation, and audit evidence.",
+  "type": "module",
+  "main": "./dist/public.js",
+  "types": "./dist/public.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/public.d.ts",
+      "import": "./dist/public.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@soren-sdk/contracts": "workspace:*",
+    "@soren-sdk/sandbox": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}

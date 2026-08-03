@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/artifact-reference.schema.json",
+  "title": "Soren SDK Artifact Reference",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "uri", "digest"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "uri": { "type": "string", "minLength": 1 },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "mediaType": { "type": "string" },
+    "bytes": { "type": "integer", "minimum": 0 }
+  }
+}

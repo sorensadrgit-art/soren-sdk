@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/apply-result.schema.json",
+  "title": "Soren SDK Apply Result",
+  "description": "Structured result of an isolated apply run, including diff, rollback records, and audit evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contractKind",
+    "runId",
+    "status",
+    "startedAt",
+    "completedAt",
+    "executionPlanId",
+    "executionPlanDigest",
+    "sandboxId",
+    "beforeSnapshotDigest",
+    "afterSnapshotDigest",
+    "diff",
+    "rollback",
+    "operations",
+    "cancelled",
+    "recoverable",
+    "errors",
+    "evidence"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0-draft.1"
+    },
+    "contractKind": {
+      "const": "apply-result"
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "applied",
+        "cancelled",
+        "failed",
+        "not-started",
+        "rolled-back",
+        "rollback-failed"
+      ]
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "executionPlanId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "executionPlanDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "sandboxId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "beforeSnapshotDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "afterSnapshotDigest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "diff": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "kind",
+          "beforeDigest",
+          "afterDigest",
+          "operation"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "created",
+              "modified",
+              "removed"
+            ]
+          },
+          "beforeDigest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "afterDigest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operation": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "rollback": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationIndex",
+          "path",
+          "reverted",
+          "verified",
+          "error"
+        ],
+        "properties": {
+          "operationIndex": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "path": {
+            "type": "string"
+          },
+          "reverted": {
+            "type": "boolean"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "index",
+          "path",
+          "operation",
+          "status"
+        ],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "path": {
+            "type": "string"
+          },
+          "operation": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "applied",
+              "blocked",
+              "failed",
+              "skipped"
+            ]
+          }
+        }
+      }
+    },
+    "cancelled": {
+      "type": "boolean"
+    },
+    "recoverable": {
+      "type": "boolean"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "recordedAt",
+          "runId",
+          "redacted"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "redacted": {
+            "type": "boolean"
+          },
+          "detail": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  }
+}
