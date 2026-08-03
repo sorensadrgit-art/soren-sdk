@@ -17,9 +17,7 @@ import {
 import {
   CatalogService,
   ProjectInspectionError,
-  RouteInputError,
-  inspectProject,
-  routeCapabilities
+  inspectProject
 } from "@soren-sdk/core";
 import {
   ConnectorCatalogError,
@@ -243,8 +241,6 @@ export function runCli(options: RunCliOptions): number {
       return 0;
     }
 
-    // The connector catalog is only constructed for commands that need it, so
-    // read-only commands running in an arbitrary cwd never touch catalog files.
     const catalog = () =>
       new CatalogService(
         new FileSystemConnectorCatalog({ root: options.cwd })
@@ -421,46 +417,50 @@ export function runCli(options: RunCliOptions): number {
         configDigest: current.configDigest,
         routePlanId: current.routePlanId,
         routePlanDigest: current.routePlanDigest,
-        capabilityOntologyVersion: "1.0.0-draft.1",
+        catalogDigest: current.catalogSnapshotId,
+        policyDigest: current.policySnapshotId,
+        routeDigest: current.routePlanDigest,
         connectors: [],
-        unavailable: []
+        integrations: [],
+        unavailable: [],
+        selectedConnectors: [],
+        selectedIntegrations: [],
+        generatedAt: new Date().toISOString()
       });
-      mkdirSync(dirname(outputPath), { recursive: true });
-      fs.writeFileAtomic(outputPath, JSON.stringify(lock, null, 2));
-      options.io.stdout(parsed.json ? formatJson(lock) : formatLock(lock));
+      new LockfileService().writeAtomic(fs, outputPath, lock, parsed.force);
+      options.io.stdout(
+        parsed.json
+          ? formatJson(lock)
+          : `Created lock ${lock.digest} at ${outputPath}\n`
+      );
       return 0;
     }
 
-    throw new CliUsageError("Unknown command.");
+    throw new CliUsageError(usage());
   } catch (error) {
-    if (error instanceof CliUsageError || error instanceof TypeError) {
-      options.io.stderr(
-        `${error instanceof Error ? error.message : "Invalid arguments."}\n${usage()}\n`
-      );
+    if (error instanceof CliUsageError) {
+      options.io.stderr(`${error.message}\n`);
       return 2;
-    }
-    if (error instanceof ConnectorCatalogError) {
-      options.io.stderr(`${error.code}: ${error.message}\n`);
-      return 1;
     }
     if (error instanceof ProjectInspectionError) {
       options.io.stderr(`${error.code}: ${error.message}\n`);
       return 1;
     }
-    if (error instanceof ConfigLoadError || error instanceof ConfigParseError) {
+    if (error instanceof ConnectorCatalogError) {
       options.io.stderr(`${error.code}: ${error.message}\n`);
       return 1;
     }
-    if (error instanceof PolicyResolutionError) {
-      options.io.stderr(`${error.code}: ${error.message}\n`);
-      return 1;
-    }
-    if (error instanceof LockfileError) {
+    if (
+      error instanceof ConfigLoadError ||
+      error instanceof ConfigParseError ||
+      error instanceof PolicyResolutionError ||
+      error instanceof LockfileError
+    ) {
       options.io.stderr(`${error.code}: ${error.message}\n`);
       return 1;
     }
     options.io.stderr(
-      `${error instanceof Error ? error.message : "Unknown Soren SDK failure."}\n`
+      `${error instanceof Error ? error.message : "Unknown error"}\n`
     );
     return 1;
   }
