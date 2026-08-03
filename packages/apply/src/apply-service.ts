@@ -55,6 +55,10 @@ export class DefaultApplyService implements ApplyService {
   readonly #usedApprovals = new Set<string>();
   readonly #cancelledRuns = new Set<string>();
   readonly #crashStates = new Map<string, CrashStateRecord>();
+  readonly #rollbackContents = new Map<
+    string,
+    Map<number, Uint8Array | null>
+  >();
   #applyDisabled = true;
 
   constructor(options: ApplyServiceOptions) {
@@ -164,10 +168,21 @@ export class DefaultApplyService implements ApplyService {
     if (this.#cancelledRuns.has(preparation.runId)) {
       throw new ApplyError("APPLY_CANCELLED", `Run ${preparation.runId} was cancelled.`);
     }
+    if (this.#usedApprovals.has(preparation.approvalNonce)) {
+      throw new ApplyError(
+        "APPLY_APPROVAL_REPLAYED",
+        `Approval nonce ${preparation.approvalNonce} has already been used.`
+      );
+    }
+    // Reserve the one-time approval before any asynchronous mutation work so
+    // concurrent apply calls cannot race with the same preparation.
+    this.#usedApprovals.add(preparation.approvalNonce);
 
     const startedAt = new Date(this.#now()).toISOString();
     const ops: ApplyOperationEvent[] = [];
     const rollbackRecords: RollbackRecordEntry[] = [];
+    const rollbackContents = new Map<number, Uint8Array | null>();
+    this.#rollbackContents.set(preparation.runId, rollbackContents);
     const errors: string[] = [];
 
     await this.#emit({
@@ -215,13 +230,19 @@ export class DefaultApplyService implements ApplyService {
         assertOperationAllowedGate(preparation, operation);
 
         const prior = await this.#captureBefore(sandbox, operation.path);
-        rollbackRecords.push({
-          operationIndex: operation.index,
-          path: operation.path,
-          reverted: false,
-          verified: false,
-          error: null
-        });
+        const recordRollback = () => {
+          rollbackContents.set(
+            operation.index,
+            prior === null ? null : new Uint8Array(prior)
+          );
+          rollbackRecords.push({
+            operationIndex: operation.index,
+            path: operation.path,
+            reverted: false,
+            verified: false,
+            error: null
+          });
+        };
 
         switch (operation.operation) {
           case "create-file":
@@ -237,6 +258,7 @@ export class DefaultApplyService implements ApplyService {
                 { path: operation.path }
               );
             }
+            recordRollback();
             await sandbox.write(operation.path, content);
             ops.push({
               index: operation.index,
@@ -254,6 +276,7 @@ export class DefaultApplyService implements ApplyService {
                 { path: operation.path }
               );
             }
+            recordRollback();
             await sandbox.remove(operation.path);
             ops.push({
               index: operation.index,
@@ -269,10 +292,16 @@ export class DefaultApplyService implements ApplyService {
       failed = true;
       errors.push(error instanceof Error ? error.message : String(error));
       const last = ops.filter((op) => op.status === "applied").at(-1);
-      this.#recordCrashState(preparation, sandbox, last?.index ?? -1, beforeSnapshot);
+      this.#recordCrashState(
+        preparation,
+        sandbox,
+        last?.index ?? -1,
+        beforeSnapshot,
+        rollbackRecords
+      );
     }
 
-    const afterSnapshot = await sandbox.snapshot().catch(() => null);
+    let afterSnapshot = await sandbox.snapshot().catch(() => null);
     const diff = afterSnapshot
       ? diffSnapshots(beforeSnapshot, afterSnapshot, preparation.operations)
       : [];
@@ -287,6 +316,9 @@ export class DefaultApplyService implements ApplyService {
       );
       rollbackFailed = rollbackResult.status === "rollback-failed";
       if (rollbackFailed) errors.push(...rollbackResult.errors);
+      // Report the final sandbox state after rollback, not the failed
+      // intermediate state used to produce the attempted diff.
+      afterSnapshot = await sandbox.snapshot().catch(() => null);
     }
 
     await sandbox.close().catch(() => undefined);
@@ -335,7 +367,6 @@ export class DefaultApplyService implements ApplyService {
       }
     });
 
-    this.#usedApprovals.add(input.preparation.approvalNonce);
     return result;
   }
 
@@ -406,7 +437,8 @@ export class DefaultApplyService implements ApplyService {
     preparation: ApplyPreparation,
     sandbox: SandboxSession,
     lastOperationIndex: number,
-    beforeSnapshot: SandboxSnapshot
+    beforeSnapshot: SandboxSnapshot,
+    rollbackRecords: RollbackRecordEntry[]
   ): void {
     const record: CrashStateRecord = {
       runId: preparation.runId,
@@ -416,9 +448,9 @@ export class DefaultApplyService implements ApplyService {
       startedAt: preparation.preparedAt,
       lastOperationIndex,
       operationsApplied: lastOperationIndex + 1,
-      rollbackRecords: [],
+      rollbackRecords: rollbackRecords.map((entry) => ({ ...entry })),
       beforeSnapshotDigest: beforeSnapshot.digest,
-      recoverable: true,
+      recoverable: this.#rollbackContents.has(preparation.runId),
       recordedAt: new Date(this.#now()).toISOString()
     };
     this.#crashStates.set(preparation.runId, record);
@@ -444,6 +476,7 @@ export class DefaultApplyService implements ApplyService {
     const ordered = [...records].sort(
       (left, right) => right.operationIndex - left.operationIndex
     );
+    const priorContents = this.#rollbackContents.get(runId);
     let reverted = 0;
     let verified = 0;
     let failed = 0;
@@ -451,8 +484,21 @@ export class DefaultApplyService implements ApplyService {
 
     for (const record of ordered) {
       try {
+        if (!priorContents?.has(record.operationIndex)) {
+          throw new ApplyError(
+            "APPLY_ROLLBACK_FAILED",
+            `Missing rollback content for operation ${record.operationIndex}.`
+          );
+        }
+        const prior = priorContents.get(record.operationIndex) ?? null;
         if (!record.reverted) {
-          await sandbox.remove(record.path).catch(() => undefined);
+          if (prior === null) {
+            // A create operation had no prior file. Removal is idempotent so a
+            // failed pre-write operation does not make rollback fail.
+            await sandbox.remove(record.path).catch(() => undefined);
+          } else {
+            await sandbox.write(record.path, prior);
+          }
           record.reverted = true;
           reverted += 1;
         }
@@ -471,6 +517,12 @@ export class DefaultApplyService implements ApplyService {
       verifiedDigest = after.digest === beforeSnapshotDigest ? (after.digest as `${string}`) : null;
     } catch {
       verifiedDigest = null;
+    }
+    if (verifiedDigest === null) {
+      failed += 1;
+      errors.push(
+        `Rollback snapshot does not match the before-state digest ${beforeSnapshotDigest}.`
+      );
     }
 
     await this.#emit({
