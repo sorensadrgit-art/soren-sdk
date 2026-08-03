@@ -1,87 +1,125 @@
 {
-  "schemaVersion": "1.0.0",
-  "connectorVersion": "0.1.0",
-  "id": "gsap",
-  "name": "GSAP",
-  "status": "experimental",
-  "trust": "official",
-  "categories": [
-    "motion",
-    "timeline",
-    "scroll"
-  ],
-  "aliases": [
-    "greensock"
-  ],
-  "capabilities": [
-    "motion.timeline",
-    "motion.svg",
-    "scroll.triggered-animation",
-    "scroll.pinned-sequence",
-    "interaction.drag-advanced",
-    "motion.flip"
-  ],
-  "connectionMethods": [
+  "$schema": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/connector.schema.json",
+  "schemaVersion": "2.0.0-draft.1",
+  "connectorVersion": "0.3.0",
+  "connector": {
+    "id": "gsap",
+    "name": "GSAP connector",
+    "publisher": "soren-sdk",
+    "reviewStatus": "approved",
+    "selectable": true,
+    "blockers": []
+  },
+  "product": {
+    "canonicalName": "GSAP",
+    "homepage": "https://gsap.com/",
+    "aliases": ["greensock"],
+    "categories": ["motion", "scroll", "timeline"]
+  },
+  "sourceTrust": {
+    "sourceAuthority": "official",
+    "integrityLevel": "version-pinned",
+    "reviewedAt": "2026-07-30",
+    "reviewer": "soren-sdk"
+  },
+  "capabilityClaims": [
     {
-      "type": "official-skill",
-      "status": "available"
+      "capability": "motion.timeline",
+      "support": "primary",
+      "confidence": 1,
+      "conditions": ["Multi-step imperative choreography is required."],
+      "limitations": ["Use native CSS for simple self-contained transitions."]
     },
     {
-      "type": "official-docs",
-      "status": "available"
+      "capability": "motion.svg",
+      "support": "primary",
+      "confidence": 0.98,
+      "conditions": ["SVG choreography requires imperative sequencing."],
+      "limitations": ["SVG property ownership must be exclusive per scope."]
+    },
+    {
+      "capability": "motion.flip",
+      "support": "primary",
+      "confidence": 0.98,
+      "conditions": ["A FLIP transition is explicitly required."],
+      "limitations": ["Do not share layout/transform ownership with Motion on the same scope."]
+    },
+    {
+      "capability": "scroll.triggered-animation",
+      "support": "primary",
+      "confidence": 1,
+      "conditions": ["ScrollTrigger-style choreography is required."],
+      "limitations": ["Scroll trigger ownership must be singular per scope."]
+    },
+    {
+      "capability": "scroll.pinned-sequence",
+      "support": "primary",
+      "confidence": 1,
+      "conditions": ["Pinned scroll storytelling is required."],
+      "limitations": ["Pinning and cleanup must be tested across breakpoints."]
     }
   ],
-  "runtime": {
-    "packages": [
-      "gsap"
-    ],
-    "imports": {
-      "javascript": "gsap"
+  "integrations": [
+    {
+      "id": "gsap-runtime",
+      "kind": "runtime-package",
+      "mode": "runtime",
+      "status": "available",
+      "source": "https://www.npmjs.com/package/gsap",
+      "version": { "status": "resolved", "value": "3.15.0" },
+      "authorization": { "required": false, "method": "none", "paidPlan": false },
+      "executionRisk": "read-only",
+      "dataExposure": "local-only",
+      "permissions": { "filesystem": "project-read", "network": [], "projectWrite": false },
+      "licenseExpression": "LicenseRef-GSAP-Standard",
+      "fallback": "web-platform",
+      "packageName": "gsap",
+      "importPaths": { "javascript": "gsap", "scrollTrigger": "gsap/ScrollTrigger" }
     },
-    "supportedVersions": [
-      "define during implementation"
-    ]
+    {
+      "id": "gsap-docs",
+      "kind": "documentation",
+      "mode": "knowledge",
+      "status": "available",
+      "source": "https://gsap.com/docs/v3/GSAP/",
+      "version": { "status": "resolved", "value": "3.15.0" },
+      "authorization": { "required": false, "method": "none", "paidPlan": false },
+      "executionRisk": "none",
+      "dataExposure": "none",
+      "permissions": { "filesystem": "none", "network": [], "projectWrite": false },
+      "licenseExpression": "LicenseRef-GSAP-Documentation",
+      "fallback": null
+    },
+    {
+      "id": "gsap-agent-skill",
+      "kind": "agent-skill",
+      "mode": "knowledge",
+      "status": "available",
+      "source": "https://github.com/greensock/gsap-skills",
+      "version": { "status": "resolved", "value": "2026-07-30" },
+      "authorization": { "required": false, "method": "none", "paidPlan": false },
+      "executionRisk": "read-only",
+      "dataExposure": "local-only",
+      "permissions": { "filesystem": "project-read", "network": [], "projectWrite": false },
+      "licenseExpression": "MIT",
+      "fallback": "gsap-docs"
+    }
+  ],
+  "ownershipClaims": [
+    { "domain": "timeline", "scope": "selected-elements", "exclusive": true, "properties": ["timeline", "transform"] },
+    { "domain": "svg-animation", "scope": "selected-elements", "exclusive": true, "properties": ["svg"] },
+    { "domain": "layout", "scope": "selected-elements", "exclusive": true, "properties": ["layout", "transform"] },
+    { "domain": "scroll-trigger", "scope": "selected-route", "exclusive": true, "properties": ["scroll", "transform"] }
+  ],
+  "verification": {
+    "requiredChecks": ["cleanup", "plugin-registration", "property-ownership", "reduced-motion", "responsive-context"],
+    "hardGates": ["connector-schema-valid", "license-policy-resolved", "no-ownership-conflict", "no-unauthorized-permission", "version-policy-resolved"]
   },
-  "frameworks": [
-    "react",
-    "vue",
-    "svelte",
-    "javascript"
-  ],
-  "bestFor": [
-    "Cinematic multi-step timelines",
-    "ScrollTrigger choreography",
-    "Pinned storytelling",
-    "Advanced sequencing",
-    "Framework-independent animation"
-  ],
-  "avoidFor": [
-    "Simple CSS transitions",
-    "Smooth-scroll transport",
-    "A property on an element already owned by Motion"
-  ],
-  "owns": [
-    "timeline",
-    "scroll-trigger",
-    "selected-dom-properties"
-  ],
-  "requiredChecks": [
-    "plugin-registration",
-    "cleanup",
-    "responsive-context",
-    "property-ownership",
-    "reduced-motion"
-  ],
-  "security": {
-    "requiresAuth": false,
-    "requiresPaidPlan": false,
-    "remoteData": false
+  "relatedFiles": {
+    "skill": { "path": "./SKILL.md", "status": "present" },
+    "sources": { "path": "./docs.sources.json", "status": "present" },
+    "compatibility": { "path": "./compatibility.json", "status": "present" },
+    "evaluations": { "path": "./evaluations/", "status": "present" }
   },
-  "knowledge": {
-    "retrievedAt": "2026-07-27",
-    "officialSources": [
-      "https://github.com/greensock/gsap-skills",
-      "https://gsap.com/docs/v3/"
-    ]
-  }
+  "knowledge": { "retrievedAt": "2026-07-30", "staleAfterDays": 30 }
 }

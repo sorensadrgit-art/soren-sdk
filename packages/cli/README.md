@@ -1,6 +1,6 @@
 # @soren-sdk/cli
 
-The executable interface for Soren SDK's read-only project inspector and connector catalog, with optional local SQLite catalog-snapshot persistence.
+The executable interface for Soren SDK's read-only project inspector, connector catalog, and explicit-capability router, with optional local SQLite catalog-snapshot persistence.
 
 ## Commands
 
@@ -8,6 +8,18 @@ The executable interface for Soren SDK's read-only project inspector and connect
 soren-sdk inspect
 soren-sdk inspect ../my-project
 soren-sdk inspect ../my-project --json
+
+soren-sdk route \
+  --project ../my-project \
+  --capability platform.css-transition \
+  --json
+
+soren-sdk route \
+  --project ../my-react-project \
+  --capability motion.layout \
+  --preferred motion \
+  --scope card-grid \
+  --property layout
 
 soren-sdk catalog list
 soren-sdk catalog list --json
@@ -22,13 +34,38 @@ From this monorepo:
 ```bash
 pnpm build
 pnpm soren-sdk -- inspect --json
+pnpm soren-sdk -- route --capability platform.css-animation --json
 ```
 
 Or run the built binary directly:
 
 ```bash
 node packages/cli/dist/bin.js inspect --json
+node packages/cli/dist/bin.js route --capability platform.css-transition --json
 ```
+
+## Route input
+
+`route` accepts structured capability IDs only. It does not infer capabilities from prose.
+
+Supported repeatable flags:
+
+- `--capability <id>` for required capabilities
+- `--optional <id>` for optional capabilities
+- `--preferred <provider-id>`
+- `--forbidden <provider-id>`
+
+Other routing flags:
+
+- `--project <path>` defaults to `.`
+- `--max-providers <non-negative-integer>` defaults to `2`; `0` restricts routing to native coverage only
+- `--scope <scope>`
+- `--property <property>`
+- `--json`
+
+The Phase 4 router considers only healthy approved Web Platform, Motion, and GSAP connectors. Motion's React-specific claims require a safely provable React `18.2` or newer declaration.
+
+A valid Route Plan may have status `native`, `selected`, `no-sdk`, `needs-input`, or `blocked`. All valid Route Plans return exit code `0`; blocked and needs-input are routing results, not CLI failures.
 
 ## Inspect output
 
@@ -47,8 +84,8 @@ The snapshot ID excludes the absolute root and creation time, so identical clone
 
 ## Exit codes
 
-- `0` — successful inspection, query, or snapshot operation
-- `1` — inspection, catalog, or storage failure
+- `0` — successful inspection, catalog operation, or valid Route Plan
+- `1` — inspection, catalog, storage, contract, or internal routing failure
 - `2` — invalid arguments or unknown connector
 
 ## Output
@@ -60,6 +97,7 @@ Human-readable output is the default. `--json` emits canonical stable JSON follo
 The following commands are read-only:
 
 - `inspect`
+- `route`
 - `catalog list`
 - `catalog get`
 - `connector health`

@@ -5,7 +5,9 @@ import { parseArgs } from "node:util";
 import {
   CatalogService,
   ProjectInspectionError,
-  inspectProject
+  RouteInputError,
+  inspectProject,
+  routeCapabilities
 } from "@soren-sdk/core";
 import {
   ConnectorCatalogError,
@@ -18,8 +20,13 @@ import {
   formatConnectorLine,
   formatHealth,
   formatJson,
-  formatProjectSnapshot
+  formatProjectSnapshot,
+  formatRoutePlan
 } from "./format.js";
+import {
+  buildRouteRequest,
+  parseRouteOptions
+} from "./route-options.js";
 
 export interface CliIo {
   stdout(message: string): void;
@@ -92,6 +99,7 @@ function usage(): string {
   return [
     "Usage:",
     "  soren-sdk inspect [path] [--json]",
+    "  soren-sdk route --capability <id> [--capability <id>] [--optional <id>] [--project <path>] [--preferred <provider>] [--forbidden <provider>] [--max-providers <number>] [--scope <scope>] [--property <property>] [--json]",
     "  soren-sdk catalog list [--json]",
     "  soren-sdk catalog get <connector-id> [--json]",
     "  soren-sdk connector health <connector-id> [--json]",
@@ -112,6 +120,25 @@ export function runCli(options: RunCliOptions): number {
       options.io.stdout(
         parsed.json ? formatJson(snapshot) : formatProjectSnapshot(snapshot)
       );
+      return 0;
+    }
+
+    if (domain === "route") {
+      const parsed = parseRouteOptions(options.argv.slice(1));
+      const createdAt = new Date().toISOString();
+      const project = inspectProject({
+        root: resolve(options.cwd, parsed.project),
+        createdAt
+      });
+      const catalog = new FileSystemConnectorCatalog({ root: options.cwd });
+      const request = buildRouteRequest(parsed, project.snapshotId, createdAt);
+      const plan = routeCapabilities({
+        request,
+        project,
+        catalog,
+        createdAt
+      });
+      options.io.stdout(parsed.json ? formatJson(plan) : formatRoutePlan(plan));
       return 0;
     }
 
@@ -191,6 +218,10 @@ export function runCli(options: RunCliOptions): number {
     }
     if (error instanceof ProjectInspectionError) {
       options.io.stderr(`${error.code}: ${error.message}\n`);
+      return 1;
+    }
+    if (error instanceof RouteInputError) {
+      options.io.stderr(`${error.message}\n`);
       return 1;
     }
     options.io.stderr(
