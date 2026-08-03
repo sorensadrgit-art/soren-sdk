@@ -209,7 +209,7 @@ function semanticPlan(input: CreateExecutionPlanInput): SemanticExecutionPlan {
 }
 
 function semanticPlanFromPlan(plan: ExecutionPlan): SemanticExecutionPlan {
-  const semantic = { ...plan } as Partial<ExecutionPlan>;
+  const semantic: Partial<ExecutionPlan> = { ...plan };
   delete semantic.createdAt;
   delete semantic.executionPlanId;
   delete semantic.immutableDigest;
@@ -220,18 +220,8 @@ function expectedPlanId(digest: Digest): string {
   return `plan_${digest.slice("sha256:".length, "sha256:".length + 24)}`;
 }
 
-function jsonForComparison(value: unknown): JsonValue | undefined {
-  if (value === undefined) return undefined;
-  return JSON.parse(JSON.stringify(value)) as JsonValue;
-}
-
 function sameJson(left: unknown, right: unknown): boolean {
-  const normalizedLeft = jsonForComparison(left);
-  const normalizedRight = jsonForComparison(right);
-  if (normalizedLeft === undefined || normalizedRight === undefined) {
-    return normalizedLeft === normalizedRight;
-  }
-  return canonicalJson(normalizedLeft) === canonicalJson(normalizedRight);
+  return canonicalJson(json(left)) === canonicalJson(json(right));
 }
 
 export class DeterministicExecutionPlanner
@@ -297,8 +287,10 @@ export class DeterministicExecutionPlanner
       contextReferences: plan.contextReferences,
       objective: plan.objective,
       constraints: plan.constraints,
-      lockfile: plan.lockfile,
-      runnerCapabilities: plan.runnerCapabilities
+      ...(plan.lockfile === undefined ? {} : { lockfile: plan.lockfile }),
+      ...(plan.runnerCapabilities === undefined
+        ? {}
+        : { runnerCapabilities: plan.runnerCapabilities })
     };
     const actual = {
       projectSnapshot: current.projectSnapshot,
@@ -311,8 +303,10 @@ export class DeterministicExecutionPlanner
       ),
       objective: current.objective,
       constraints: stableStrings(current.constraints),
-      lockfile: current.lockfile,
-      runnerCapabilities: current.runnerCapabilities
+      ...(current.lockfile === undefined ? {} : { lockfile: current.lockfile }),
+      ...(current.runnerCapabilities === undefined
+        ? {}
+        : { runnerCapabilities: current.runnerCapabilities })
     };
     const differences = Object.keys(expected).filter((key) => {
       const field = key as keyof typeof expected;

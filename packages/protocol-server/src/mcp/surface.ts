@@ -1,3 +1,6 @@
+import { realpathSync } from "node:fs";
+import { isAbsolute, relative, resolve } from "node:path";
+
 import {
   ProtocolError,
   type JsonValue,
@@ -32,6 +35,18 @@ export interface McpSurface {
   tools(): McpTool[];
   resources(): McpResource[];
   callTool(request: McpRequest): Promise<JsonValue>;
+}
+
+export interface McpSurfaceOptions { allowedProjectRoots?: string[]; }
+
+function assertAllowedProjectRoot(path: string, allowedRoots: readonly string[]): void {
+  if (allowedRoots.length === 0) throw new ProtocolError("PROJECT_ROOT_DENIED", "Project inspection path is outside the configured allowlist.", undefined, 403);
+  const candidate = realpathSync(isAbsolute(path) ? path : resolve(process.cwd(), path));
+  const allowed = allowedRoots.some((root) => {
+    const contained = relative(realpathSync(resolve(root)), candidate);
+    return contained === "" || (!contained.startsWith("..") && !isAbsolute(contained));
+  });
+  if (!allowed) throw new ProtocolError("PROJECT_ROOT_DENIED", "Project inspection path is outside the configured allowlist.", undefined, 403);
 }
 
 const toolDescriptions: McpTool[] = [
@@ -82,7 +97,8 @@ function jsonValue(value: unknown): JsonValue {
   return value as JsonValue;
 }
 
-export function createMcpSurface(application: SorenApplication): McpSurface {
+export function createMcpSurface(application: SorenApplication, options: McpSurfaceOptions = {}): McpSurface {
+  const allowedProjectRoots = options.allowedProjectRoots ?? [];
   return {
     protocolVersions: SUPPORTED_MCP_PROTOCOL_VERSIONS,
     tools() {
@@ -116,7 +132,12 @@ export function createMcpSurface(application: SorenApplication): McpSurface {
         return jsonValue(await application.connectorHealth({ id: String(args.id ?? ""), meta }));
       }
       if (request.toolName === "soren_project_inspect") {
-        return jsonValue(await application.inspectProject({ path: String(args.path ?? "."), meta }));
+        const path = args.path;
+        if (typeof path !== "string" || path.trim() === "") {
+          throw new ProtocolError("VALIDATION_FAILED", "Project inspection path must be a nonempty string.");
+        }
+        assertAllowedProjectRoot(path, allowedProjectRoots);
+        return jsonValue(await application.inspectProject({ path, meta }));
       }
       if (request.toolName === "soren_route") {
         return jsonValue(await application.route({ request: args, meta }));

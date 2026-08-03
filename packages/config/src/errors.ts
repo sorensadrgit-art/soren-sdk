@@ -24,6 +24,7 @@ export class ConfigParseError extends Error {
     }
   }
 }
+
 export type ConfigLoadErrorCode =
   | "CONFIG_NOT_FOUND"
   | "CONFIG_AMBIGUOUS"
@@ -49,3 +50,4 @@ export class ConfigLoadError extends Error {
     }
   }
 }
+
