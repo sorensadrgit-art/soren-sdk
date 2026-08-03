@@ -4,4 +4,3 @@ export * from "./catalog/types.js";
 export * from "./inspector/types.js";
 export * from "./inspector/inspect-project.js";
 export * from "./context-gateway.js";
-export * from "./audit-sink.js";

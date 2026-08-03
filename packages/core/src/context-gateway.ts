@@ -4,7 +4,6 @@ import {
   type Digest,
   type JsonValue
 } from "@soren-sdk/contracts";
-import { InMemoryAuditSink, type AuditCode, type AuditEvent, type AuditSink } from "./audit-sink.js";
 
 export type ContextCategory =
   | "api"
@@ -28,8 +27,6 @@ export interface ContextRequest {
   connectorIds: string[];
   categories: ContextCategory[];
   maxItems: number;
-  /** UTF-8 context budget. Omitted preserves the legacy item-only limit. */
-  maxBytes?: number;
   now: string;
 }
 
@@ -42,28 +39,68 @@ export interface SelectedContext {
   content: string;
 }
 
-export type JsonSchema = Readonly<Record<string, unknown>>;
-
 export interface ToolDefinition {
   id: string;
   description: string;
   readOnly: boolean;
   exposesProjectContent: boolean;
-  inputSchema?: JsonSchema;
-  outputSchema?: JsonSchema;
 }
 
 export interface ToolInventory {
   providerId: string;
   protocolVersions: string[];
-  extensions?: string[];
   tools: ToolDefinition[];
 }
 
-/** Providers must observe the signal and stop work within their own bounded timeout. */
 export interface ReadOnlyToolProvider {
   inventory(): ToolInventory;
-  call(toolId: string, input: JsonValue, signal: AbortSignal): JsonValue | Promise<JsonValue>;
+  call(toolId: string, input: JsonValue): JsonValue;
+}
+
+export type ProjectContentScope =
+  | "source"
+  | "configuration"
+  | "dependencies"
+  | "lockfile";
+
+export interface ProjectContentRequest {
+  projectSnapshot: Digest;
+  policySnapshot: Digest;
+  scopes: readonly ProjectContentScope[];
+}
+
+export interface ConsentSubject {
+  readonly kind: "principal" | "run";
+  readonly id: string;
+}
+
+/** Immutable record issued by the injected authorization authority. */
+export interface ProjectContentConsent {
+  readonly subject: ConsentSubject;
+  readonly projectSnapshot: Digest;
+  readonly providerId: string;
+  readonly toolId: string;
+  readonly allowedContentScope: readonly ProjectContentScope[];
+  readonly policySnapshot: Digest;
+  readonly expiresAt: string;
+  readonly digest: Digest;
+}
+
+export interface ProjectContentConsentLookup {
+  readonly subject: ConsentSubject;
+  readonly projectSnapshot: Digest;
+  readonly providerId: string;
+  readonly toolId: string;
+  readonly requestedContentScope: readonly ProjectContentScope[];
+  readonly policySnapshot: Digest;
+}
+
+/**
+ * The sole authority for remote project-content permission. Tool inventories
+ * are untrusted metadata and cannot substitute for this provider.
+ */
+export interface ProjectContentConsentProvider {
+  findConsent(lookup: ProjectContentConsentLookup): ProjectContentConsent | undefined;
 }
 
 export interface RunGrant {
@@ -71,29 +108,18 @@ export interface RunGrant {
   providerId: string;
   toolIds: string[];
   inventoryDigest: Digest;
-  /** Persisted negotiation binding. Optional only for input compatibility; issuance fills these. */
-  protocolVersion?: string;
-  extensions?: string[];
-  negotiationDigest?: Digest;
   issuedAt: string;
   expiresAt: string;
   allowRemoteProjectContent: boolean;
   digest: Digest;
 }
 
-export interface StoredGrantState {
-  grantDigest: Digest;
-  status: "active" | "revoked";
-  revokedAt?: string;
-}
-
-export type { AuditEvent, AuditSink } from "./audit-sink.js";
-
-interface ActiveCall {
-  grant: RunGrant;
-  toolId: string;
-  controller: AbortController;
-  cancellationAudited: boolean;
+export interface AuditEvent {
+  code: string;
+  runId: string;
+  providerId: string;
+  toolId?: string;
+  at: string;
 }
 
 function sorted<T>(
@@ -110,42 +136,78 @@ function normalizedToolIds(toolIds: readonly string[]): string[] {
 export function inventoryDigest(inventory: ToolInventory): Digest {
   return digestJson({
     providerId: inventory.providerId,
-    protocolVersions: sorted(inventory.protocolVersions, (left, right) => left.localeCompare(right)),
-    extensions: sorted(inventory.extensions ?? [], (left, right) => left.localeCompare(right)),
-    tools: sorted(inventory.tools, (left, right) => left.id.localeCompare(right.id)).map(({ id, description, readOnly, exposesProjectContent, inputSchema, outputSchema }) => ({ id, description, readOnly, exposesProjectContent, inputSchema: inputSchema ?? {}, outputSchema: outputSchema ?? {} }))
+    protocolVersions: sorted(
+      inventory.protocolVersions,
+      (left, right) => left.localeCompare(right)
+    ),
+    tools: sorted(inventory.tools, (left, right) =>
+      left.id.localeCompare(right.id)
+    ).map(({ id, description, readOnly, exposesProjectContent }) => ({
+      id,
+      description,
+      readOnly,
+      exposesProjectContent
+    }))
   } as JsonValue);
-}
-
-export function negotiateProtocol(inventory: ToolInventory, supportedVersions: readonly string[], requiredExtensions: readonly string[], createdAt: string, expiresAt: string): NegotiationResult {
-  if (expiresAt <= createdAt) throw new TypeError("Negotiation expiration must follow creation.");
-  const compatible = [...new Set(supportedVersions)].filter((version) => inventory.protocolVersions.includes(version));
-  if (compatible.length === 0) throw new TypeError("No compatible protocol version.");
-  const extensions = [...new Set(requiredExtensions)].sort((left, right) => left.localeCompare(right));
-  if (extensions.some((extension) => !(inventory.extensions ?? []).includes(extension))) throw new TypeError("Required protocol extension unavailable.");
-  const selected = compatible.sort((left, right) => left.localeCompare(right, undefined, { numeric: true })).at(-1);
-  if (selected === undefined) throw new TypeError("No compatible protocol version.");
-  const protocolVersion = selected;
-  const inventoryHash = inventoryDigest(inventory);
-  const base = { providerId: inventory.providerId, protocolVersion, extensions, inventoryDigest: inventoryHash, createdAt, expiresAt };
-  return { ...base, digest: digestJson(base as unknown as JsonValue) };
-}
-
-function validateJson(value: unknown, schema: JsonSchema | undefined, path = "$"): void {
-  if (value === null || typeof value === "string" || typeof value === "boolean") return;
-  if (typeof value === "number") { if (!Number.isFinite(value)) throw new TypeError(`Unsupported non-JSON value at ${path}.`); return; }
-  if (Array.isArray(value)) { value.forEach((item, index) => validateJson(item, undefined, `${path}[${index}]`)); return; }
-  if (typeof value !== "object" || Object.getPrototypeOf(value) !== Object.prototype) throw new TypeError(`Unsupported non-JSON value at ${path}.`);
-  const object = value as Record<string, unknown>;
-  for (const [key, item] of Object.entries(object)) { if (["__proto__", "prototype", "constructor"].includes(key)) throw new TypeError(`Unsafe object key at ${path}.`); validateJson(item, undefined, `${path}.${key}`); }
-  if (!schema || schema.type !== "object") return;
-  const properties = schema.properties as Record<string, JsonSchema> | undefined;
-  for (const key of (schema.required as unknown[] ?? [])) if (typeof key === "string" && !(key in object)) throw new TypeError(`Missing required property: ${key}.`);
-  if (schema.additionalProperties === false && properties) for (const key of Object.keys(object)) if (!(key in properties)) throw new TypeError(`Unknown property: ${key}.`);
-  if (properties) for (const [key, child] of Object.entries(properties)) if (key in object) validateJson(object[key], child, `${path}.${key}`);
 }
 
 function grantDigest(value: Omit<RunGrant, "digest">): Digest {
   return digestJson(value as unknown as JsonValue);
+}
+
+function normalizedScopes(
+  scopes: readonly ProjectContentScope[]
+): ProjectContentScope[] {
+  return sorted([...new Set(scopes)], (left, right) => left.localeCompare(right));
+}
+
+function consentDigest(value: Omit<ProjectContentConsent, "digest">): Digest {
+  return digestJson(value as unknown as JsonValue);
+}
+
+export function createProjectContentConsent(
+  input: Omit<ProjectContentConsent, "digest">
+): ProjectContentConsent {
+  const allowedContentScope = normalizedScopes(input.allowedContentScope);
+  if (
+    input.subject.id.length === 0 ||
+    input.providerId.length === 0 ||
+    input.toolId.length === 0 ||
+    allowedContentScope.length === 0
+  ) {
+    throw new TypeError("Invalid project-content consent.");
+  }
+  const subject = Object.freeze({ ...input.subject });
+  const normalized: Omit<ProjectContentConsent, "digest"> = {
+    ...input,
+    subject,
+    allowedContentScope: Object.freeze(allowedContentScope)
+  };
+  return Object.freeze({
+    ...normalized,
+    digest: consentDigest(normalized)
+  });
+}
+
+function consentMatches(
+  consent: ProjectContentConsent,
+  lookup: ProjectContentConsentLookup,
+  now: string
+): boolean {
+  const { digest, ...base } = consent;
+  return (
+    digest === consentDigest(base) &&
+    consent.expiresAt > now &&
+    consent.subject.kind === lookup.subject.kind &&
+    consent.subject.id === lookup.subject.id &&
+    consent.projectSnapshot === lookup.projectSnapshot &&
+    consent.providerId === lookup.providerId &&
+    consent.toolId === lookup.toolId &&
+    consent.policySnapshot === lookup.policySnapshot &&
+    lookup.requestedContentScope.every((scope) =>
+      consent.allowedContentScope.includes(scope)
+    )
+  );
 }
 
 export function selectContext(
@@ -157,7 +219,7 @@ export function selectContext(
   }
   const ids = new Set(request.connectorIds);
   const categories = new Set(request.categories);
-  const candidates = sorted(
+  return sorted(
     sources.filter((source) => {
       if (
         !source.reviewed ||
@@ -178,17 +240,16 @@ export function selectContext(
       `${left.connectorId}\u0000${left.category}\u0000${left.id}`.localeCompare(
         `${right.connectorId}\u0000${right.category}\u0000${right.id}`
       )
-  );
-  const selected: SelectedContext[] = [];
-  let bytes = 0;
-  for (const source of candidates) {
-    if (selected.length >= request.maxItems) break;
-    const sourceBytes = new TextEncoder().encode(source.content).byteLength;
-    if (request.maxBytes !== undefined && (sourceBytes > request.maxBytes || bytes + sourceBytes > request.maxBytes)) continue;
-    bytes += sourceBytes;
-    selected.push({ sourceId: source.id, connectorId: source.connectorId, category: source.category, origin: source.origin, digest: source.digest, content: source.content });
-  }
-  return selected;
+  )
+    .slice(0, request.maxItems)
+    .map(({ id, connectorId, category, origin, digest, content }) => ({
+      sourceId: id,
+      connectorId,
+      category,
+      origin,
+      digest,
+      content
+    }));
 }
 
 export function createRunGrant(
@@ -211,31 +272,14 @@ export function createRunGrant(
   const toolIds = normalizedToolIds(input.toolIds);
   for (const id of toolIds) {
     const tool = tools.get(id);
-    if (
-      tool === undefined ||
-      !tool.readOnly ||
-      (tool.exposesProjectContent && !input.allowRemoteProjectContent)
-    ) {
+    if (tool === undefined || !tool.readOnly) {
       throw new TypeError("Grant exceeds read-only policy.");
     }
   }
 
-  const defaultProtocolVersion = sorted(inventory.protocolVersions, (left, right) => left.localeCompare(right, undefined, { numeric: true })).at(-1);
-  const protocolVersion = input.protocolVersion ?? defaultProtocolVersion;
-  if (protocolVersion === undefined || !inventory.protocolVersions.includes(protocolVersion)) {
-    throw new TypeError("Grant protocol is unavailable.");
-  }
-  const extensions = sorted([...(new Set(input.extensions ?? []))], (left, right) => left.localeCompare(right));
-  const negotiation = negotiateProtocol(inventory, [protocolVersion], extensions, input.issuedAt, input.expiresAt);
-  if (input.negotiationDigest !== undefined && input.negotiationDigest !== negotiation.digest) {
-    throw new TypeError("Invalid negotiation digest.");
-  }
   const normalized: Omit<RunGrant, "digest"> = {
     ...input,
-    toolIds,
-    protocolVersion,
-    extensions,
-    negotiationDigest: negotiation.digest
+    toolIds
   };
   return {
     ...normalized,
@@ -245,230 +289,95 @@ export function createRunGrant(
 
 export class ReadOnlyToolGateway {
   #killed = false;
-  #nextCallId = 0;
-  #eventSequence = 0;
-  readonly #grantStates = new Map<Digest, StoredGrantState>();
-  readonly #grants = new Map<Digest, RunGrant>();
-  readonly #activeCalls = new Map<string, ActiveCall>();
-  readonly #cancelledRuns = new Set<string>();
+  readonly #events: AuditEvent[] = [];
 
   constructor(
     private readonly provider: ReadOnlyToolProvider,
     private readonly auditTime: () => string,
-    private readonly auditSink: AuditSink = new InMemoryAuditSink()
+    private readonly projectContentConsentProvider?: ProjectContentConsentProvider
   ) {}
 
-  registerGrant(grant: RunGrant): void {
-    const { digest, ...grantBase } = grant;
-    if (digest !== grantDigest(grantBase)) {
-      throw new TypeError("Invalid run grant.");
-    }
-    const existing = this.#grantStates.get(grant.digest);
-    if (existing?.status === "revoked") {
-      throw new TypeError("Grant revoked.");
-    }
-    this.#grants.set(grant.digest, { ...grant, toolIds: [...grant.toolIds] });
-    this.#grantStates.set(grant.digest, { grantDigest: grant.digest, status: "active" });
-  }
-
-  grantState(grant: RunGrant): StoredGrantState | undefined {
-    const state = this.#grantStates.get(grant.digest);
-    return state === undefined ? undefined : { ...state };
-  }
-
-  revokeGrant(grant: RunGrant, reason: string): void {
-    // Reasons influence neither authorization nor redacted audit content.
-    void reason;
-    this.registerGrantIfAbsent(grant);
-    const revokedAt = this.auditTime();
-    this.#grantStates.set(grant.digest, {
-      grantDigest: grant.digest,
-      status: "revoked",
-      revokedAt
-    });
-    this.event("GRANT_REVOKED", grant, undefined, undefined, revokedAt);
-    for (const [callId, active] of this.#activeCalls) {
-      if (active.grant.digest === grant.digest) {
-        this.cancelActiveCall(callId, active);
-      }
-    }
-  }
-
   kill(): void {
-    if (this.#killed) return;
     this.#killed = true;
-    const killedAt = this.auditTime();
-    for (const [callId, active] of this.#activeCalls) {
-      this.event("KILL_SWITCH", active.grant, active.toolId, callId, killedAt);
-      this.cancelActiveCall(callId, active);
-    }
-  }
-
-  cancelCall(callId: string): boolean {
-    const active = this.#activeCalls.get(callId);
-    if (active === undefined) return false;
-    this.cancelActiveCall(callId, active);
-    return true;
-  }
-
-  /** The timeout controller must call this at its deadline. */
-  timeoutCall(callId: string): boolean {
-    const active = this.#activeCalls.get(callId);
-    if (active === undefined) return false;
-    this.event("CALL_TIMED_OUT", active.grant, active.toolId, callId);
-    this.cancelActiveCall(callId, active);
-    return true;
-  }
-
-  cancelRun(runId: string): void {
-    if (this.#cancelledRuns.has(runId)) return;
-    this.#cancelledRuns.add(runId);
-    for (const grant of this.#grants.values()) {
-      if (grant.runId === runId) this.event("CALL_CANCELLED", grant);
-    }
-    for (const [callId, active] of this.#activeCalls) {
-      if (active.grant.runId === runId) this.cancelActiveCall(callId, active);
-    }
   }
 
   auditEvents(): readonly AuditEvent[] {
-    return this.auditSink instanceof InMemoryAuditSink ? this.auditSink.list() : [];
+    return this.#events.map((event) => ({ ...event }));
   }
 
-  async call(
+  call(
     grant: RunGrant,
     toolId: string,
     input: JsonValue,
-    now: string
-  ): Promise<JsonValue> {
+    now: string,
+    projectContent?: ProjectContentRequest
+  ): JsonValue {
     const inventory = this.provider.inventory();
-    const callId = `${grant.runId}:${++this.#nextCallId}`;
-    this.registerGrantIfAbsent(grant);
-    this.event("CALL_REQUESTED", grant, toolId, callId);
+    const event = (code: string) =>
+      this.#events.push({
+        code,
+        runId: grant.runId,
+        providerId: grant.providerId,
+        toolId,
+        at: this.auditTime()
+      });
 
     if (this.#killed) {
-      this.event("KILL_SWITCH", grant, toolId, callId);
+      event("KILL_SWITCH");
       throw new TypeError("Gateway disabled.");
     }
-    if (this.#cancelledRuns.has(grant.runId)) {
-      this.event("CALL_CANCELLED", grant, toolId, callId);
-      throw new TypeError("Call cancelled.");
+
+    const { digest, ...grantBase } = grant;
+    if (
+      grant.providerId !== inventory.providerId ||
+      grant.expiresAt <= now ||
+      digest !== grantDigest(grantBase)
+    ) {
+      event("GRANT_DENIED");
+      throw new TypeError("Grant denied.");
     }
-    this.assertGrantUsable(grant, inventory, now, toolId, callId);
-    this.event("GRANT_ACCEPTED", grant, toolId, callId);
+    if (grant.inventoryDigest !== inventoryDigest(inventory)) {
+      event("INVENTORY_CHANGED");
+      throw new TypeError("Tool inventory changed.");
+    }
 
     const tool = inventory.tools.find((candidate) => candidate.id === toolId);
     if (
       !grant.toolIds.includes(toolId) ||
       tool === undefined ||
-      !tool.readOnly ||
-      (tool.exposesProjectContent && !grant.allowRemoteProjectContent)
+      !tool.readOnly
     ) {
-      this.event("TOOL_DENIED", grant, toolId, callId);
+      event("TOOL_DENIED");
       throw new TypeError("Tool denied.");
     }
-
-    const active: ActiveCall = {
-      grant,
-      toolId,
-      controller: new AbortController(),
-      cancellationAudited: false
-    };
-    this.#activeCalls.set(callId, active);
-    try {
-      this.event("PROVIDER_DISPATCH", grant, toolId, callId);
-      const result = await this.provider.call(toolId, input, active.controller.signal);
-      if (active.controller.signal.aborted) {
-        this.cancelActiveCall(callId, active);
-        throw new TypeError("Call cancelled.");
+    if (projectContent !== undefined) {
+      const scopes = normalizedScopes(projectContent.scopes);
+      const lookup: ProjectContentConsentLookup = {
+        subject: { kind: "run", id: grant.runId },
+        projectSnapshot: projectContent.projectSnapshot,
+        providerId: grant.providerId,
+        toolId,
+        requestedContentScope: scopes,
+        policySnapshot: projectContent.policySnapshot
+      };
+      const consent = this.projectContentConsentProvider?.findConsent(lookup);
+      if (
+        scopes.length === 0 ||
+        consent === undefined ||
+        !consentMatches(consent, lookup, now)
+      ) {
+        event("PROJECT_CONTENT_CONSENT_DENIED");
+        throw new TypeError("Project-content consent denied.");
       }
-      this.assertGrantUsable(grant, inventory, this.auditTime(), toolId, callId);
-      let responseBytes: number;
-      try {
-        responseBytes = new TextEncoder().encode(JSON.stringify(result)).byteLength;
-      } catch {
-        this.event("SCHEMA_VIOLATION", grant, toolId, callId);
-        throw new TypeError("Tool response violates the JSON schema boundary.");
-      }
-      if (responseBytes > 65_536) {
-        this.event("RESPONSE_TOO_LARGE", grant, toolId, callId);
-        throw new TypeError("Tool response exceeds limit.");
-      }
-      this.event("CALL_COMPLETED", grant, toolId, callId);
-      return result;
-    } catch (error) {
-      if (active.controller.signal.aborted) {
-        this.cancelActiveCall(callId, active);
-        throw new TypeError("Call cancelled.");
-      }
-      this.event("PROVIDER_FAILURE", grant, toolId, callId);
-      throw error;
-    } finally {
-      this.#activeCalls.delete(callId);
     }
-  }
 
-  private registerGrantIfAbsent(grant: RunGrant): void {
-    if (!this.#grantStates.has(grant.digest)) this.registerGrant(grant);
-  }
-
-  private assertGrantUsable(
-    grant: RunGrant,
-    inventory: ToolInventory,
-    now: string,
-    toolId: string,
-    callId: string
-  ): void {
-    const { digest, ...grantBase } = grant;
-    const state = this.#grantStates.get(grant.digest);
-    if (state?.status === "revoked") {
-      this.event("GRANT_REVOKED", grant, toolId, callId);
-      throw new TypeError("Grant revoked.");
+    const result = this.provider.call(toolId, input);
+    const responseBytes = new TextEncoder().encode(JSON.stringify(result)).byteLength;
+    if (responseBytes > 65_536) {
+      event("RESPONSE_TOO_LARGE");
+      throw new TypeError("Tool response exceeds limit.");
     }
-    if (
-      grant.providerId !== inventory.providerId ||
-      digest !== grantDigest(grantBase)
-    ) {
-      this.event("GRANT_DENIED", grant, toolId, callId);
-      throw new TypeError("Grant denied.");
-    }
-    if (grant.expiresAt <= now) {
-      this.event("GRANT_EXPIRED", grant, toolId, callId);
-      throw new TypeError("Grant expired.");
-    }
-    if (grant.inventoryDigest !== inventoryDigest(inventory)) {
-      this.event("INVENTORY_CHANGED", grant, toolId, callId);
-      throw new TypeError("Tool inventory changed.");
-    }
-  }
-
-  private cancelActiveCall(callId: string, active: ActiveCall): void {
-    if (!active.cancellationAudited) {
-      active.cancellationAudited = true;
-      this.event("CALL_CANCELLED", active.grant, active.toolId, callId);
-    }
-    active.controller.abort();
-  }
-
-  private event(
-    code: AuditCode,
-    grant: RunGrant,
-    toolId?: string,
-    callId?: string,
-    at = this.auditTime()
-  ): void {
-    const event = {
-      sequence: ++this.#eventSequence,
-      code,
-      runId: grant.runId,
-      providerId: grant.providerId,
-      grantDigest: grant.digest,
-      ...(toolId === undefined ? {} : { toolId }),
-      ...(callId === undefined ? {} : { callId }),
-      at,
-      redacted: true as const
-    };
-    const complete = { ...event, id: digestJson(event as unknown as JsonValue) };
-    try { this.auditSink.append(complete); } catch { throw new TypeError("Audit sink unavailable."); }
+    event("TOOL_CALLED");
+    return result;
   }
 }
