@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import {
   digestJson,
   sha256Bytes,
@@ -52,11 +54,30 @@ export interface ToolInventory {
   tools: ToolDefinition[];
 }
 
-export interface ReadOnlyToolProvider {
-  inventory(): ToolInventory;
-  call(toolId: string, input: JsonValue): JsonValue;
+export interface ProviderCallOptions {
+  signal: AbortSignal;
 }
 
+/** Providers yield encoded JSON chunks. The gateway owns decoding and all limits. */
+export interface ReadOnlyToolProvider {
+  inventory(): ToolInventory;
+  call(
+    toolId: string,
+    input: JsonValue,
+    options: ProviderCallOptions
+  ): AsyncIterable<Uint8Array>;
+}
+
+<<<<<<< review/phase7-async-bounded-gateway
+export interface GatewayCallOptions {
+  signal?: AbortSignal;
+  deadlineMs: number;
+  maxChunkBytes: number;
+  maxResponseBytes: number;
+}
+
+/** A process-bound, opaque handle. Permissions never leave the grant store. */
+=======
 export type ProjectContentScope =
   | "source"
   | "configuration"
@@ -103,24 +124,74 @@ export interface ProjectContentConsentProvider {
   findConsent(lookup: ProjectContentConsentLookup): ProjectContentConsent | undefined;
 }
 
+>>>>>>> review/phases-5-9-master-antigravity
 export interface RunGrant {
+  readonly id: string;
+}
+
+export type RunGrantState =
+  | "active"
+  | "revoked"
+  | "expired"
+  | "consumed"
+  | "exhausted";
+
+export interface RunGrantRequest {
   runId: string;
   providerId: string;
-  toolIds: string[];
+  toolIds: readonly string[];
   inventoryDigest: Digest;
   issuedAt: string;
   expiresAt: string;
   allowRemoteProjectContent: boolean;
-  digest: Digest;
+  /** Defaults to one, making each grant non-replayable. */
+  maxCalls?: number;
+  /** Defaults to 65,536 UTF-8 bytes across all provider output for this grant. */
+  maxBytes?: number;
 }
 
-export interface AuditEvent {
-  code: string;
+/** Immutable canonical data held only by the persistence port and grant store. */
+export interface StoredRunGrant {
+  id: string;
   runId: string;
   providerId: string;
-  toolId?: string;
-  at: string;
+  toolIds: readonly string[];
+  inventoryDigest: Digest;
+  issuedAt: string;
+  expiresAt: string;
+  allowRemoteProjectContent: boolean;
+  maxCalls: number;
+  calls: number;
+  maxBytes: number;
+  bytes: number;
+  state: RunGrantState;
 }
+
+export interface RunGrantPersistence {
+  load(storeId: string): readonly StoredRunGrant[];
+  save(storeId: string, grant: StoredRunGrant): void;
+}
+
+function copyStoredGrant(grant: StoredRunGrant): StoredRunGrant {
+  return Object.freeze({ ...grant, toolIds: Object.freeze([...grant.toolIds]) });
+}
+
+/** Test and local adapter. Production storage can implement the same narrow port. */
+export class InMemoryRunGrantPersistence implements RunGrantPersistence {
+  readonly #stores = new Map<string, Map<string, StoredRunGrant>>();
+
+  load(storeId: string): readonly StoredRunGrant[] {
+    return [...(this.#stores.get(storeId)?.values() ?? [])].map(copyStoredGrant);
+  }
+
+  save(storeId: string, grant: StoredRunGrant): void {
+    const records = this.#stores.get(storeId) ?? new Map<string, StoredRunGrant>();
+    records.set(grant.id, copyStoredGrant(grant));
+    this.#stores.set(storeId, records);
+  }
+}
+
+const handleStores = new WeakMap<RunGrant, string>();
 
 function sorted<T>(
   values: readonly T[],
@@ -131,6 +202,10 @@ function sorted<T>(
 
 function normalizedToolIds(toolIds: readonly string[]): string[] {
   return sorted([...new Set(toolIds)], (left, right) => left.localeCompare(right));
+}
+
+function validTimestamp(value: string): boolean {
+  return Number.isFinite(Date.parse(value));
 }
 
 export function inventoryDigest(inventory: ToolInventory): Digest {
@@ -151,6 +226,8 @@ export function inventoryDigest(inventory: ToolInventory): Digest {
   } as JsonValue);
 }
 
+<<<<<<< review/phase7-async-bounded-gateway
+=======
 function grantDigest(value: Omit<RunGrant, "digest">): Digest {
   return digestJson(value as unknown as JsonValue);
 }
@@ -210,6 +287,7 @@ function consentMatches(
   );
 }
 
+>>>>>>> review/phases-5-9-master-antigravity
 export function selectContext(
   request: ContextRequest,
   sources: readonly SourceRecord[]
@@ -252,39 +330,161 @@ export function selectContext(
     }));
 }
 
-export function createRunGrant(
-  input: Omit<RunGrant, "digest">,
-  inventory: ToolInventory,
-  now: string
-): RunGrant {
-  if (input.providerId !== inventory.providerId) {
-    throw new TypeError("Run grant provider does not match tool inventory provider.");
-  }
-  if (
-    input.expiresAt <= now ||
-    input.issuedAt > now ||
-    input.inventoryDigest !== inventoryDigest(inventory)
-  ) {
-    throw new TypeError("Invalid run grant.");
+export class RunGrantStore {
+  readonly #records = new Map<string, StoredRunGrant>();
+  readonly #persistence: RunGrantPersistence | undefined;
+  readonly #storeId: string;
+
+  constructor(options: { storeId: string; persistence?: RunGrantPersistence }) {
+    if (options.storeId.length === 0) {
+      throw new TypeError("Grant store id must not be empty.");
+    }
+    this.#storeId = options.storeId;
+    this.#persistence = options.persistence;
+    for (const record of options.persistence?.load(options.storeId) ?? []) {
+      this.#records.set(record.id, copyStoredGrant(record));
+    }
   }
 
+  issue(input: RunGrantRequest, inventory: ToolInventory, now: string): RunGrant {
+    if (
+      input.providerId !== inventory.providerId ||
+      !validTimestamp(input.issuedAt) ||
+      !validTimestamp(input.expiresAt) ||
+      !validTimestamp(now) ||
+      Date.parse(input.expiresAt) <= Date.parse(now) ||
+      Date.parse(input.issuedAt) > Date.parse(now) ||
+      input.inventoryDigest !== inventoryDigest(inventory)
+    ) {
+      throw new TypeError("Invalid run grant.");
+    }
+    const maxCalls = input.maxCalls ?? 1;
+    const maxBytes = input.maxBytes ?? 65_536;
+    if (!Number.isInteger(maxCalls) || maxCalls < 1) {
+      throw new TypeError("Grant maxCalls must be a positive integer.");
+    }
+    if (!Number.isInteger(maxBytes) || maxBytes < 1) {
+      throw new TypeError("Grant maxBytes must be a positive integer.");
+    }
+    const tools = new Map(inventory.tools.map((tool) => [tool.id, tool]));
+    const toolIds = normalizedToolIds(input.toolIds);
+    for (const id of toolIds) {
+      const tool = tools.get(id);
+      if (
+        tool === undefined ||
+        !tool.readOnly ||
+        (tool.exposesProjectContent && !input.allowRemoteProjectContent)
+      ) {
+        throw new TypeError("Grant exceeds read-only policy.");
+      }
+    }
+    const record = copyStoredGrant({
+      id: randomUUID(),
+      runId: input.runId,
+      providerId: input.providerId,
+      toolIds,
+      inventoryDigest: input.inventoryDigest,
+      issuedAt: input.issuedAt,
+      expiresAt: input.expiresAt,
+      allowRemoteProjectContent: input.allowRemoteProjectContent,
+      maxCalls,
+      calls: 0,
+      maxBytes,
+      bytes: 0,
+      state: "active"
+    });
+    this.#records.set(record.id, record);
+    this.#persist(record);
+    return this.#createHandle(record.id);
+  }
+
+  revoke(grant: RunGrant): void {
+    const record = this.#ownedRecord(grant);
+    if (record === undefined) return;
+    this.#replace({ ...record, state: "revoked" });
+  }
+
+<<<<<<< review/phase7-async-bounded-gateway
+  authorize(grant: RunGrant, now: string): StoredRunGrant | undefined {
+    const record = this.#ownedRecord(grant);
+    if (record === undefined || !validTimestamp(now)) return undefined;
+    if (record.state !== "active" || Date.parse(record.issuedAt) > Date.parse(now)) return undefined;
+    if (Date.parse(record.expiresAt) <= Date.parse(now)) {
+      this.#replace({ ...record, state: "expired" });
+      return undefined;
+    }
+    return record;
+  }
+
+  consume(grant: RunGrant): StoredRunGrant | undefined {
+    const record = this.#ownedRecord(grant);
+    if (record === undefined || record.state !== "active") return undefined;
+    const calls = record.calls + 1;
+    const state: RunGrantState = calls >= record.maxCalls
+      ? record.maxCalls === 1 ? "consumed" : "exhausted"
+      : "active";
+    return this.#replace({ ...record, calls, state });
+  }
+
+  chargeBytes(grant: RunGrant, amount: number): StoredRunGrant | undefined {
+    const record = this.#ownedRecord(grant);
+    if (
+      record === undefined ||
+      !Number.isInteger(amount) ||
+      amount < 0 ||
+      record.state === "revoked" ||
+      record.state === "expired" ||
+      record.state === "exhausted" ||
+      record.bytes + amount > record.maxBytes
+    ) {
+      return undefined;
+    }
+    const bytes = record.bytes + amount;
+    const state: RunGrantState = bytes === record.maxBytes && record.state === "active"
+      ? "exhausted"
+      : record.state;
+    return this.#replace({ ...record, bytes, state });
+  }
+
+  #createHandle(id: string): RunGrant {
+    const handle = Object.freeze({ id });
+    handleStores.set(handle, this.#storeId);
+    return handle;
+  }
+
+  #ownedRecord(grant: RunGrant): StoredRunGrant | undefined {
+    if (typeof grant !== "object" || grant === null || handleStores.get(grant) !== this.#storeId) {
+      return undefined;
+=======
   const tools = new Map(inventory.tools.map((tool) => [tool.id, tool]));
   const toolIds = normalizedToolIds(input.toolIds);
   for (const id of toolIds) {
     const tool = tools.get(id);
     if (tool === undefined || !tool.readOnly) {
       throw new TypeError("Grant exceeds read-only policy.");
+>>>>>>> review/phases-5-9-master-antigravity
     }
+    return this.#records.get(grant.id);
   }
 
-  const normalized: Omit<RunGrant, "digest"> = {
-    ...input,
-    toolIds
-  };
-  return {
-    ...normalized,
-    digest: grantDigest(normalized)
-  };
+  #replace(record: StoredRunGrant): StoredRunGrant {
+    const immutable = copyStoredGrant(record);
+    this.#records.set(immutable.id, immutable);
+    this.#persist(immutable);
+    return immutable;
+  }
+
+  #persist(record: StoredRunGrant): void {
+    this.#persistence?.save(this.#storeId, record);
+  }
+}
+
+export interface AuditEvent {
+  code: string;
+  runId: string;
+  providerId: string;
+  toolId?: string;
+  at: string;
 }
 
 export class ReadOnlyToolGateway {
@@ -294,7 +494,7 @@ export class ReadOnlyToolGateway {
   constructor(
     private readonly provider: ReadOnlyToolProvider,
     private readonly auditTime: () => string,
-    private readonly projectContentConsentProvider?: ProjectContentConsentProvider
+    private readonly grants: RunGrantStore
   ) {}
 
   kill(): void {
@@ -305,79 +505,62 @@ export class ReadOnlyToolGateway {
     return this.#events.map((event) => ({ ...event }));
   }
 
-  call(
+  async call(
     grant: RunGrant,
     toolId: string,
     input: JsonValue,
-    now: string,
-    projectContent?: ProjectContentRequest
-  ): JsonValue {
+    options: GatewayCallOptions
+  ): Promise<JsonValue> {
     const inventory = this.provider.inventory();
-    const event = (code: string) =>
-      this.#events.push({
-        code,
-        runId: grant.runId,
-        providerId: grant.providerId,
-        toolId,
-        at: this.auditTime()
-      });
-
-    if (this.#killed) {
-      event("KILL_SWITCH");
-      throw new TypeError("Gateway disabled.");
+    const event = (code: string, record?: StoredRunGrant) =>
+      this.#events.push({ code, runId: record?.runId ?? "unknown", providerId: record?.providerId ?? inventory.providerId, toolId, at: this.auditTime() });
+    if (!Number.isInteger(options.deadlineMs) || options.deadlineMs < 1 || !Number.isInteger(options.maxChunkBytes) || options.maxChunkBytes < 1 || !Number.isInteger(options.maxResponseBytes) || options.maxResponseBytes < 1) {
+      throw new TypeError("Invalid gateway limits.");
     }
-
-    const { digest, ...grantBase } = grant;
-    if (
-      grant.providerId !== inventory.providerId ||
-      grant.expiresAt <= now ||
-      digest !== grantDigest(grantBase)
-    ) {
-      event("GRANT_DENIED");
-      throw new TypeError("Grant denied.");
-    }
-    if (grant.inventoryDigest !== inventoryDigest(inventory)) {
-      event("INVENTORY_CHANGED");
-      throw new TypeError("Tool inventory changed.");
-    }
-
+    if (this.#killed) { event("KILL_SWITCH"); throw new TypeError("Gateway disabled."); }
+    const canonical = this.grants.authorize(grant, new Date().toISOString());
+    if (canonical === undefined || canonical.providerId !== inventory.providerId) { event("GRANT_DENIED", canonical); throw new TypeError("Grant denied."); }
+    if (canonical.inventoryDigest !== inventoryDigest(inventory)) { event("INVENTORY_CHANGED", canonical); throw new TypeError("Tool inventory changed."); }
     const tool = inventory.tools.find((candidate) => candidate.id === toolId);
-    if (
-      !grant.toolIds.includes(toolId) ||
-      tool === undefined ||
-      !tool.readOnly
-    ) {
-      event("TOOL_DENIED");
-      throw new TypeError("Tool denied.");
-    }
-    if (projectContent !== undefined) {
-      const scopes = normalizedScopes(projectContent.scopes);
-      const lookup: ProjectContentConsentLookup = {
-        subject: { kind: "run", id: grant.runId },
-        projectSnapshot: projectContent.projectSnapshot,
-        providerId: grant.providerId,
-        toolId,
-        requestedContentScope: scopes,
-        policySnapshot: projectContent.policySnapshot
-      };
-      const consent = this.projectContentConsentProvider?.findConsent(lookup);
-      if (
-        scopes.length === 0 ||
-        consent === undefined ||
-        !consentMatches(consent, lookup, now)
-      ) {
-        event("PROJECT_CONTENT_CONSENT_DENIED");
-        throw new TypeError("Project-content consent denied.");
-      }
-    }
+    if (!canonical.toolIds.includes(toolId) || tool === undefined || !tool.readOnly || (tool.exposesProjectContent && !canonical.allowRemoteProjectContent)) { event("TOOL_DENIED", canonical); throw new TypeError("Tool denied."); }
+    if (this.grants.consume(grant) === undefined) { event("GRANT_DENIED", canonical); throw new TypeError("Grant denied."); }
 
-    const result = this.provider.call(toolId, input);
-    const responseBytes = new TextEncoder().encode(JSON.stringify(result)).byteLength;
-    if (responseBytes > 65_536) {
-      event("RESPONSE_TOO_LARGE");
-      throw new TypeError("Tool response exceeds limit.");
+    const controller = new AbortController();
+    let reason: "cancelled" | "deadline" | "limit" | undefined;
+    const abort = (value: typeof reason) => { if (!controller.signal.aborted) { reason = value; controller.abort(); } };
+    const timer = setTimeout(() => abort("deadline"), options.deadlineMs);
+    const cancel = () => abort("cancelled");
+    options.signal?.addEventListener("abort", cancel, { once: true });
+    const iterator = this.provider.call(toolId, input, { signal: controller.signal })[Symbol.asyncIterator]();
+    const waitForAbort = new Promise<never>((_resolve, reject) => controller.signal.addEventListener("abort", () => reject(new TypeError(reason === "deadline" ? "Gateway deadline exceeded." : reason === "cancelled" ? "Gateway cancelled." : "Gateway limit exceeded.")), { once: true }));
+    const parts: Uint8Array[] = [];
+    let bytes = 0;
+    try {
+      while (true) {
+        const next = iterator.next();
+        const step = await Promise.race([next, waitForAbort]);
+        if (step.done) break;
+        const chunk = step.value;
+        if (!(chunk instanceof Uint8Array) || chunk.byteLength > options.maxChunkBytes) { abort("limit"); throw new TypeError("Gateway chunk limit exceeded."); }
+        if (bytes + chunk.byteLength > options.maxResponseBytes) { abort("limit"); throw new TypeError("Gateway response limit exceeded."); }
+        if (this.grants.chargeBytes(grant, chunk.byteLength) === undefined) { abort("limit"); throw new TypeError("Gateway grant byte limit exceeded."); }
+        bytes += chunk.byteLength;
+        parts.push(chunk);
+      }
+      const output = new Uint8Array(bytes);
+      let offset = 0;
+      for (const part of parts) { output.set(part, offset); offset += part.byteLength; }
+      const result = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(output)) as JsonValue;
+      event("TOOL_CALLED", canonical);
+      return result;
+    } catch (error) {
+      abort(reason ?? "limit");
+      event(reason === "deadline" ? "DEADLINE_EXCEEDED" : reason === "cancelled" ? "CANCELLED" : "TOOL_FAILED", canonical);
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      options.signal?.removeEventListener("abort", cancel);
+      if (controller.signal.aborted) void iterator.return?.();
     }
-    event("TOOL_CALLED");
-    return result;
   }
 }
