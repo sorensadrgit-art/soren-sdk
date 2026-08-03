@@ -548,6 +548,70 @@ export class ReadOnlyToolGateway {
       throw new TypeError("Gateway disabled.");
     }
 
+    const tool = inventory.tools.find((candidate) => candidate.id === toolId);
+    if (
+      !grant.toolIds.includes(toolId) ||
+      tool === undefined ||
+      !tool.readOnly ||
+      (tool.exposesProjectContent && !grant.allowRemoteProjectContent)
+    ) {
+      this.event("TOOL_DENIED", grant, toolId, callId);
+      throw new TypeError("Tool denied.");
+    }
+
+    const active: ActiveCall = {
+      grant,
+      toolId,
+      controller: new AbortController(),
+      cancellationAudited: false
+    };
+    this.#activeCalls.set(callId, active);
+    try {
+      const providerResult = Promise.resolve().then(() =>
+        this.provider.call(toolId, input, active.controller.signal)
+      );
+      const cancellation = new Promise<never>((_resolve, reject) => {
+        active.controller.signal.addEventListener(
+          "abort",
+          () => reject(new TypeError("Call cancelled.")),
+          { once: true }
+        );
+      });
+      const result = await Promise.race([providerResult, cancellation]);
+      if (active.controller.signal.aborted) {
+        this.cancelActiveCall(callId, active);
+        throw new TypeError("Call cancelled.");
+      }
+      this.assertGrantUsable(grant, inventory, this.auditTime(), toolId, callId);
+      const responseBytes = new TextEncoder().encode(JSON.stringify(result)).byteLength;
+      if (responseBytes > 65_536) {
+        this.event("RESPONSE_TOO_LARGE", grant, toolId, callId);
+        throw new TypeError("Tool response exceeds limit.");
+      }
+      this.event("TOOL_CALLED", grant, toolId, callId);
+      return result;
+    } catch (error) {
+      if (active.controller.signal.aborted) {
+        this.cancelActiveCall(callId, active);
+        throw new TypeError("Call cancelled.");
+      }
+      throw error;
+    } finally {
+      this.#activeCalls.delete(callId);
+    }
+  }
+
+  private registerGrantIfAbsent(grant: RunGrant): void {
+    if (!this.#grantStates.has(grant.digest)) this.registerGrant(grant);
+  }
+
+  private assertGrantUsable(
+    grant: RunGrant,
+    inventory: ToolInventory,
+    now: string,
+    toolId: string,
+    callId: string
+  ): void {
     const { digest, ...grantBase } = grant;
     if (
       grant.providerId !== inventory.providerId ||
