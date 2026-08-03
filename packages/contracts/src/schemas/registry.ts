@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 export const CONTRACT_SCHEMA_FILES = {
   "capability-catalog": "capability-catalog.schema.json",
+  "artifact-reference": "artifact-reference.schema.json",
   "catalog-snapshot": "catalog-snapshot.schema.json",
   connector: "connector.schema.json",
   "error-envelope": "error-envelope.schema.json",
@@ -13,7 +14,10 @@ export const CONTRACT_SCHEMA_FILES = {
   "project-snapshot": "project-snapshot.schema.json",
   "route-plan": "route-plan.schema.json",
   "route-request": "route-request.schema.json",
-  "soren-sdk-lock": "soren-sdk-lock.schema.json"
+  "runner-result": "runner-result.schema.json",
+  "soren-config": "soren-config.schema.json",
+  "soren-sdk-lock": "soren-sdk-lock.schema.json",
+  "verification-plan": "verification-plan.schema.json"
 } as const;
 
 export type ContractSchemaName = keyof typeof CONTRACT_SCHEMA_FILES;

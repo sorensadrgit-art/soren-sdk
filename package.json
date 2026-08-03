@@ -12,10 +12,10 @@
     "build": "pnpm -r --if-present build",
     "lint": "eslint .",
     "typecheck": "pnpm -r --if-present build && pnpm -r --if-present typecheck",
-    "test": "pnpm -r --if-present build && pnpm -r --if-present test",
+    "test": "pnpm -r --if-present build && pnpm -r --workspace-concurrency=1 --if-present test",
     "validate:repository": "pnpm --filter @soren-sdk/contracts validate:repository",
     "soren-sdk": "pnpm --filter @soren-sdk/cli start",
-    "smoke:cli": "node packages/cli/dist/bin.js catalog list && node packages/cli/dist/bin.js catalog get web-platform --json && node packages/cli/dist/bin.js connector health web-platform --json && node packages/cli/dist/bin.js inspect --json && node packages/cli/dist/bin.js inspect . && node packages/cli/dist/bin.js route --project . --capability platform.css-transition --json",
+    "smoke:cli": "node packages/cli/dist/bin.js catalog list && node packages/cli/dist/bin.js catalog get web-platform --json && node packages/cli/dist/bin.js connector health web-platform --json && node packages/cli/dist/bin.js inspect --json && node packages/cli/dist/bin.js inspect . && node packages/cli/dist/bin.js config show --project packages/cli/test/fixtures/config-project --json && node packages/cli/dist/bin.js policy resolve --project packages/cli/test/fixtures/config-project --json && node packages/cli/dist/bin.js lock inspect packages/cli/test/fixtures/config-project/soren-sdk.lock --json && node packages/cli/dist/bin.js lock check packages/cli/test/fixtures/config-project/soren-sdk.lock --project packages/cli/test/fixtures/config-project --json && node packages/cli/dist/bin.js lock create --project packages/cli/test/fixtures/config-project --route-plan packages/cli/test/fixtures/config-project/route-plan.json --output \"$(mktemp -d)/soren-sdk.lock\" --force --json",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm validate:repository && pnpm smoke:cli"
   },
   "devDependencies": {

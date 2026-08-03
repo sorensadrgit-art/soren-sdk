@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0.0-draft.1",
+  "contractKind": "soren-sdk-lock",
+  "generatedAt": "2026-08-01T00:00:00.000Z",
+  "capabilityOntologyVersion": "1.0.0-draft.1",
+  "catalogSnapshotDigest": "sha256:ca9ea643a58bef0264974ad04123faaa81f5d54f06aaaa04cc97526672592739",
+  "policySnapshotDigest": "sha256:e5111ec3697e1cd4e4fa478cf113b80c90aa290976cc9fa399f4c21f511a0892",
+  "projectSnapshotDigest": "sha256:8edc91d131ff4270acdc3d9f08172b3fc335c86e49b674b302800ea82e9d39c2",
+  "configDigest": "sha256:514f039e98b191f17e80c9b033476896bc26891ac8f97a443425bdba024a5cde",
+  "routePlanId": "",
+  "routePlanDigest": "sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+  "connectors": [],
+  "unavailable": [],
+  "protocolResolutions": [],
+  "runtimeResolutions": [],
+  "digest": "sha256:ad461bd076997f1d4aec42e2c5b19f32cb6482a82c0e40e3bf02758ca6c96495"
+}

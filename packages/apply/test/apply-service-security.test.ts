@@ -5,10 +5,9 @@ import type { SandboxSession } from "@soren-sdk/sandbox";
 import { MemorySandboxProvider } from "@soren-sdk/sandbox";
 
 import {
-  APPLY_DISABLED,
+  createApplyServiceForTesting,
   DefaultApplyService,
   InMemoryEvidenceSink,
-  registerSandboxFactory,
   type ApplyApproval,
   type PrepareApplyInput
 } from "../src/index.js";
@@ -29,19 +28,26 @@ const encoder = new TextEncoder();
 function makeService() {
   const evidence = new InMemoryEvidenceSink();
   const clockObj = fixedClock();
-  const service = new DefaultApplyService({ evidenceSink: evidence, clock: clockObj });
-  service.setEnabledForTesting(true);
+  let provider: { create(sandboxId: string): Promise<SandboxSession> } | null = null;
   const sandboxProvider = new MemorySandboxProvider();
-  registerSandboxFactory({
-    async create(sandboxId: string): Promise<SandboxSession> {
-      return sandboxProvider.create({
-        policy: sampleSandboxPolicy(),
-        root: `/sandbox/${sandboxId}`,
-        sandboxId
-      });
+  const service = createApplyServiceForTesting({
+    evidenceSink: evidence,
+    clock: clockObj,
+    sandboxProvider: {
+      async create(request) {
+        if (provider !== null) return provider.create(request.sandboxId);
+        return sandboxProvider.create(request);
+      }
     }
   });
-  return { service, evidence, clockObj };
+  return {
+    service,
+    evidence,
+    clockObj,
+    setSandbox(value: { create(sandboxId: string): Promise<SandboxSession> }) {
+      provider = value;
+    }
+  };
 }
 
 function prepareInput(
@@ -80,7 +86,8 @@ function contentProvider(): (path: string) => Promise<Uint8Array> {
 
 describe("Phase 9 apply security corpus", () => {
   it("is disabled by default (APPLY_DISABLED)", () => {
-    expect(APPLY_DISABLED).toBe(true);
+    const service = new DefaultApplyService({ evidenceSink: new InMemoryEvidenceSink() });
+    expect(() => service.prepare(prepareInput())).toThrow("disabled");
   });
 
   it("throws APPLY_DISABLED when apply is not enabled", () => {
@@ -380,10 +387,10 @@ describe("Phase 9 apply security corpus", () => {
   });
 
   it("never reports success after rollback failure", async () => {
-    const { service } = makeService();
+    const { service, setSandbox } = makeService();
     // Use a sandbox that fails on remove to force rollback failure.
     const preparation = service.prepare(prepareInput());
-    registerSandboxFactory({
+    setSandbox({
       async create(sandboxId: string): Promise<SandboxSession> {
         return {
           id: sandboxId,
