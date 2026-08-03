@@ -100,10 +100,6 @@ function normalizeConnectors(
     }));
 }
 
-function connectorFingerprint(connector: SelectedConnector | SorenSdkLock["connectors"][number]): string {
-  return digestJson(jsonValue(normalizeConnectors([connector])));
-}
-
 function normalizeUnavailable(
   unavailable: CreateLockfileInput["unavailable"]
 ): SorenSdkLock["unavailable"] {
@@ -265,13 +261,31 @@ export class LockfileService {
           });
           continue;
         }
-        if (connectorFingerprint(lockedConnector) !== connectorFingerprint(currentConnector)) {
-          drifts.push({
-            field: `connectors.${lockedConnector.id}`,
-            locked: connectorFingerprint(lockedConnector),
-            current: connectorFingerprint(currentConnector),
-            severity: "critical",
-          });
+        const lockedIntegrationIds = new Set(
+          lockedConnector.integrations.map((integration) => integration.id)
+        );
+        const currentIntegrationIds = new Set(
+          currentConnector.integrations.map((integration) => integration.id)
+        );
+        for (const id of lockedIntegrationIds) {
+          if (!currentIntegrationIds.has(id)) {
+            drifts.push({
+              field: `integrations.${lockedConnector.id}.${id}`,
+              locked: id,
+              current: undefined,
+              severity: "warning",
+            });
+          }
+        }
+        for (const id of currentIntegrationIds) {
+          if (!lockedIntegrationIds.has(id)) {
+            drifts.push({
+              field: `integrations.${lockedConnector.id}.${id}`,
+              locked: undefined,
+              current: id,
+              severity: "warning",
+            });
+          }
         }
       }
       for (const currentConnector of currentConnectors) {
@@ -283,7 +297,7 @@ export class LockfileService {
             field: `connectors.${currentConnector.id}`,
             locked: undefined,
             current: currentConnector.id,
-            severity: "critical",
+            severity: "warning",
           });
         }
       }
