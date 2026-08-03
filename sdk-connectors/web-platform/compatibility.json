@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0.0",
+  "providerId": "web-platform",
+  "relationships": [
+    {
+      "providerId": "motion",
+      "status": "compatible-with-ownership",
+      "condition": "Different explicit scope or property ownership"
+    },
+    {
+      "providerId": "gsap",
+      "status": "compatible-with-ownership",
+      "condition": "Different explicit scope or property ownership"
+    }
+  ]
+}
