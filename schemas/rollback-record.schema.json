@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/rollback-record.schema.json",
+  "title": "Soren SDK Rollback Record",
+  "description": "Portable rollback record capturing the before-state of a single apply mutation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contractKind",
+    "runId",
+    "recordId",
+    "operationIndex",
+    "operation",
+    "path",
+    "fileType",
+    "beforeDigest",
+    "beforeContentRef",
+    "mode",
+    "mtimeMs",
+    "recordedAt"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0-draft.1"
+    },
+    "contractKind": {
+      "const": "rollback-record"
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recordId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operationIndex": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "operation": {
+      "enum": [
+        "create-file",
+        "replace-file",
+        "delete-file",
+        "create-directory",
+        "remove-empty-directory"
+      ]
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fileType": {
+      "enum": [
+        "directory",
+        "file",
+        "missing",
+        "unknown"
+      ]
+    },
+    "beforeDigest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "beforeContentRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "mode": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "mtimeMs": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "recordedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

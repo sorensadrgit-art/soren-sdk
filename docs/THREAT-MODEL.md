@@ -218,3 +218,111 @@ A release must fail when:
 - A hard policy evaluation fails
 - Secrets are detected
 - Evidence reports required checks as passed without runner evidence
+
+## 7. Phase 9 apply sandbox threats
+
+The apply sandbox is the isolated mutation boundary for explicitly approved
+immutable plans. It adds the following threat surface and mitigations.
+
+### Approval replay
+
+An attacker reuses a consumed approval to apply a plan again.
+
+Mitigations:
+
+- One-time nonce tracked by the apply service
+- Integrity digest over all binding fields
+- Nonce consumed only after a completed run
+
+### Plan / project / policy drift
+
+An attacker applies a plan, project, or policy that differs from the one the
+approval was bound to.
+
+Mitigations:
+
+- Exact plan ID and immutable digest binding
+- Exact project snapshot ID binding
+- Exact policy snapshot digest binding
+- Hard gates before the first mutation
+
+### Path traversal and absolute paths
+
+An attacker writes outside the approved scope.
+
+Mitigations:
+
+- NUL-byte and invalid-encoding rejection
+- `..` and traversal rejection
+- Absolute-path rejection unless explicitly permitted
+- Writable-root and deny-path enforcement
+
+### Symlink escape and TOCTOU races
+
+An attacker swaps a directory for a symlink to escape the sandbox.
+
+Mitigations:
+
+- Real-path resolution and recheck before every mutation
+- Symlink-escape rejection
+- Special-file (device, socket, FIFO) rejection
+
+### Quota bypass
+
+An attacker exceeds file, byte, operation, or time limits.
+
+Mitigations:
+
+- File-count, byte, operation, and time limits enforced in the sandbox
+- Approval limits must be within the sandbox policy
+
+### Command and network execution
+
+An attacker requests command execution or network access.
+
+Mitigations:
+
+- Command execution disabled in Phase 9
+- Network access disabled in Phase 9
+- `execution.denied` hard gate
+
+### Protected-workspace mutation
+
+An attacker applies to a protected branch or the original workspace.
+
+Mitigations:
+
+- VCS isolation port checks protected-branch state
+- Original workspace untouched by default
+- Temporary-copy isolation for the first real adapter
+
+### Partial-write corruption and rollback bypass
+
+An attacker corrupts a file mid-apply or bypasses rollback.
+
+Mitigations:
+
+- Atomic writes (temp file + rename)
+- Before-state digests captured before each mutation
+- Reverse rollback with digest verification
+- Never report success after rollback failure
+
+### Cancellation races
+
+An attacker races cancellation against apply.
+
+Mitigations:
+
+- Cancellation checked before each operation
+- Cancelled runs roll back applied operations
+- Crash-state recovery records for interrupted runs
+
+### Evidence forgery and credential leakage
+
+An attacker forges evidence or leaks credentials.
+
+Mitigations:
+
+- Evidence events are redacted by default
+- Approval data never contains credentials
+- Evidence sink is a local port; Phase 8 will persist artifacts
