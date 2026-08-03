@@ -138,6 +138,11 @@ export class RunGrantStore {
     requireLimit(request.maxCalls, "maxCalls");
     requireLimit(request.maxResponseBytes, "maxResponseBytes");
     requireLimit(request.maxTotalResponseBytes, "maxTotalResponseBytes");
+    if (request.maxResponseBytes > request.maxTotalResponseBytes) {
+      throw new TypeError(
+        "maxResponseBytes cannot exceed maxTotalResponseBytes."
+      );
+    }
 
     const issuedAt = timestamp(request.issuedAt, "issuedAt");
     const expiresAt = timestamp(request.expiresAt, "expiresAt");
@@ -153,6 +158,14 @@ export class RunGrantStore {
     }
     if (!inventory.protocolVersions.includes(request.protocolVersion)) {
       throw new TypeError("Run grant protocol version is not supported.");
+    }
+
+    const availableExtensions = new Set(inventory.extensions ?? []);
+    const extensions = normalizedStrings(request.extensions);
+    for (const extension of extensions) {
+      if (!availableExtensions.has(extension)) {
+        throw new TypeError("Run grant extension is not supported.");
+      }
     }
 
     const inventoryTools = new Map(inventory.tools.map((tool) => [tool.id, tool]));
@@ -176,7 +189,7 @@ export class RunGrantStore {
       toolIds,
       inventoryDigest: request.inventoryDigest,
       protocolVersion: request.protocolVersion,
-      extensions: normalizedStrings(request.extensions),
+      extensions,
       issuedAt: request.issuedAt,
       expiresAt: request.expiresAt,
       maxCalls: request.maxCalls,
