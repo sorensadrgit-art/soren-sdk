@@ -67,9 +67,7 @@ export function buildRejectedProviders(input: {
   requestedCapabilityIds: string[];
 }): RoutePlan["rejectedProviders"] {
   const selected = new Set(
-    input.assignments
-      .filter((assignment) => !assignment.native)
-      .map((assignment) => assignment.providerId)
+    input.assignments.map((assignment) => assignment.providerId)
   );
   const values = new Map<string, RoutePlan["rejectedProviders"][number]>();
 
