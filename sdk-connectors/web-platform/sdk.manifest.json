@@ -1,72 +1,48 @@
 {
   "$schema": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/connector.schema.json",
   "schemaVersion": "2.0.0-draft.1",
-  "connectorVersion": "0.2.0",
+  "connectorVersion": "0.3.0",
   "connector": {
     "id": "web-platform",
     "name": "Web Platform connector",
     "publisher": "soren-sdk",
-    "reviewStatus": "experimental",
-    "selectable": false,
-    "blockers": [
-      "Built-in provider implementation is not yet available",
-      "Browser support policy is not yet encoded",
-      "Route evaluations are missing"
-    ]
+    "reviewStatus": "approved",
+    "selectable": true,
+    "blockers": []
   },
   "product": {
     "canonicalName": "Web Platform",
     "homepage": "https://developer.mozilla.org/",
-    "aliases": [
-      "css",
-      "waapi",
-      "browser-native"
-    ],
-    "categories": [
-      "platform",
-      "css",
-      "browser"
-    ]
+    "aliases": ["browser-native", "css", "waapi"],
+    "categories": ["browser", "css", "platform"]
   },
   "sourceTrust": {
     "sourceAuthority": "official",
     "integrityLevel": "url-recorded",
-    "reviewedAt": "2026-07-27",
+    "reviewedAt": "2026-07-30",
     "reviewer": "soren-sdk"
   },
   "capabilityClaims": [
     {
       "capability": "platform.css-transition",
       "support": "primary",
-      "confidence": 1.0,
-      "conditions": [
-        "Visual state can be expressed with CSS"
-      ],
-      "limitations": [
-        "Not appropriate for complex imperative choreography"
-      ]
+      "confidence": 1,
+      "conditions": ["The state change is self-contained and expressible with CSS."],
+      "limitations": ["Not intended for complex imperative choreography."]
     },
     {
       "capability": "platform.css-animation",
       "support": "primary",
-      "confidence": 1.0,
-      "conditions": [
-        "Animation can be expressed declaratively"
-      ],
-      "limitations": [
-        "Limited orchestration compared with timeline engines"
-      ]
+      "confidence": 1,
+      "conditions": ["The animation is declarative and expressible with CSS keyframes."],
+      "limitations": ["Limited orchestration compared with timeline engines."]
     },
     {
       "capability": "platform.waapi-animation",
       "support": "primary",
       "confidence": 0.95,
-      "conditions": [
-        "Browser support meets project policy"
-      ],
-      "limitations": [
-        "Requires explicit lifecycle and cancellation management"
-      ]
+      "conditions": ["The project browser targets support the required Web Animations API behavior."],
+      "limitations": ["The implementation must manage lifecycle, cancellation, and reduced motion explicitly."]
     }
   ],
   "integrations": [
@@ -76,26 +52,28 @@
       "mode": "runtime",
       "status": "available",
       "source": "https://www.w3.org/TR/web-animations-1/",
-      "version": {
-        "status": "not-applicable"
-      },
-      "authorization": {
-        "required": false,
-        "method": "none",
-        "paidPlan": false
-      },
+      "version": { "status": "not-applicable" },
+      "authorization": { "required": false, "method": "none", "paidPlan": false },
       "executionRisk": "none",
       "dataExposure": "none",
-      "permissions": {
-        "filesystem": "none",
-        "network": [],
-        "projectWrite": false
-      },
+      "permissions": { "filesystem": "none", "network": [], "projectWrite": false },
       "licenseExpression": "not-applicable",
       "fallback": null,
-      "notes": [
-        "Represents native browser capabilities and requires no package installation."
-      ]
+      "notes": ["Requires no third-party runtime package."]
+    },
+    {
+      "id": "web-platform-docs",
+      "kind": "documentation",
+      "mode": "knowledge",
+      "status": "available",
+      "source": "https://developer.mozilla.org/en-US/docs/Web/API/Web_Animations_API",
+      "version": { "status": "not-applicable" },
+      "authorization": { "required": false, "method": "none", "paidPlan": false },
+      "executionRisk": "none",
+      "dataExposure": "none",
+      "permissions": { "filesystem": "none", "network": [], "projectWrite": false },
+      "licenseExpression": "CC-BY-SA-2.5",
+      "fallback": null
     }
   ],
   "ownershipClaims": [
@@ -103,59 +81,24 @@
       "domain": "dom-style",
       "scope": "selected-elements",
       "exclusive": true,
-      "properties": [
-        "color",
-        "background",
-        "border",
-        "opacity"
-      ]
+      "properties": ["background", "border", "color", "filter", "opacity", "transform"]
     },
     {
       "domain": "dom-animation",
       "scope": "selected-elements",
       "exclusive": true,
-      "properties": [
-        "transform",
-        "opacity",
-        "filter"
-      ]
+      "properties": ["filter", "opacity", "transform"]
     }
   ],
   "verification": {
-    "requiredChecks": [
-      "reduced-motion",
-      "browser-support",
-      "property-ownership",
-      "cleanup"
-    ],
-    "hardGates": [
-      "connector-schema-valid",
-      "version-policy-resolved",
-      "license-policy-resolved",
-      "no-ownership-conflict",
-      "no-unauthorized-permission"
-    ]
+    "requiredChecks": ["browser-support", "cleanup", "property-ownership", "reduced-motion"],
+    "hardGates": ["connector-schema-valid", "license-policy-resolved", "no-ownership-conflict", "no-unauthorized-permission", "version-policy-resolved"]
   },
   "relatedFiles": {
-    "skill": {
-      "path": "./SKILL.md",
-      "status": "planned"
-    },
-    "sources": {
-      "path": "./docs.sources.json",
-      "status": "planned"
-    },
-    "compatibility": {
-      "path": "./compatibility.json",
-      "status": "planned"
-    },
-    "evaluations": {
-      "path": "./evaluations/",
-      "status": "planned"
-    }
+    "skill": { "path": "./SKILL.md", "status": "present" },
+    "sources": { "path": "./docs.sources.json", "status": "present" },
+    "compatibility": { "path": "./compatibility.json", "status": "present" },
+    "evaluations": { "path": "./evaluations/", "status": "present" }
   },
-  "knowledge": {
-    "retrievedAt": "2026-07-27",
-    "staleAfterDays": 30
-  }
+  "knowledge": { "retrievedAt": "2026-07-30", "staleAfterDays": 30 }
 }

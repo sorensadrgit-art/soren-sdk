@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/apply-request.schema.json",
+  "title": "Soren SDK Apply Request",
+  "description": "Request to apply an explicitly approved immutable execution plan inside an isolated sandbox.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contractKind",
+    "runId",
+    "createdAt",
+    "executionPlan",
+    "approval",
+    "projectSnapshot",
+    "policySnapshot",
+    "sandboxPolicy"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0-draft.1"
+    },
+    "contractKind": {
+      "const": "apply-request"
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "executionPlan": {
+      "type": "object"
+    },
+    "approval": {
+      "type": "object"
+    },
+    "projectSnapshot": {
+      "type": "object"
+    },
+    "policySnapshot": {
+      "type": "object"
+    },
+    "sandboxPolicy": {
+      "$ref": "sandbox-policy.schema.json"
+    }
+  }
+}

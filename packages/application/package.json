@@ -1,0 +1,33 @@
+{
+  "name": "@soren-sdk/application",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Transport-neutral Soren SDK application services.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "pnpm --filter @soren-sdk/contracts build && pnpm --filter @soren-sdk/core build && pnpm --filter @soren-sdk/connectors build && vitest run"
+  },
+  "dependencies": {
+    "@soren-sdk/connectors": "workspace:*",
+    "@soren-sdk/contracts": "workspace:*",
+    "@soren-sdk/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}

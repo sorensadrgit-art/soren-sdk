@@ -1,84 +1,95 @@
 # Soren SDK
 
-> Agent-native SDK intelligence, project inspection, cataloging, policy, routing, tool brokering, execution planning, and verification for premium frontend development.
+> Agent-native SDK intelligence, project inspection, cataloging, native-first routing, policy, execution planning, and verification for premium frontend development.
 
 **Repository:** `sorensadrgit-art/soren-sdk`  
-**Status:** Phase 3 read-only intelligence foundation complete  
+**Stable branch:** `main`  
+**Active development:** `feat/router-vertical-slice-v1` / [PR #12](https://github.com/sorensadrgit-art/soren-sdk/pull/12)  
 **Runtime:** Node.js 24, pnpm 11.17.0, TypeScript 6  
 **Primary owner:** Soren
 
 ## What Soren SDK is
 
-Soren SDK is the intelligence and governance layer between a user request and the frontend SDKs used to implement that request.
-
-It is not an animation library, a package installer, or one giant prompt containing every SDK. It gives coding agents structured contracts, current connector knowledge, deterministic project context, policy boundaries, compatibility rules, verification requirements, and evidence.
+Soren SDK is the intelligence and governance layer between a structured frontend capability request and the technologies used to implement it.
 
 ```text
-User request
-    ↓
-Project snapshot
-    ↓
-Capability resolution
-    ↓
-Native and SDK candidates
-    ↓
-Policy and ownership checks
-    ↓
-Smallest safe provider set
-    ↓
-Selective context and tools
-    ↓
-Reviewable plan
-    ↓
-Verification and evidence
+Structured capability request
+        ↓
+Read-only project snapshot
+        ↓
+Reviewed connector catalog
+        ↓
+Policy and environment constraints
+        ↓
+Native-first provider selection
+        ↓
+Ownership-safe Route Plan
+        ↓
+Selective context, planning, and verification
 ```
 
-Only the first three layers are executable today. Routing, external tool access, and project mutation remain disabled.
+Release `0.1` remains read-only. Package installation, command execution, external tool invocation, code generation, and application-source mutation are not enabled.
 
-## Completed executable phases
+## Implementation status
 
-### Phase 1 — Versioned contracts
+| Milestone | Status | Result |
+|---|---|---|
+| Architecture Hardening v2 | Complete | Agent-neutral architecture, connector model, threat model, license policy, and security boundaries |
+| Phase 1 — Contracts | Complete and merged | Versioned schemas, runtime validation, canonical JSON, digests, typed errors, fixtures, and CI |
+| Phase 2 — Catalog and snapshots | Complete and merged | Deterministic catalog, connector health, content-addressed snapshots, SQLite storage, and catalog CLI |
+| Phase 3 — Project inspector | Complete and merged | Static project detection and deterministic `ProjectSnapshot` generation |
+| Phase 4 — Native-first router | Implementation complete on PR #12; final review pending | Web Platform, Motion, and GSAP routing, evaluations, and explicit route CLI |
 
-`@soren-sdk/contracts` provides:
+## Completed executable layers
 
-- JSON Schema Draft 2020-12 contracts
-- Connector Manifest v2 structural and semantic validation
-- Project, catalog, policy, route, execution, evidence, error, and lockfile contracts
-- Canonical JSON serialization
-- Deterministic SHA-256 digests
-- Typed errors
-- Explicit migration scaffolding
-- Repository-wide contract validation
+### Contracts
 
-### Phase 2 — Connector catalog and local snapshots
+`@soren-sdk/contracts` provides JSON Schema Draft 2020-12 contracts, Connector Manifest v2 validation, canonical JSON, deterministic SHA-256 digests, typed errors, fixtures, migration scaffolding, and repository validation.
 
-`@soren-sdk/core`, `@soren-sdk/connectors`, and `@soren-sdk/cli` provide:
+### Catalog and snapshots
 
-- Deterministic connector discovery
-- Lazy manifest loading
-- Legacy connector isolation
-- Connector health and freshness diagnostics
-- Content-addressed catalog snapshots
-- In-memory and SQLite snapshot storage
-- SQLite integrity verification
-- Read-only catalog CLI commands
+`@soren-sdk/connectors` and `@soren-sdk/core` provide deterministic connector discovery, legacy isolation, connector health/freshness diagnostics, content-addressed catalog snapshots, in-memory storage, SQLite persistence, and integrity checks.
 
-### Phase 3 — Static project inspector
+### Static project inspector
 
-The project inspector provides:
+The inspector detects package managers, lockfiles, workspaces, frameworks, dependencies, configuration and policy digests, browser/runtime targets, and static Git metadata without running Git, package managers, subprocesses, or network requests.
 
-- npm, pnpm, Yarn, and Bun detection
-- Lockfile hashing
-- npm/Yarn/Bun and pnpm workspace discovery
-- Stable workspace package inventory
-- Runtime, framework, and dependency detection
-- Storybook, shadcn, framework, testing, TypeScript, lint, and Soren configuration detection
-- Policy and browser-target detection
-- Static Git revision parsing
-- Symlink-safe recursive discovery
-- Deterministic, contract-valid `ProjectSnapshot` records
+### Native-first router
 
-The inspector never executes Git or a package manager. Git projects are conservatively marked dirty because static inspection cannot prove worktree cleanliness.
+Phase 4 implements:
+
+- Healthy approved Connector Manifest v2 records for Web Platform, Motion, and GSAP
+- `motion@12.42.2` with MIT licensing
+- `gsap@3.15.0` with `LicenseRef-GSAP-Standard`
+- Immutable built-in read-only policy and tightening-only overrides
+- Runtime-artifact, license, paid-service, health, forbidden-provider, and environment checks
+- Conservative Motion React `18.2+` compatibility validation
+- Native-first deterministic provider-set selection
+- Existing approved dependency reuse
+- Provider-set minimization
+- Motion/GSAP ownership conflict and ambiguity handling
+- `native`, `selected`, `no-sdk`, `needs-input`, and `blocked` outcomes
+- Contract-valid, content-addressed `RoutePlan` records
+- Stable selected/rejected-provider reason codes
+- 36 data-driven golden routing cases plus unit and metamorphic tests
+- Explicit-capability `soren-sdk route` CLI
+- Canonical JSON, human output, exit-code, deterministic request-ID, and no-write tests
+
+Final independent review, exact-head audit, ready-for-review transition, and merge remain intentionally pending.
+
+## Current connector status
+
+| Connector | Schema | Status | Selectable |
+|---|---|---|---|
+| Web Platform | Connector Manifest v2 | Approved and healthy | Yes |
+| Motion | Connector Manifest v2 | Approved and healthy | Yes |
+| GSAP | Connector Manifest v2 | Approved and healthy | Yes |
+| Lenis | Legacy planning manifest | Non-selectable | No |
+| React Three Fiber | Legacy planning manifest | Non-selectable | No |
+| Storybook | Legacy planning manifest | Non-selectable | No |
+| shadcn | Legacy planning manifest | Non-selectable | No |
+
+A healthy connector becomes selectable only after policy, environment, runtime-artifact, capability, provider-limit, and ownership constraints pass.
 
 ## Quick start
 
@@ -87,41 +98,59 @@ pnpm install --frozen-lockfile
 pnpm build
 ```
 
-### Inspect a frontend project
+### Inspect a project
 
 ```bash
 node packages/cli/dist/bin.js inspect ../my-project
 node packages/cli/dist/bin.js inspect ../my-project --json
 ```
 
-Inspect this repository:
+### Route explicit capabilities
+
+Native CSS transition:
 
 ```bash
-node packages/cli/dist/bin.js inspect --json
+node packages/cli/dist/bin.js route \
+  --project ../my-project \
+  --capability platform.css-transition \
+  --json
 ```
 
-### Explore the SDK catalog
+Motion layout:
+
+```bash
+node packages/cli/dist/bin.js route \
+  --project ../my-react-project \
+  --capability motion.layout \
+  --preferred motion \
+  --scope card-grid \
+  --property layout
+```
+
+GSAP timeline:
+
+```bash
+node packages/cli/dist/bin.js route \
+  --project ../my-project \
+  --capability motion.timeline
+```
+
+The route command accepts explicit capability IDs only. It does not infer capabilities from prose.
+
+### Explore the catalog
 
 ```bash
 node packages/cli/dist/bin.js catalog list
-node packages/cli/dist/bin.js catalog list --json
-node packages/cli/dist/bin.js catalog get web-platform --json
-node packages/cli/dist/bin.js connector health web-platform --json
+node packages/cli/dist/bin.js catalog get motion --json
+node packages/cli/dist/bin.js connector health motion --json
+node packages/cli/dist/bin.js catalog get gsap --json
 ```
 
 ### Create a catalog snapshot
 
-Without persistence:
-
 ```bash
 node packages/cli/dist/bin.js catalog snapshot --json
-```
-
-With explicit local SQLite persistence:
-
-```bash
-node packages/cli/dist/bin.js \
-  catalog snapshot \
+node packages/cli/dist/bin.js catalog snapshot \
   --database .soren-sdk/catalog.sqlite \
   --json
 ```
@@ -131,6 +160,7 @@ node packages/cli/dist/bin.js \
 These commands are read-only:
 
 - `inspect`
+- `route`
 - `catalog list`
 - `catalog get`
 - `connector health`
@@ -138,86 +168,19 @@ These commands are read-only:
 
 Only `catalog snapshot --database <path>` creates or updates a file, and it writes only to the explicitly requested SQLite database.
 
-There is currently no package installation, shell execution, project-source mutation, remote MCP invocation, or network access.
-
-## ProjectSnapshot behavior
-
-A project snapshot contains:
-
-- Revision metadata
-- Package manager and lockfile digest
-- Workspace graph
-- Runtimes and frameworks
-- Dependency inventory
-- Configuration and policy file digests
-- Browser and runtime targets
-- Warnings
-- Content-addressed snapshot ID
-
-The snapshot ID excludes the absolute root and creation time, so identical clones produce the same ID. It changes when meaningful project state changes.
-
-Raw configuration and policy file contents are not copied into the snapshot. Only paths and SHA-256 digests are retained.
-
-## Connector status
-
-- `web-platform` is the first Connector Schema v2 record.
-- Motion, GSAP, Lenis, React Three Fiber, Storybook, and shadcn remain legacy planning manifests.
-- Legacy records are visible but never selectable.
-- Health is diagnostic and does not authorize routing.
-- Connector documents are parsed as untrusted data and never executed by the catalog.
-
-Standards:
-
-- [`docs/SDK-CONNECTOR-STANDARD.md`](./docs/SDK-CONNECTOR-STANDARD.md)
-- [`schemas/connector.schema.json`](./schemas/connector.schema.json)
-- [`capabilities/catalog.json`](./capabilities/catalog.json)
+There is no package installation, shell execution, application-source mutation, remote MCP invocation, Agent Skill execution, or router-side network access.
 
 ## Package structure
 
 ```text
 packages/
-├── contracts/      # schemas, validation, canonical JSON, digests
-├── core/           # catalog service and static project inspector
-├── connectors/     # connector loading, health, snapshots, storage
-├── cli/            # read-only CLI
+├── contracts/       # contracts, validation, canonical JSON, digests
+├── core/            # catalog service, inspector, policy, router
+├── connectors/      # connector loading, health, snapshots, storage
+├── cli/             # read-only CLI
 ├── protocol-server/ # planned
 └── testing/         # planned
 ```
-
-Applications such as the Control Center remain planned clients of the core. They will never become the system of record.
-
-## Next milestone
-
-Phase 4 is the first capability router vertical slice:
-
-1. Web Platform
-2. Motion
-3. GSAP
-
-It must determine when CSS or Web Animations API is sufficient, when Motion or GSAP is appropriate, when they may coexist, when user input is required, and when policy blocks a route.
-
-Hard gates include zero forbidden selections, zero ownership conflicts, native-first behavior, and positive, negative, and metamorphic route fixtures.
-
-## Security position
-
-- Retrieved documentation and tool metadata are untrusted input.
-- Connector files are data, not executable instructions.
-- Project inspection is static and read-only.
-- Symlinks are not followed during project discovery.
-- Git commit values are accepted only when they match valid hash formats.
-- Runtime dependencies belong only in target workspaces.
-- No credentials, agents, or model IDs are hardcoded in core contracts.
-- Protected branches change through reviewed pull requests.
-- Completion claims require runner-generated evidence.
-
-Read:
-
-- [`SECURITY.md`](./SECURITY.md)
-- [`docs/THREAT-MODEL.md`](./docs/THREAT-MODEL.md)
-- [`docs/GOVERNANCE-SECURITY.md`](./docs/GOVERNANCE-SECURITY.md)
-- [`docs/LICENSE-POLICY.md`](./docs/LICENSE-POLICY.md)
-- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
-- [`docs/PLATFORM-CONTRACTS-V2.md`](./docs/PLATFORM-CONTRACTS-V2.md)
 
 ## Verification
 
@@ -232,24 +195,47 @@ pnpm validate:repository
 pnpm smoke:cli
 ```
 
+Latest full Phase 4 implementation run before documentation finalization: workflow `30643899335`, all steps passed.
+
+## Security position
+
+- Connector and retrieved knowledge files are untrusted data and are never executed.
+- Project inspection is static, symlink-safe, and read-only.
+- Routing applies hard policy and environment constraints before ranking.
+- Forbidden, unhealthy, legacy, blocked, or non-selectable providers cannot be selected.
+- Same-scope exclusive ownership conflicts block routing.
+- No credentials, agent names, vendor IDs, or model IDs are hardcoded in core routing logic.
+- Completion claims require runner-generated evidence.
+
+Read:
+
+- [`SECURITY.md`](./SECURITY.md)
+- [`docs/THREAT-MODEL.md`](./docs/THREAT-MODEL.md)
+- [`docs/GOVERNANCE-SECURITY.md`](./docs/GOVERNANCE-SECURITY.md)
+- [`docs/LICENSE-POLICY.md`](./docs/LICENSE-POLICY.md)
+- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
+- [`docs/PLATFORM-CONTRACTS-V2.md`](./docs/PLATFORM-CONTRACTS-V2.md)
+- [`docs/superpowers/specs/2026-07-30-phase-4-native-router-design.md`](./docs/superpowers/specs/2026-07-30-phase-4-native-router-design.md)
+- [`docs/superpowers/plans/2026-07-30-phase-4-native-router.md`](./docs/superpowers/plans/2026-07-30-phase-4-native-router.md)
+
 ## Roadmap
 
-Completed:
+Implemented:
 
 - Architecture Hardening v2
 - Phase 1 contracts
 - Phase 2 catalog and SQLite snapshots
 - Phase 3 project inspector
+- Phase 4 Web Platform + Motion + GSAP routing implementation
 
-Next:
+Next after Phase 4 review and merge:
 
-- Phase 4 Web Platform + Motion + GSAP routing
-- Policy, configuration, and lockfile enforcement
+- Phase 5 policy hierarchy, configuration, and `soren-sdk.lock`
 - Universal CLI/REST/MCP/TypeScript surfaces
 - Context broker and read-only tool gateway
 - Plan, verification, and evidence services
 - Approved apply sandbox after release `0.1`
-- Remaining first-wave connectors
+- Remaining connector migrations
 - Soren Design System integration
 - Control Center
 

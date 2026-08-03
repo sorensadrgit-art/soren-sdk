@@ -8,37 +8,56 @@ This package owns:
 
 - Loading and validating `capabilities/catalog.json`
 - Deterministic discovery of `sdk-connectors/*`
-- Lazy loading of connector manifests
+- Lazy connector-manifest loading
 - Explicit representation of legacy planning manifests
 - Connector health diagnostics
 - Deterministic `CatalogSnapshot` generation
 - In-memory snapshot persistence
 - Local SQLite snapshot persistence
 
-It does **not** own routing, provider scoring, package installation, MCP invocation, skill execution, network access, or project mutation.
+It does **not** own routing, provider scoring, package installation, MCP invocation, Agent Skill execution, network access, or project mutation.
 
 ## Connector loading
 
 `FileSystemConnectorCatalog`:
 
-- Skips only underscore-prefixed template directories
+- Skips underscore-prefixed template directories
 - Sorts connector directories deterministically
 - Validates Schema v2 manifests through `@soren-sdk/contracts`
 - Keeps legacy manifests visible but permanently non-selectable
-- Rejects missing, malformed, invalid, and duplicate connector manifests
+- Rejects missing, malformed, invalid, unreadable, and duplicate manifests
 - Never imports or executes connector content
 
 ```ts
 import { FileSystemConnectorCatalog } from "@soren-sdk/connectors";
 
-const catalog = new FileSystemConnectorCatalog({
-  root: process.cwd()
-});
-
+const catalog = new FileSystemConnectorCatalog({ root: process.cwd() });
 const records = catalog.list();
-const webPlatform = catalog.get("web-platform");
-const health = catalog.health("web-platform");
+const motion = catalog.get("motion");
+const health = catalog.health("motion");
 ```
+
+## Phase 4 routing providers
+
+The following records are complete Connector Manifest v2 providers:
+
+| Provider | Runtime | License | Review | Selectable |
+|---|---|---|---|---|
+| Web Platform | Built-in | `not-applicable` | Approved | Yes |
+| Motion | `motion@12.42.2` | MIT | Approved | Yes |
+| GSAP | `gsap@3.15.0` | `LicenseRef-GSAP-Standard` | Approved | Yes |
+
+Each provider contains:
+
+- `sdk.manifest.json`
+- Focused `SKILL.md`
+- Official source registry
+- Compatibility data
+- Connector-local route cases
+
+Provider readiness does not bypass routing constraints. Core routing independently checks health, policy, environment, runtime artifacts, licenses, provider limits, capabilities, and ownership.
+
+Lenis, React Three Fiber, Storybook, and shadcn remain visible legacy planning manifests and cannot be selected.
 
 ## Health diagnostics
 
@@ -73,7 +92,7 @@ missing
 - Stable connector ordering
 - A snapshot ID independent of directory order and `createdAt`
 
-Legacy connectors remain visible in catalog queries but are excluded from Schema v2 snapshot entries.
+Legacy connectors remain visible in queries but are excluded from Schema v2 snapshot entries.
 
 ## Storage adapters
 
@@ -105,4 +124,4 @@ interface CatalogSnapshotStore {
 - Makes no network calls
 - Loads no SQLite extensions
 
-Because `node:sqlite` remains replaceable, consumers should depend on `CatalogSnapshotStore` rather than the concrete adapter where possible.
+Consumers should depend on `CatalogSnapshotStore` rather than the concrete SQLite adapter where possible.
