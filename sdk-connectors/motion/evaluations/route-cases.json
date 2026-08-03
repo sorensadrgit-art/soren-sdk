@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0.0",
+  "providerId": "motion",
+  "cases": [
+    { "id": "presence", "capability": "motion.presence", "react": "19.2.0", "expected": "selected" },
+    { "id": "layout", "capability": "motion.layout", "react": "19.2.0", "expected": "selected" },
+    { "id": "drag", "capability": "interaction.drag", "react": "18.2.0", "expected": "selected" },
+    { "id": "react-too-old", "capability": "motion.presence", "react": "17.0.2", "expected": "blocked" },
+    { "id": "css-preferred", "capability": "platform.css-transition", "react": "19.2.0", "expected": "not-selected" },
+    { "id": "gsap-separate-scope", "capability": "motion.layout", "scope": "cards", "property": "layout", "expected": "compatible" }
+  ]
+}

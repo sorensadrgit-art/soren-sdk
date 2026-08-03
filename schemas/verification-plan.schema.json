@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/verification-plan.schema.json",
+  "title": "Soren SDK Verification Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractKind", "verificationPlanId", "executionPlanId", "executionPlanDigest", "checks", "digest"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0-draft.1" },
+    "contractKind": { "const": "verification-plan" },
+    "verificationPlanId": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+    "executionPlanId": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+    "executionPlanDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "checks": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["id", "kind", "required", "status"], "properties": { "id": { "type": "string", "minLength": 1 }, "kind": { "type": "string", "minLength": 1 }, "required": { "type": "boolean" }, "status": { "enum": ["passed", "failed", "not-run", "not-required", "blocked", "cancelled", "timed-out", "unverified"] }, "reason": { "type": "string" }, "artifacts": { "type": "array", "items": { "type": "string" }, "uniqueItems": true } } }, "uniqueItems": true },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 export const CONTRACT_SCHEMA_FILES = {
   "capability-catalog": "capability-catalog.schema.json",
+  "artifact-reference": "artifact-reference.schema.json",
   "catalog-snapshot": "catalog-snapshot.schema.json",
   connector: "connector.schema.json",
   "error-envelope": "error-envelope.schema.json",
