@@ -67,7 +67,7 @@ export class InMemoryResolvedPolicyProvider implements ResolvedPolicyProvider {
     this.#policies.set(policyId, { policyId, digest, document });
   }
 
-  async getPolicySnapshot(policyId: string): Promise<{
+  async getCurrentPolicySnapshot(policyId: string): Promise<{
     policyId: string;
     digest: Digest;
     document: unknown;
@@ -86,8 +86,8 @@ export class InMemoryProjectSnapshotProvider implements ProjectSnapshotProvider 
     this.#snapshots.set(snapshot.snapshotId, snapshot);
   }
 
-  async getProjectSnapshot(snapshotId: Digest): Promise<ProjectSnapshot | null> {
-    return this.#snapshots.get(snapshotId) ?? null;
+  async getCurrentProjectSnapshot(): Promise<ProjectSnapshot | null> {
+    return this.#snapshots.values().next().value ?? null;
   }
 }
 
@@ -101,7 +101,7 @@ export class InMemorySandboxPolicyProvider implements SandboxPolicyProvider {
     this.#policies.set(policy.policyId, policy);
   }
 
-  async getSandboxPolicy(policyId: string): Promise<SandboxPolicy | null> {
+  async getCurrentSandboxPolicy(policyId: string): Promise<SandboxPolicy | null> {
     return this.#policies.get(policyId) ?? null;
   }
 }
