@@ -1,25 +1,20 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  createRunGrant,
   inventoryDigest,
   ReadOnlyToolGateway,
+  RunGrantStore,
   type ReadOnlyToolProvider,
   type ToolInventory
 } from "../src/context-gateway.js";
+
+const encoder = new TextEncoder();
 
 function inventory(): ToolInventory {
   return {
     providerId: "fake",
     protocolVersions: ["2025-11-25"],
-    tools: [
-      {
-        id: "read",
-        description: "Read approved metadata.",
-        readOnly: true,
-        exposesProjectContent: false
-      }
-    ]
+    tools: [{ id: "read", description: "Read approved metadata.", readOnly: true, exposesProjectContent: false }]
   };
 }
 

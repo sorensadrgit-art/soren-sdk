@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://soren.dev/schemas/protocol-error.schema.json",
+  "title": "Soren Protocol Error Envelope",
+  "type": "object",
+  "required": ["schemaVersion", "ok", "error", "meta"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0-draft.1"
+    },
+    "ok": {
+      "const": false
+    },
+    "error": {
+      "type": "object",
+      "required": ["code", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "AUTHENTICATION_FAILED",
+            "AUTHORIZATION_DENIED",
+            "BODY_TOO_LARGE",
+            "CONTENT_TYPE_UNSUPPORTED",
+            "INTERNAL_ERROR",
+            "INVALID_ARGUMENT",
+            "METHOD_NOT_FOUND",
+            "NOT_IMPLEMENTED",
+            "PROJECT_ROOT_DENIED",
+            "PROTOCOL_VERSION_UNSUPPORTED",
+            "REQUEST_CANCELLED",
+            "REQUEST_TIMEOUT",
+            "VALIDATION_FAILED"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "details": true
+      }
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "correlationId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "surface": {
+          "enum": ["application", "mcp", "rest", "sdk-http", "sdk-in-process"]
+        }
+      }
+    }
+  }
+}

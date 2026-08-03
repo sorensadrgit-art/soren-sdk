@@ -2,7 +2,7 @@
 
 ## Strategy
 
-Build secure, inspectable, read-only vertical slices before enabling routing, external tools, or project mutation.
+Build secure, inspectable, read-only vertical slices before enabling external tools or project mutation.
 
 Release `0.1` remains read-only. Package installation, command execution, and project writes are excluded until the apply sandbox receives an independent security review.
 
@@ -12,7 +12,7 @@ Release `0.1` remains read-only. Package installation, command execution, and pr
 - ✅ Phase 1 — Versioned contracts
 - ✅ Phase 2 — Connector catalog, health, snapshots, SQLite, and CLI
 - ✅ Phase 3 — Static content-addressed project inspector
-- ▶️ Phase 4 — Web Platform + Motion + GSAP routing vertical slice
+- 🟡 Phase 4 — Web Platform + Motion + GSAP routing implementation complete; final review and merge pending
 
 ---
 
@@ -65,12 +65,10 @@ Delivered:
 - pnpm and package.json workspace patterns
 - Stable workspace graph
 - Dependency, framework, and runtime inventory
-- Storybook, shadcn, framework, testing, TypeScript, lint, Soren configuration, and policy detection
-- Browser and runtime targets
-- Static Git HEAD, loose-ref, packed-ref, and worktree metadata parsing
+- Configuration, policy, browser-target, and runtime-target detection
+- Static Git metadata parsing
 - Safe commit-hash and ref validation
 - Symlink-safe filesystem discovery
-- Package-manifest, workspace, configuration, policy, lockfile, target, and revision hashing
 - Deterministic `ProjectSnapshot`
 - `soren-sdk inspect [path] [--json]`
 
@@ -78,51 +76,41 @@ Known intentional limitation:
 
 - Git projects are conservatively reported dirty because the inspector does not execute `git status`.
 
----
+## Phase 4 — First routing vertical slice 🟡
 
-## Phase 4 — First routing vertical slice ▶️
+Implementation complete on PR #12; final independent review and merge remain pending.
 
-Implement only:
+Delivered:
 
-- Web Platform
-- Motion
-- GSAP
+- Healthy approved Connector Manifest v2 records for Web Platform, Motion, and GSAP
+- Web Platform native CSS transition, CSS animation, and WAAPI claims
+- Motion presence, layout, shared-layout, spring, drag, and gesture claims
+- GSAP timeline, SVG, FLIP, ScrollTrigger, and pinned-sequence claims
+- `motion@12.42.2`, MIT
+- `gsap@3.15.0`, `LicenseRef-GSAP-Standard`
+- Built-in immutable read-only policy
+- Tightening-only policy overrides
+- Health, license, paid-service, artifact, forbidden-provider, provider-limit, and environment constraints
+- Conservative React `18.2+` validation for Motion React claims
+- Native-first provider selection
+- Existing dependency reuse
+- Smallest sufficient provider-set selection
+- Ownership conflict and ambiguity handling
+- `native`, `selected`, `no-sdk`, `needs-input`, and `blocked` outcomes
+- Deterministic contract-valid `RoutePlan` records
+- Stable selected/rejected-provider explanations
+- 36 data-driven golden route cases plus direct and metamorphic tests
+- Explicit-capability `soren-sdk route` CLI
+- Route CLI canonical JSON, human output, deterministic request-ID, exit-code, and no-write tests
+- Native route smoke test in permanent CI
 
-Capabilities:
+Remaining gates:
 
-- CSS transitions and animations
-- Web Animations API
-- Presence and layout animation
-- Gesture and drag
-- Timelines
-- ScrollTrigger and pinned sequences
-
-Route outcomes:
-
-- `native`
-- `selected`
-- `no-sdk`
-- `needs-input`
-- `blocked`
-
-Required behavior:
-
-- Native Web Platform candidates are evaluated first.
-- Existing approved dependencies receive a reuse preference.
-- Hard policy and environment constraints run before scoring.
-- Provider sets are minimized.
-- Motion and GSAP cannot own the same property on the same scope.
-- Ambiguous material decisions return `needs-input`.
-- Impossible routes return `blocked`.
-- Explanations list selected and rejected providers without hidden reasoning.
-
-Hard exit gates:
-
-- Zero hard-policy violations
-- Zero forbidden-provider selections
-- Zero unresolved ownership conflicts
-- Native provider wins simple cases
-- At least 30 positive, negative, and metamorphic fixtures pass
+- Fresh complete-diff security and routing review
+- Exact final-head CI after review fixes
+- PR #12 ready-for-review transition
+- Squash merge with expected-head protection
+- Issue #9 closure and master-roadmap update
 
 ## Phase 5 — Policy, configuration, and lockfile
 
@@ -250,36 +238,7 @@ The Control Center will display catalog, project, policy, route, evaluation, and
 
 ## Phase 13 — Controlled expansion
 
-Potential future connector groups:
-
-### Creative motion and media
-
-- Rive
-- Lottie
-- Theatre.js
-- Spline
-- PixiJS
-
-### UI architecture
-
-- Base UI
-- Radix
-- React Aria
-- Floating UI
-- Tailwind CSS
-- React Hook Form
-- Zod
-
-### Data and advanced tools
-
-- TanStack Query
-- TanStack Table
-- D3
-- Mapbox
-- Monaco
-- Tiptap
-
-A connector is added only when it fills a defined capability gap.
+Potential future connector groups are added only when they fill defined capability gaps and pass contract, routing, security, implementation, and human-quality review.
 
 ## Release 0.1 definition of done
 
@@ -287,7 +246,8 @@ A connector is added only when it fills a defined capability gap.
 - [x] Deterministic catalog snapshots work
 - [x] SQLite persistence and integrity checks work
 - [x] Static project inspection works
-- [ ] Web Platform, Motion, and GSAP route correctly
+- [x] Web Platform, Motion, and GSAP routing implementation works on the Phase 4 branch
+- [ ] Phase 4 independent review and merge complete
 - [ ] Policy and lockfile enforcement work
 - [ ] CLI, REST, MCP, and TypeScript SDK are contract-equivalent
 - [ ] Context is selective
