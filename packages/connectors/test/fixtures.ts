@@ -31,7 +31,13 @@ export async function validConnectorManifest(
   const manifest = JSON.parse(source) as ConnectorManifest;
   manifest.connector.id = connectorId;
   manifest.connector.name = `${connectorId} connector`;
+  manifest.connector.reviewStatus = "experimental";
+  manifest.connector.selectable = false;
+  manifest.connector.blockers = ["Fixture not approved"];
   manifest.product.canonicalName = connectorId;
+  for (const related of Object.values(manifest.relatedFiles)) {
+    related.status = "planned";
+  }
   return manifest;
 }
 

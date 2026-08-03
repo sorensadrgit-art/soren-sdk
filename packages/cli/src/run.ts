@@ -17,7 +17,9 @@ import {
 import {
   CatalogService,
   ProjectInspectionError,
-  inspectProject
+  RouteInputError,
+  inspectProject,
+  routeCapabilities
 } from "@soren-sdk/core";
 import {
   ConnectorCatalogError,
@@ -120,6 +122,7 @@ function usage(): string {
   return [
     "Usage:",
     "  soren-sdk inspect [path] [--json]",
+    "  soren-sdk route --capability <id> [--capability <id>] [--optional <id>] [--project <path>] [--preferred <provider>] [--forbidden <provider>] [--max-providers <number>] [--scope <scope>] [--property <property>] [--json]",
     "  soren-sdk catalog list [--json]",
     "  soren-sdk catalog get <connector-id> [--json]",
     "  soren-sdk connector health <connector-id> [--json]",

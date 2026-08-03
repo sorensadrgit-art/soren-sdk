@@ -95,7 +95,9 @@ describe("Soren SDK CLI", () => {
     expect(
       runCli({ argv: ["catalog", "list"], cwd: repositoryRoot(), io: human.io })
     ).toBe(0);
-    expect(human.stdout.join("")).toContain("web-platform\tschema-v2\tfalse");
+    expect(human.stdout.join("")).toContain("web-platform\tschema-v2\ttrue");
+    expect(human.stdout.join("")).toContain("motion\tschema-v2\ttrue");
+    expect(human.stdout.join("")).toContain("gsap\tschema-v2\ttrue");
 
     const json = captureIo();
     expect(
@@ -133,7 +135,8 @@ describe("Soren SDK CLI", () => {
     ).toBe(0);
     expect(JSON.parse(health.stdout.join(""))).toMatchObject({
       connectorId: "web-platform",
-      state: "blocked"
+      state: "healthy",
+      selectable: true
     });
   });
 

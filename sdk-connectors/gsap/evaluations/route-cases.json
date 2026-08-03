@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0.0",
+  "providerId": "gsap",
+  "cases": [
+    { "id": "timeline", "capability": "motion.timeline", "expected": "selected" },
+    { "id": "svg", "capability": "motion.svg", "expected": "selected" },
+    { "id": "flip", "capability": "motion.flip", "expected": "selected" },
+    { "id": "scroll-trigger", "capability": "scroll.triggered-animation", "expected": "selected" },
+    { "id": "pinned", "capability": "scroll.pinned-sequence", "expected": "selected" },
+    { "id": "css-preferred", "capability": "platform.css-animation", "expected": "not-selected" },
+    { "id": "motion-separate-scope", "capability": "motion.timeline", "scope": "hero", "property": "timeline", "expected": "compatible" }
+  ]
+}
