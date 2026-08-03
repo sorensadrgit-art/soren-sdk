@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0.0-draft.1",
+  "contractKind": "soren-config",
+  "configId": "web-platform-example",
+  "preferences": {
+    "preferredProviders": ["web-platform"],
+    "forbiddenProviders": ["gsap"],
+    "maxProviders": 1,
+    "unknownPreference": true
+  }
+}

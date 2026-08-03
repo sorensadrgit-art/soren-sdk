@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/sorensadrgit-art/soren-sdk/main/schemas/sandbox-policy.schema.json",
+  "title": "Soren SDK Sandbox Policy",
+  "description": "Strict resource and safety controls enforced by an isolated apply sandbox.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contractKind",
+    "policyId",
+    "allowAbsolutePaths",
+    "allowSymlinkEscapes",
+    "allowSpecialFiles",
+    "allowCommands",
+    "allowNetwork",
+    "maxFiles",
+    "maxBytes",
+    "maxOperations",
+    "maxDurationSeconds",
+    "writableRoots",
+    "denyPaths"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0-draft.1"
+    },
+    "contractKind": {
+      "const": "sandbox-policy"
+    },
+    "policyId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "allowAbsolutePaths": {
+      "type": "boolean",
+      "default": false
+    },
+    "allowSymlinkEscapes": {
+      "type": "boolean",
+      "default": false
+    },
+    "allowSpecialFiles": {
+      "type": "boolean",
+      "default": false
+    },
+    "allowCommands": {
+      "type": "boolean",
+      "default": false
+    },
+    "allowNetwork": {
+      "type": "boolean",
+      "default": false
+    },
+    "maxFiles": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "maxBytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "maxOperations": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "maxDurationSeconds": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "writableRoots": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "denyPaths": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "default": []
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "1.0.0",
+  "providerId": "motion",
+  "relationships": [
+    { "providerId": "web-platform", "status": "compatible-with-ownership", "condition": "Native and Motion capabilities use different explicit scope or property ownership" },
+    { "providerId": "gsap", "status": "compatible-with-ownership", "condition": "Motion and GSAP do not exclusively own the same explicit scope/property" }
+  ],
+  "environment": { "reactMinimum": "18.2.0" }
+}

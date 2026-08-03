@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1.0.0",
+  "providerId": "gsap",
+  "relationships": [
+    { "providerId": "web-platform", "status": "compatible-with-ownership", "condition": "Native and GSAP capabilities use different explicit scope or property ownership" },
+    { "providerId": "motion", "status": "compatible-with-ownership", "condition": "GSAP and Motion do not exclusively own the same explicit scope/property" }
+  ]
+}
