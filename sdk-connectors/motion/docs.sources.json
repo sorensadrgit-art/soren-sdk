@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0.0",
+  "providerId": "motion",
+  "retrievedAt": "2026-07-30",
+  "productVersion": "12.42.2",
+  "sources": [
+    { "url": "https://motion.dev/docs/react-installation", "type": "documentation", "authority": "official", "allowedUse": ["link", "summarize"], "license": "LicenseRef-Motion-Documentation" },
+    { "url": "https://motion.dev/docs/react", "type": "documentation", "authority": "official", "allowedUse": ["link", "summarize"], "license": "LicenseRef-Motion-Documentation" },
+    { "url": "https://motion.dev/docs/ai-kit-install", "type": "documentation", "authority": "official", "allowedUse": ["link", "summarize"], "license": "LicenseRef-Motion-Plus-Terms" },
+    { "url": "https://www.npmjs.com/package/motion", "type": "registry", "authority": "official", "allowedUse": ["link", "summarize"], "license": "MIT" },
+    { "url": "https://github.com/motiondivision/motion", "type": "repository", "authority": "official", "allowedUse": ["link", "summarize"], "license": "MIT" }
+  ]
+}
