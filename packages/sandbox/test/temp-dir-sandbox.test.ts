@@ -1,9 +1,19 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import * as fsp from "node:fs/promises";
+import type * as FsPromises from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof FsPromises>();
+  return {
+    ...actual,
+    readdir: vi.fn(actual.readdir),
+    writeFile: vi.fn(actual.writeFile)
+  };
+});
 
 import { FakeClock } from "../src/clock.js";
 import { TempDirSandboxProvider } from "../src/temp-dir-sandbox.js";
@@ -116,19 +126,174 @@ describe("TempDirSandboxSession", () => {
     await session.close();
   });
 
-  it("rejects special files", async () => {
+  if (process.platform === "win32") {
+    it("does not require POSIX FIFO support on Windows", () => {
+      expect(process.platform).toBe("win32");
+    });
+  } else {
+    it("rejects FIFO special files without replacing them", async () => {
+      const provider = new TempDirSandboxProvider(new FakeClock(), baseDir);
+      const session = await provider.create({
+        policy: policy(),
+        root: baseDir,
+        sandboxId: "t6"
+      });
+      const fifo = path.join(baseDir, "t6", "fifo");
+      execFileSync("mkfifo", [fifo]);
+
+      await expect(session.write("fifo", encoder.encode("x"))).rejects.toMatchObject({
+        code: "SANDBOX_SPECIAL_FILE"
+      });
+      expect((await fsp.lstat(fifo)).isFIFO()).toBe(true);
+      await session.close();
+    });
+  }
+
+  it("rejects symlink entries even when they resolve to a file inside the sandbox", async (context) => {
     const provider = new TempDirSandboxProvider(new FakeClock(), baseDir);
     const session = await provider.create({
       policy: policy(),
       root: baseDir,
-      sandboxId: "t6"
+      sandboxId: "t6-symlinks"
     });
-    // FIFO is a special file. Create it inside the sandbox root.
-    const fifo = path.join(baseDir, "t6", "fifo");
-    execSync(`mkfifo "${fifo}"`);
-    await expect(
-      session.write("fifo", encoder.encode("x"))
-    ).rejects.toThrow(SandboxError);
+    const sandboxRoot = path.join(baseDir, "t6-symlinks");
+    const insideTarget = path.join(sandboxRoot, "inside.txt");
+    const outsideTarget = path.join(baseDir, "outside.txt");
+    await fsp.writeFile(insideTarget, "inside");
+    await fsp.writeFile(outsideTarget, "outside");
+
+    try {
+      await fsp.symlink(insideTarget, path.join(sandboxRoot, "inside-link"));
+      await fsp.symlink(outsideTarget, path.join(sandboxRoot, "outside-link"));
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        "code" in error &&
+        (error.code === "EPERM" || error.code === "EACCES")
+      ) {
+        context.skip("The host does not permit symlink creation for this test.");
+        return;
+      }
+      throw error;
+    }
+
+    await expect(session.write("inside-link", encoder.encode("x"))).rejects.toMatchObject({
+      code: "SANDBOX_SYMLINK_ESCAPE"
+    });
+    await expect(session.write("outside-link", encoder.encode("x"))).rejects.toMatchObject({
+      code: "SANDBOX_SYMLINK_ESCAPE"
+    });
+    expect(await fsp.readFile(insideTarget, "utf8")).toBe("inside");
+    expect(await fsp.readFile(outsideTarget, "utf8")).toBe("outside");
+    await session.close();
+  });
+
+  it("rejects a symlink ancestor even when it resolves inside the sandbox", async (context) => {
+    const provider = new TempDirSandboxProvider(new FakeClock(), baseDir);
+    const session = await provider.create({
+      policy: policy(),
+      root: baseDir,
+      sandboxId: "t6-symlink-ancestor"
+    });
+    const sandboxRoot = path.join(baseDir, "t6-symlink-ancestor");
+    const realDirectory = path.join(sandboxRoot, "real-directory");
+    await fsp.mkdir(realDirectory);
+
+    try {
+      await fsp.symlink(realDirectory, path.join(sandboxRoot, "linked-directory"));
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        "code" in error &&
+        (error.code === "EPERM" || error.code === "EACCES")
+      ) {
+        context.skip("The host does not permit symlink creation for this test.");
+        return;
+      }
+      throw error;
+    }
+
+    await expect(session.write("linked-directory/file.txt", encoder.encode("x"))).rejects.toMatchObject({
+      code: "SANDBOX_SYMLINK_ESCAPE"
+    });
+    await expect(fsp.stat(path.join(realDirectory, "file.txt"))).rejects.toMatchObject({
+      code: "ENOENT"
+    });
+    await session.close();
+  });
+
+  it("rejects a write when its target is replaced after initial validation", async () => {
+    const provider = new TempDirSandboxProvider(new FakeClock(), baseDir);
+    const session = await provider.create({
+      policy: policy(),
+      root: baseDir,
+      sandboxId: "t6-write-race"
+    });
+    const sandboxRoot = path.join(baseDir, "t6-write-race");
+    const target = path.join(sandboxRoot, "target.txt");
+    const replacement = path.join(sandboxRoot, "replacement.txt");
+    await fsp.writeFile(target, "original");
+    await fsp.writeFile(replacement, "replacement");
+
+    const actualFs = await vi.importActual<typeof FsPromises>(
+      "node:fs/promises"
+    );
+    const writeFile = vi.mocked(fsp.writeFile);
+    writeFile.mockImplementation(async (...args) => {
+      if (typeof args[0] === "string" && path.basename(args[0]).startsWith(".soren-sdk-tmp-")) {
+        await fsp.rename(replacement, target);
+      }
+      return actualFs.writeFile(...args);
+    });
+
+    await expect(session.write("target.txt", encoder.encode("new"))).rejects.toMatchObject({
+      code: "SANDBOX_OPERATION_DENIED"
+    });
+    writeFile.mockImplementation(actualFs.writeFile);
+
+    expect(await fsp.readFile(target, "utf8")).toBe("replacement");
+    expect(
+      (await fsp.readdir(sandboxRoot)).filter((name) => name.startsWith(".soren-sdk-tmp-"))
+    ).toEqual([]);
+    await session.close();
+  });
+
+  it("rejects removal when the target is replaced after initial validation", async () => {
+    const provider = new TempDirSandboxProvider(new FakeClock(), baseDir);
+    const session = await provider.create({
+      policy: policy(),
+      root: baseDir,
+      sandboxId: "t6-remove-race"
+    });
+    const sandboxRoot = path.join(baseDir, "t6-remove-race");
+    const target = path.join(sandboxRoot, "target");
+    const replacement = path.join(sandboxRoot, "replacement");
+    const outside = path.join(baseDir, "outside");
+    await fsp.mkdir(target);
+    await fsp.mkdir(replacement);
+    await fsp.mkdir(outside);
+    await fsp.writeFile(path.join(outside, "keep.txt"), "outside");
+
+    const actualFs = await vi.importActual<typeof FsPromises>(
+      "node:fs/promises"
+    );
+    const readdir = vi.mocked(fsp.readdir);
+    readdir.mockImplementation(async (...args) => {
+      if (args[0] === target) {
+        await fsp.rmdir(target);
+        await fsp.rename(replacement, target);
+        return [];
+      }
+      return actualFs.readdir(...args);
+    });
+
+    await expect(session.remove("target")).rejects.toMatchObject({
+      code: "SANDBOX_OPERATION_DENIED"
+    });
+    readdir.mockImplementation(actualFs.readdir);
+
+    expect((await fsp.lstat(target)).isDirectory()).toBe(true);
+    expect(await fsp.readFile(path.join(outside, "keep.txt"), "utf8")).toBe("outside");
     await session.close();
   });
 

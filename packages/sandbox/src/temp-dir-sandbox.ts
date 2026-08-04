@@ -23,6 +23,19 @@ import {
   type SandboxSnapshot
 } from "./types.js";
 
+interface MutationEntryIdentity {
+  dev: number | bigint;
+  ino: number | bigint;
+  mode: number | bigint;
+}
+
+interface ValidatedMutationTarget {
+  relativePath: string;
+  absolutePath: string;
+  resolvedPath: string;
+  entryIdentity: MutationEntryIdentity | null;
+}
+
 /**
  * Temporary-directory sandbox. Enforces strict path, symlink, special-file,
  * and resource controls before every mutation. The original host tree is
@@ -66,19 +79,100 @@ export class TempDirSandboxSession implements SandboxSession {
   }
 
   private async resolveCandidate(candidate: string): Promise<string> {
+    return (await this.resolveMutationTarget(candidate)).absolutePath;
+  }
+
+  private async resolveMutationTarget(candidate: string): Promise<ValidatedMutationTarget> {
     assertNoNulOrEncodingIssues(candidate);
     const safe = assertSafeRelativeSync(candidate);
     assertPathAllowed(safe, this.policy.writableRoots, this.policy.denyPaths);
-    // Re-resolve real path and recheck containment before every mutation.
-    const resolved = await resolveWithinRoot(safe, this.root, {
+    const absolutePath = path.resolve(this.root, ...safe.split("/").filter(Boolean));
+    const resolvedPath = await resolveWithinRoot(safe, this.root, {
       allowAbsolutePaths: this.policy.allowAbsolutePaths,
       denyPaths: this.policy.denyPaths
     });
-    await assertRegularFileOrDirectory(resolved, {
+    await this.assertSafeEntryChain(absolutePath);
+    const entry = await this.lstatIfExists(absolutePath);
+    return {
+      relativePath: safe,
+      absolutePath,
+      resolvedPath,
+      entryIdentity: entry === null ? null : this.entryIdentity(entry)
+    };
+  }
+
+  private async revalidateMutationTarget(
+    original: ValidatedMutationTarget
+  ): Promise<ValidatedMutationTarget> {
+    const current = await this.resolveMutationTarget(original.relativePath);
+    if (
+      current.resolvedPath !== original.resolvedPath ||
+      !this.sameEntryIdentity(current.entryIdentity, original.entryIdentity)
+    ) {
+      throw new SandboxError(
+        "SANDBOX_OPERATION_DENIED",
+        "Mutation target changed after authorization.",
+        { path: original.relativePath }
+      );
+    }
+    return current;
+  }
+
+  private async assertSafeEntryChain(target: string): Promise<void> {
+    const root = path.resolve(this.root);
+    const relative = path.relative(root, target);
+    if (relative.startsWith("..") || path.isAbsolute(relative)) {
+      throw new SandboxError("SANDBOX_PATH_TRAVERSAL", "Sandbox path containment check failed.");
+    }
+
+    const rootEntry = await this.lstatIfExists(root);
+    if (rootEntry === null || !rootEntry.isDirectory()) {
+      throw new SandboxError("SANDBOX_OPERATION_DENIED", "Sandbox root is not an accessible directory.");
+    }
+    await assertRegularFileOrDirectory(root, {
       allowSpecialFiles: this.policy.allowSpecialFiles,
       allowSymlinkEscapes: this.policy.allowSymlinkEscapes
     });
-    return resolved;
+
+    let current = root;
+    for (const segment of relative.split(path.sep).filter(Boolean)) {
+      current = path.join(current, segment);
+      const entry = await this.lstatIfExists(current);
+      if (entry === null) return;
+      await assertRegularFileOrDirectory(current, {
+        allowSpecialFiles: this.policy.allowSpecialFiles,
+        allowSymlinkEscapes: this.policy.allowSymlinkEscapes
+      });
+      if (current !== target && !entry.isDirectory()) {
+        throw new SandboxError("SANDBOX_OPERATION_DENIED", "Sandbox path ancestor is not a directory.");
+      }
+    }
+  }
+
+  private async lstatIfExists(target: string): Promise<Awaited<ReturnType<typeof fsp.lstat>> | null> {
+    try {
+      return await fsp.lstat(target);
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private entryIdentity(entry: Awaited<ReturnType<typeof fsp.lstat>>): MutationEntryIdentity {
+    return { dev: entry.dev, ino: entry.ino, mode: entry.mode };
+  }
+
+  private sameEntryIdentity(
+    left: MutationEntryIdentity | null,
+    right: MutationEntryIdentity | null
+  ): boolean {
+    return (
+      left?.dev === right?.dev &&
+      left?.ino === right?.ino &&
+      left?.mode === right?.mode
+    );
   }
 
   async read(p: string): Promise<Uint8Array> {
@@ -111,12 +205,12 @@ export class TempDirSandboxSession implements SandboxSession {
       );
     }
 
-    const resolved = await this.resolveCandidate(p);
-    const parent = path.dirname(resolved);
+    const target = await this.resolveMutationTarget(p);
+    const parent = path.dirname(target.absolutePath);
     await fsp.mkdir(parent, { recursive: true });
+    const targetBeforeWrite = await this.revalidateMutationTarget(target);
 
-    const existing = await this.exists(resolved);
-    if (!existing) {
+    if (targetBeforeWrite.entryIdentity === null) {
       const fileCount = await this.countFiles();
       if (fileCount >= this.policy.maxFiles) {
         throw new SandboxError(
@@ -132,9 +226,10 @@ export class TempDirSandboxSession implements SandboxSession {
     const tempPath = path.join(parent, tempName);
     try {
       await fsp.writeFile(tempPath, content, { flag: "wx" });
-      await fsp.rename(tempPath, resolved);
+      const targetBeforeRename = await this.revalidateMutationTarget(target);
+      await fsp.rename(tempPath, targetBeforeRename.absolutePath);
     } catch (error) {
-      await fsp.rm(tempPath, { force: true }).catch(() => undefined);
+      await fsp.rm(tempPath, { force: true });
       throw error;
     }
   }
@@ -150,13 +245,13 @@ export class TempDirSandboxSession implements SandboxSession {
         { operations: this.#operations }
       );
     }
-    const resolved = await this.resolveCandidate(p);
-    const stat = await fsp.stat(resolved).catch(() => null);
+    const target = await this.resolveMutationTarget(p);
+    const stat = await this.lstatIfExists(target.absolutePath);
     if (stat === null) {
       throw new SandboxError("SANDBOX_NOT_FOUND", `Not found: ${p}`, { path: p });
     }
     if (stat.isDirectory()) {
-      const children = await fsp.readdir(resolved).catch(() => []);
+      const children = await fsp.readdir(target.absolutePath);
       if (children.length > 0) {
         throw new SandboxError(
           "SANDBOX_OPERATION_DENIED",
@@ -164,9 +259,11 @@ export class TempDirSandboxSession implements SandboxSession {
           { path: p }
         );
       }
-      await fsp.rmdir(resolved);
+      const targetBeforeRemove = await this.revalidateMutationTarget(target);
+      await fsp.rmdir(targetBeforeRemove.absolutePath);
     } else {
-      await fsp.rm(resolved, { force: false });
+      const targetBeforeRemove = await this.revalidateMutationTarget(target);
+      await fsp.rm(targetBeforeRemove.absolutePath, { force: false });
     }
   }
 
@@ -208,14 +305,6 @@ export class TempDirSandboxSession implements SandboxSession {
     this.#closed = true;
   }
 
-  private async exists(target: string): Promise<boolean> {
-    try {
-      await fsp.stat(target);
-      return true;
-    } catch {
-      return false;
-    }
-  }
 
   private async countFiles(): Promise<number> {
     const snapshot = await buildSnapshot(this.root);

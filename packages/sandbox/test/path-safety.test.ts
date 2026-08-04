@@ -1,8 +1,13 @@
-import { describe, expect, it } from "vitest";
+import * as fsp from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
+
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   assertNoNulOrEncodingIssues,
   assertPathAllowed,
+  assertRegularFileOrDirectory,
   assertSafeRelative,
   assertSafeRelativeSync,
   fileDigest,
@@ -10,6 +15,17 @@ import {
   resolveWithinRoot
 } from "../src/path-safety.js";
 import { SandboxError } from "../src/types.js";
+
+let tempDir: string;
+
+beforeEach(async () => {
+  tempDir = path.join(os.tmpdir(), `soren-sdk-path-safety-${Date.now()}-${Math.random()}`);
+  await fsp.mkdir(tempDir, { recursive: true });
+});
+
+afterEach(async () => {
+  await fsp.rm(tempDir, { recursive: true, force: true });
+});
 
 describe("path-safety", () => {
   describe("assertNoNulOrEncodingIssues", () => {
@@ -117,6 +133,35 @@ describe("path-safety", () => {
           denyPaths: []
         })
       ).rejects.toThrow(SandboxError);
+    });
+  });
+
+  describe("assertRegularFileOrDirectory", () => {
+    it("identifies a symlink entry instead of following its regular-file target", async (context) => {
+      const target = path.join(tempDir, "target.txt");
+      const link = path.join(tempDir, "link.txt");
+      await fsp.writeFile(target, "target");
+
+      try {
+        await fsp.symlink(target, link);
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          "code" in error &&
+          (error.code === "EPERM" || error.code === "EACCES")
+        ) {
+          context.skip("The host does not permit symlink creation for this test.");
+          return;
+        }
+        throw error;
+      }
+
+      await expect(
+        assertRegularFileOrDirectory(link, {
+          allowSpecialFiles: false,
+          allowSymlinkEscapes: false
+        })
+      ).rejects.toMatchObject({ code: "SANDBOX_SYMLINK_ESCAPE" });
     });
   });
 
