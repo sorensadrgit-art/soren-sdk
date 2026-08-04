@@ -139,6 +139,9 @@ importers:
       '@soren-sdk/contracts':
         specifier: workspace:*
         version: link:../contracts
+      ajv:
+        specifier: 8.20.0
+        version: 8.20.0
     devDependencies:
       typescript:
         specifier: 6.0.3

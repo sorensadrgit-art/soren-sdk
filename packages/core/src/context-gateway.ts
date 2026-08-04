@@ -86,3 +86,5 @@ export function selectContext(request: ContextRequest, sources: readonly SourceR
     .slice(0, request.maxItems)
     .map(({ id, connectorId, category, origin, digest, content }) => ({ sourceId: id, connectorId, category, origin, digest, content }));
 }
+
+export { negotiateProtocol, validateInventory, type ProtocolNegotiation } from "./protocol-negotiation.js";
