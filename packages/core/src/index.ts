@@ -10,7 +10,8 @@ export * from "./context-gateway.js";
 export {
   InMemoryRunGrantRepository,
   RunGrantStore,
-  type RunGrant as OpaqueRunGrant,
+  type CallReservation,
+  type RunGrant,
   type RunGrantRepository,
   type RunGrantRequest,
   type RunGrantState,
