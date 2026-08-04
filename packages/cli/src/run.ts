@@ -17,7 +17,9 @@ import {
 import {
   CatalogService,
   ProjectInspectionError,
-  inspectProject
+  RouteInputError,
+  inspectProject,
+  routeCapabilities
 } from "@soren-sdk/core";
 import {
   ConnectorCatalogError,
@@ -36,7 +38,8 @@ import {
   formatLoadedConfig,
   formatLock,
   formatProjectSnapshot,
-  formatResolvedPolicy
+  formatResolvedPolicy,
+  formatRoutePlan
 } from "./format.js";
 import { parseConfigShowOptions } from "./config-options.js";
 import { parsePolicyResolveOptions } from "./policy-options.js";
@@ -45,6 +48,7 @@ import {
   parseLockCreateOptions,
   parseLockInspectOptions
 } from "./lock-options.js";
+import { buildRouteRequest, parseRouteOptions } from "./route-options.js";
 
 export interface CliIo {
   stdout(message: string): void;
@@ -241,6 +245,24 @@ export function runCli(options: RunCliOptions): number {
       return 0;
     }
 
+    if (domain === "route") {
+      const parsed = parseRouteOptions(options.argv.slice(1));
+      const createdAt = new Date().toISOString();
+      const project = inspectProject({
+        root: resolve(options.cwd, parsed.project),
+        createdAt
+      });
+      const request = buildRouteRequest(parsed, project.snapshotId, createdAt);
+      const plan = routeCapabilities({
+        request,
+        project,
+        catalog: new FileSystemConnectorCatalog({ root: options.cwd }),
+        createdAt
+      });
+      options.io.stdout(parsed.json ? formatJson(plan) : formatRoutePlan(plan));
+      return 0;
+    }
+
     const catalog = () =>
       new CatalogService(
         new FileSystemConnectorCatalog({ root: options.cwd })
@@ -429,6 +451,14 @@ export function runCli(options: RunCliOptions): number {
 
     throw new CliUsageError(usage());
   } catch (error) {
+    if (error instanceof RouteInputError) {
+      const prefix = `${error.code}: `;
+      const message = error.message.startsWith(prefix)
+        ? error.message.slice(prefix.length)
+        : error.message;
+      options.io.stderr(`${prefix}${message}\n`);
+      return 1;
+    }
     if (error instanceof CliUsageError || error instanceof TypeError) {
       options.io.stderr(
         `${error instanceof Error ? error.message : "Invalid arguments."}\n${usage()}\n`

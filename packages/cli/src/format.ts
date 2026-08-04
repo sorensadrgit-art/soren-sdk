@@ -2,6 +2,7 @@ import {
   canonicalJson,
   type JsonValue,
   type ProjectSnapshot,
+  type RoutePlan,
   type SorenSdkLock
 } from "@soren-sdk/contracts";
 import type {
@@ -107,6 +108,34 @@ export function formatResolvedPolicy(policy: ResolvedPolicy): string {
     `requiredApprovals: ${effective.requiredApprovals.join(", ") || "none"}`,
     `decisions: ${policy.decisions.length}`
   ];
+  return `${lines.join("\n")}\n`;
+}
+
+export function formatRoutePlan(plan: RoutePlan): string {
+  const lines = [
+    `Route plan: ${plan.planId}`,
+    `status: ${plan.status}`,
+    `digest: ${plan.digest}`,
+    `capabilities: ${plan.requestedCapabilities.join(", ") || "none"}`
+  ];
+  for (const provider of plan.selectedProviders) {
+    lines.push(
+      `provider: ${provider.providerId} (${provider.capabilities.join(", ")}) [${provider.reasonCode}]`
+    );
+  }
+  for (const provider of plan.rejectedProviders) {
+    lines.push(`rejected: ${provider.providerId} [${provider.reasonCode}]`);
+  }
+  for (const constraint of plan.constraints) {
+    if (constraint.status !== "passed") {
+      lines.push(
+        `constraint: ${constraint.code} ${constraint.status} - ${constraint.message}`
+      );
+    }
+  }
+  for (const required of plan.requiredInput) {
+    lines.push(`required input: ${required}`);
+  }
   return `${lines.join("\n")}\n`;
 }
 
