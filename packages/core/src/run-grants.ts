@@ -411,8 +411,8 @@ export class RunGrantStore {
   }
 
   releaseCall(grant: RunGrant, reservation: CallReservation, now: string): StoredRunGrant {
-    this.#authorized(grant, now);
-    return this.#repository.releaseCall(reservation, now);
+    const record = this.#authenticated(grant);
+    return this.#repository.releaseCall({ ...reservation, issuerId: record.issuerId, grantId: record.id }, now);
   }
 
   revoke(grant: RunGrant, now: string): StoredRunGrant {
@@ -438,6 +438,13 @@ export class RunGrantStore {
 
   #validHandle(grant: unknown): grant is RunGrant {
     return typeof grant === "object" && grant !== null && "id" in grant && "token" in grant && typeof grant.id === "string" && typeof grant.token === "string";
+  }
+
+  #authenticated(grant: RunGrant): StoredRunGrant {
+    if (!this.#validHandle(grant)) throw new TypeError("Run grant denied.");
+    const record = this.#repository.read(this.#issuerId, grant.id);
+    if (record === undefined || !tokenMatches(grant.token, record.tokenHash)) throw new TypeError("Run grant denied.");
+    return record;
   }
 
   #authorized(grant: RunGrant, now: string): StoredRunGrant {

@@ -7,6 +7,8 @@ export * from "./router/types.js";
 export * from "./router/policy.js";
 export * from "./router/route-capabilities.js";
 export * from "./context-gateway.js";
+export * from "./read-only-gateway.js";
+export * from "./schema-validation.js";
 export {
   InMemoryRunGrantRepository,
   RunGrantStore,
