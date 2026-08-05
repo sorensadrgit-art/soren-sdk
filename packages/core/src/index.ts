@@ -20,3 +20,6 @@ export {
   type RunGrantStoreOptions,
   type StoredRunGrant
 } from "./run-grants.js";
+export { InMemoryAuditSink, auditEventDigest, type AuditEventInput, type AuditSink, type StoredAuditEvent } from "./audit.js";
+export { SqliteAuditSink } from "./sqlite-audit.js";
+export { SqliteRunGrantRepository } from "./sqlite-run-grants.js";

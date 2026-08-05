@@ -1,5 +1,6 @@
 import { canonicalJson, digestJson, type Digest, type JsonValue } from "@soren-sdk/contracts";
 
+import { InMemoryAuditSink, type AuditSink } from "./audit.js";
 import { inventoryDigest, type ToolInventory } from "./context-gateway.js";
 import { validateInventory } from "./protocol-negotiation.js";
 import type { RunGrant, RunGrantStore } from "./run-grants.js";
@@ -121,15 +122,14 @@ interface ActiveGatewayCall {
 export class ReadOnlyToolGateway {
   #killed = false;
   readonly #activeCalls = new Set<ActiveGatewayCall>();
-  readonly #events: { readonly code: string; readonly digest: string }[] = [];
 
-  constructor(private readonly provider: ReadOnlyToolProvider, private readonly grants: RunGrantStore, private readonly consents: ConsentStore, private readonly clock: () => string) {}
+  constructor(private readonly provider: ReadOnlyToolProvider, private readonly grants: RunGrantStore, private readonly consents: ConsentStore, private readonly clock: () => string, private readonly auditSink: AuditSink = new InMemoryAuditSink()) {}
 
   kill(): void { this.#killed = true; for (const activeCall of this.#activeCalls) activeCall.abort("kill-switch"); }
-  auditEvents(): readonly { readonly code: string; readonly digest: string }[] { return this.#events.map((event) => ({ ...event })); }
+  auditEvents(): readonly { readonly code: string; readonly digest: string }[] { return this.auditSink.readAll().map((event) => ({ code: event.code, digest: event.digest })); }
 
   async call(grant: RunGrant, toolId: string, input: JsonValue, options: GatewayCallOptions): Promise<JsonValue> {
-    const event = (code: string) => this.#events.push(Object.freeze({ code, digest: digestJson({ code, at: this.clock() }) }));
+    const event = (code: string): void => { this.auditSink.append({ code, occurredAt: this.clock() }); };
     const startedAt = this.clock();
     if (this.#killed) { event(auditCodeForAbort("kill-switch")); throw new GatewayAbortError("kill-switch"); }
     if (options.signal?.aborted) { event(auditCodeForAbort("caller-cancelled")); throw new GatewayAbortError("caller-cancelled"); }
