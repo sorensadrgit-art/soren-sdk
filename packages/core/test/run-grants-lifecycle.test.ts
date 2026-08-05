@@ -4,6 +4,7 @@ import { inventoryDigest, type ToolInventory } from "../src/context-gateway.js";
 import {
   InMemoryRunGrantRepository,
   RunGrantStore,
+  type CallReservation,
   type RunGrantRequest
 } from "../src/run-grants.js";
 
@@ -31,6 +32,15 @@ function request(value: ToolInventory): RunGrantRequest {
     maxCalls: 1,
     maxResponseBytes: 32,
     maxTotalResponseBytes: 32
+  };
+}
+
+function concurrentRequest(value: ToolInventory): RunGrantRequest {
+  return {
+    ...request(value),
+    maxCalls: 2,
+    maxResponseBytes: 10,
+    maxTotalResponseBytes: 20
   };
 }
 
@@ -102,6 +112,65 @@ describe("canonical opaque run grants", () => {
     expect(released.reservedResponseBytes).toBe(32);
     expect(released.callsUsed).toBe(0);
     expect(() => store.releaseCall(issued, first, NOW)).toThrow("reservation");
+  });
+
+  it("commits concurrent reservations independently in creation order", () => {
+    const value = inventory();
+    const store = new RunGrantStore({ issuerId: "issuer-a", repository: new InMemoryRunGrantRepository() });
+    const issued = store.issue(concurrentRequest(value), value, NOW);
+    const first = store.reserveCall(issued, NOW);
+    const second = store.reserveCall(issued, NOW);
+
+    store.commitCall(issued, first, 3, NOW);
+    const committed = store.commitCall(issued, second, 4, NOW);
+
+    expect(committed).toMatchObject({
+      callsUsed: 2,
+      responseBytesUsed: 7,
+      reservedCalls: 0,
+      reservedResponseBytes: 0,
+      state: "exhausted"
+    });
+  });
+
+  it("commits concurrent reservations independently in reverse order", () => {
+    const value = inventory();
+    const store = new RunGrantStore({ issuerId: "issuer-a", repository: new InMemoryRunGrantRepository() });
+    const issued = store.issue(concurrentRequest(value), value, NOW);
+    const first = store.reserveCall(issued, NOW);
+    const second = store.reserveCall(issued, NOW);
+
+    store.commitCall(issued, second, 4, NOW);
+    const committed = store.commitCall(issued, first, 3, NOW);
+
+    expect(committed).toMatchObject({
+      callsUsed: 2,
+      responseBytesUsed: 7,
+      reservedCalls: 0,
+      reservedResponseBytes: 0,
+      state: "exhausted"
+    });
+  });
+
+  it("rejects a tampered concurrent reservation handle", () => {
+    const tamperCases: readonly [string, (reservation: CallReservation) => CallReservation][] = [
+      ["grantId", (reservation) => ({ ...reservation, grantId: "other-grant" })],
+      ["issuerId", (reservation) => ({ ...reservation, issuerId: "other-issuer" })],
+      ["revision", (reservation) => ({ ...reservation, revision: reservation.revision + 1 })],
+      ["maxResponseBytes", (reservation) => ({ ...reservation, maxResponseBytes: reservation.maxResponseBytes - 1 })]
+    ];
+
+    for (const [field, tamper] of tamperCases) {
+      const value = inventory();
+      const store = new RunGrantStore({ issuerId: "issuer-a", repository: new InMemoryRunGrantRepository() });
+      const issued = store.issue(concurrentRequest(value), value, NOW);
+      const first = store.reserveCall(issued, NOW);
+      const second = store.reserveCall(issued, NOW);
+
+      expect(() => store.commitCall(issued, tamper(first), 3, NOW), field).toThrow("Unknown call reservation.");
+      expect(store.commitCall(issued, first, 3, NOW)).toMatchObject({ callsUsed: 1, reservedCalls: 1, reservedResponseBytes: 10 });
+      expect(store.commitCall(issued, second, 4, NOW)).toMatchObject({ callsUsed: 2, responseBytesUsed: 7, reservedCalls: 0 });
+    }
   });
 
   it("persists only a token hash and enforces lifecycle transitions", () => {

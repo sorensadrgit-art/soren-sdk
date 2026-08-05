@@ -233,15 +233,21 @@ export class InMemoryRunGrantRepository implements RunGrantRepository {
   commitCall(reservation: CallReservation, responseBytes: number, now: string): StoredRunGrant {
     safeNonNegative(responseBytes, "responseBytes");
     const storedReservation = this.#reservations.get(reservation.id);
-    if (storedReservation === undefined || storedReservation.grantId !== reservation.grantId || storedReservation.issuerId !== reservation.issuerId) {
+    if (
+      storedReservation === undefined ||
+      storedReservation.grantId !== reservation.grantId ||
+      storedReservation.issuerId !== reservation.issuerId ||
+      storedReservation.revision !== reservation.revision ||
+      storedReservation.maxResponseBytes !== reservation.maxResponseBytes
+    ) {
       throw new TypeError("Unknown call reservation.");
     }
-    if (responseBytes > reservation.maxResponseBytes) {
+    if (responseBytes > storedReservation.maxResponseBytes) {
       throw new TypeError("Run grant response exceeds reservation quota.");
     }
-    const recordKey = key(reservation.issuerId, reservation.grantId);
+    const recordKey = key(storedReservation.issuerId, storedReservation.grantId);
     const record = this.#records.get(recordKey);
-    if (record === undefined || record.revision !== reservation.revision || record.reservedCalls < 1 || record.reservedResponseBytes < reservation.maxResponseBytes) {
+    if (record === undefined || record.reservedCalls < 1 || record.reservedResponseBytes < storedReservation.maxResponseBytes) {
       throw new TypeError("Run grant reservation mismatch.");
     }
     active(record, now);
@@ -258,7 +264,7 @@ export class InMemoryRunGrantRepository implements RunGrantRepository {
       callsUsed: calls,
       responseBytesUsed: bytes,
       reservedCalls: record.reservedCalls - 1,
-      reservedResponseBytes: record.reservedResponseBytes - reservation.maxResponseBytes,
+      reservedResponseBytes: record.reservedResponseBytes - storedReservation.maxResponseBytes,
       state
     });
     this.#records.set(recordKey, next);
