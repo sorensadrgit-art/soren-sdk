@@ -51,11 +51,13 @@ export function collectDependencies(
       }
     }
   }
-  return result.sort((left, right) =>
-    [left.workspace, left.name, left.kind].join("\0").localeCompare(
-      [right.workspace, right.name, right.kind].join("\0")
-    )
-  );
+  return result.sort((left, right) => {
+    let cmp = left.workspace.localeCompare(right.workspace);
+    if (cmp !== 0) return cmp;
+    cmp = left.name.localeCompare(right.name);
+    if (cmp !== 0) return cmp;
+    return left.kind.localeCompare(right.kind);
+  });
 }
 
 export function detectFrameworks(
@@ -92,11 +94,10 @@ export function detectFrameworks(
       version: record.version,
       workspace: record.workspace
     }))
-    .sort((left, right) =>
-      [left.workspace, left.name].join("\0").localeCompare(
-        [right.workspace, right.name].join("\0")
-      )
-    );
+    .sort((left, right) => {
+      const cmp = left.workspace.localeCompare(right.workspace);
+      return cmp !== 0 ? cmp : left.name.localeCompare(right.name);
+    });
 }
 
 export function detectRuntimes(
@@ -110,11 +111,10 @@ export function detectRuntimes(
       values.set(`${name}\0${version}`, { name, version });
     }
   }
-  return [...values.values()].sort((left, right) =>
-    [left.name, left.version ?? ""].join("\0").localeCompare(
-      [right.name, right.version ?? ""].join("\0")
-    )
-  );
+  return [...values.values()].sort((left, right) => {
+    const cmp = left.name.localeCompare(right.name);
+    return cmp !== 0 ? cmp : (left.version ?? "").localeCompare(right.version ?? "");
+  });
 }
 
 function configurationKind(projectPath: string): string | null {
@@ -165,11 +165,10 @@ export function detectConfigurations(
     });
   }
 
-  return configurations.sort((left, right) =>
-    [left.path, left.kind].join("\0").localeCompare(
-      [right.path, right.kind].join("\0")
-    )
-  );
+  return configurations.sort((left, right) => {
+    const cmp = left.path.localeCompare(right.path);
+    return cmp !== 0 ? cmp : left.kind.localeCompare(right.kind);
+  });
 }
 
 export function detectPolicies(root: string): ProjectSnapshot["policies"] {

@@ -151,18 +151,15 @@ function sortedOwnership(
 ): RoutePlan["ownership"] {
   return values
     .map(({ item }) => item)
-    .sort((left, right) =>
-      [left.providerId, left.scope, left.domain, left.properties.join("\0")]
-        .join("\0")
-        .localeCompare(
-          [
-            right.providerId,
-            right.scope,
-            right.domain,
-            right.properties.join("\0")
-          ].join("\0")
-        )
-    );
+    .sort((left, right) => {
+      let cmp = left.providerId.localeCompare(right.providerId);
+      if (cmp !== 0) return cmp;
+      cmp = left.scope.localeCompare(right.scope);
+      if (cmp !== 0) return cmp;
+      cmp = left.domain.localeCompare(right.domain);
+      if (cmp !== 0) return cmp;
+      return left.properties.join("\0").localeCompare(right.properties.join("\0"));
+    });
 }
 
 export function resolveOwnership(
@@ -252,11 +249,10 @@ export function resolveOwnership(
     }
   }
 
-  constraints.sort((left, right) =>
-    [left.code, left.message].join("\0").localeCompare(
-      [right.code, right.message].join("\0")
-    )
-  );
+  constraints.sort((left, right) => {
+    const cmp = left.code.localeCompare(right.code);
+    return cmp !== 0 ? cmp : left.message.localeCompare(right.message);
+  });
 
   return {
     ownership: sortedOwnership(resolved),
