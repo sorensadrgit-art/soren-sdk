@@ -96,6 +96,8 @@ export interface ExecutionPlanner {
 }
 
 const SENSITIVE_TEXT = /(api[_-]?key|password|secret|token|private[_-]?key)/i;
+const ARRAY_INDEX = /^(0|[1-9][0-9]*)$/u;
+const DANGEROUS_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 
 function stable<T>(items: readonly T[], key: (item: T) => string): T[] {
   return [...items].sort((left, right) => key(left).localeCompare(key(right)));
@@ -105,26 +107,84 @@ function stableStrings(items: readonly string[]): string[] {
   return [...new Set(items)].sort();
 }
 
-function json(value: unknown): JsonValue {
-  return value as JsonValue;
+function assertSafe(value: unknown, path = "input", seen = new WeakSet<object>()): void {
+  if (typeof value === "string" && SENSITIVE_TEXT.test(value)) {
+    throw new Error(`Secret-like data is forbidden at ${path}.`);
+  }
+  if (value === null || typeof value !== "object") return;
+  if (seen.has(value)) return;
+  seen.add(value);
+
+  for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(value))) {
+    if (!descriptor.enumerable || (Array.isArray(value) && key === "length")) continue;
+    if ((!Array.isArray(value) || !ARRAY_INDEX.test(key)) && SENSITIVE_TEXT.test(key)) {
+      throw new Error(`Secret-like field is forbidden at ${path}.${key}.`);
+    }
+    if ("value" in descriptor) {
+      const childPath = Array.isArray(value) && ARRAY_INDEX.test(key) ? `${path}[${key}]` : `${path}.${key}`;
+      assertSafe(descriptor.value, childPath, seen);
+    }
+  }
+  seen.delete(value);
 }
 
-function assertSafe(value: unknown, path = "input"): void {
-  if (typeof value === "string" && SENSITIVE_TEXT.test(value)) {
-    throw new Error(`Sensitive-looking data is forbidden at ${path}.`);
+function invalidJson(path: string): never {
+  throw new TypeError(`Value at ${path} is not valid JSON.`);
+}
+
+function validateJsonValue(value: unknown, path: string): JsonValue {
+  assertSafe(value, path);
+  return validateJsonValueInternal(value, path, new WeakSet<object>());
+}
+
+function validateJsonValueInternal(
+  value: unknown,
+  path: string,
+  seen: WeakSet<object>
+): JsonValue {
+  if (value === null || typeof value === "boolean" || typeof value === "string") return value;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) invalidJson(path);
+    return value;
   }
+  if (typeof value !== "object") invalidJson(path);
+  if (seen.has(value)) invalidJson(path);
+  seen.add(value);
+
   if (Array.isArray(value)) {
-    value.forEach((entry, index) => assertSafe(entry, `${path}[${index}]`));
-    return;
+    const result: JsonValue[] = [];
+    for (let index = 0; index < value.length; index += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+      if (descriptor === undefined || !("value" in descriptor)) invalidJson(`${path}[${index}]`);
+      result.push(validateJsonValueInternal(descriptor.value, `${path}[${index}]`, seen));
+    }
+    for (const key of Object.keys(value)) {
+      if (!ARRAY_INDEX.test(key) || Number(key) >= value.length) invalidJson(`${path}.${key}`);
+    }
+    seen.delete(value);
+    return result;
   }
-  if (value !== null && typeof value === "object") {
-    Object.entries(value).forEach(([key, entry]) => {
-      if (SENSITIVE_TEXT.test(key)) {
-        throw new Error(`Sensitive-looking field is forbidden at ${path}.${key}.`);
-      }
-      assertSafe(entry, `${path}.${key}`);
-    });
+
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) invalidJson(path);
+  const result: Record<string, JsonValue> = Object.create(null);
+  for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(value))) {
+    if (!descriptor.enumerable) continue;
+    if (DANGEROUS_KEYS.has(key) || !("value" in descriptor)) invalidJson(`${path}.${key}`);
+    result[key] = validateJsonValueInternal(descriptor.value, `${path}.${key}`, seen);
   }
+  seen.delete(value);
+  return result;
+}
+
+function normalizeRunnerCapabilities(value: unknown, path: string): Record<string, JsonValue> {
+  const normalized = validateJsonValue(value, path);
+  if (normalized === null || Array.isArray(normalized) || typeof normalized !== "object") invalidJson(path);
+  return normalized;
+}
+
+function normalizeComparisonRunnerCapabilities(value: unknown, path: string): JsonValue {
+  return validateJsonValue(value, path);
 }
 
 function normalizeProviders(
@@ -137,6 +197,24 @@ function normalizeProviders(
     })),
     (provider) => provider.id
   );
+}
+
+function normalizeRoutePlan(routePlan: { id: string; digest: Digest }): { id: string; digest: Digest } {
+  return { ...routePlan };
+}
+
+function normalizeContextReferences(
+  references: readonly { id: string; digest: Digest }[]
+): Array<{ id: string; digest: Digest }> {
+  return stable(references.map((reference) => ({ ...reference })), (reference) => reference.id);
+}
+
+function normalizeConstraints(constraints: readonly string[]): string[] {
+  return stableStrings(constraints);
+}
+
+function normalizeLockfile(lockfile: { id: string; digest: Digest }): { id: string; digest: Digest } {
+  return { ...lockfile };
 }
 
 type SemanticExecutionPlan = Omit<
@@ -187,13 +265,10 @@ function semanticPlan(input: CreateExecutionPlanInput): SemanticExecutionPlan {
     projectSnapshot: input.projectSnapshot,
     catalogSnapshot: input.catalogSnapshot,
     policySnapshot: input.policySnapshot,
-    routePlan: { ...input.routePlan },
-    contextReferences: stable(
-      input.contextReferences.map((reference) => ({ ...reference })),
-      (reference) => reference.id
-    ),
+    routePlan: normalizeRoutePlan(input.routePlan),
+    contextReferences: normalizeContextReferences(input.contextReferences),
     objective: input.objective,
-    constraints: stableStrings(input.constraints),
+    constraints: normalizeConstraints(input.constraints),
     status,
     providers: normalizeProviders(input.providers ?? []),
     expectedArtifacts: stableStrings(input.expectedArtifacts ?? []),
@@ -201,10 +276,15 @@ function semanticPlan(input: CreateExecutionPlanInput): SemanticExecutionPlan {
     risks: stableStrings(input.risks ?? []),
     unresolvedInputs,
     deniedSteps,
-    ...(input.lockfile === undefined ? {} : { lockfile: { ...input.lockfile } }),
+    ...(input.lockfile === undefined ? {} : { lockfile: normalizeLockfile(input.lockfile) }),
     ...(input.runnerCapabilities === undefined
       ? {}
-      : { runnerCapabilities: input.runnerCapabilities })
+      : {
+          runnerCapabilities: normalizeRunnerCapabilities(
+            input.runnerCapabilities,
+            "input.runnerCapabilities"
+          )
+        })
   };
 }
 
@@ -220,8 +300,29 @@ function expectedPlanId(digest: Digest): string {
   return `plan_${digest.slice("sha256:".length, "sha256:".length + 24)}`;
 }
 
-function sameJson(left: unknown, right: unknown): boolean {
-  return canonicalJson(json(left)) === canonicalJson(json(right));
+function comparisonRecord(input: PlanningInputs, side: "plan" | "current"): Record<string, JsonValue> {
+  return {
+    projectSnapshot: input.projectSnapshot,
+    catalogSnapshot: input.catalogSnapshot,
+    policySnapshot: input.policySnapshot,
+    routePlan: normalizeRoutePlan(input.routePlan),
+    contextReferences: normalizeContextReferences(input.contextReferences),
+    objective: input.objective,
+    constraints: normalizeConstraints(input.constraints),
+    ...(input.lockfile === undefined ? {} : { lockfile: normalizeLockfile(input.lockfile) }),
+    ...(input.runnerCapabilities === undefined
+      ? {}
+      : {
+          runnerCapabilities: normalizeComparisonRunnerCapabilities(
+            input.runnerCapabilities,
+            `${side}.runnerCapabilities`
+          )
+        })
+  };
+}
+
+function sameJson(left: JsonValue, right: JsonValue): boolean {
+  return canonicalJson(left) === canonicalJson(right);
 }
 
 export class DeterministicExecutionPlanner
@@ -231,7 +332,7 @@ export class DeterministicExecutionPlanner
 
   create(input: CreateExecutionPlanInput): ExecutionPlan {
     const semantic = semanticPlan(input);
-    const immutableDigest = digestJson(json(semantic));
+    const immutableDigest = digestJson(validateJsonValue(semantic, "plan"));
     const executionPlanId = expectedPlanId(immutableDigest);
     const plan: ExecutionPlan = {
       ...semantic,
@@ -264,7 +365,7 @@ export class DeterministicExecutionPlanner
     }
 
     const candidate = result.value as ExecutionPlan;
-    const recomputed = digestJson(json(semanticPlanFromPlan(candidate)));
+    const recomputed = digestJson(validateJsonValue(semanticPlanFromPlan(candidate), "plan"));
     const issues: string[] = [];
     if (candidate.immutableDigest !== recomputed) {
       issues.push(
@@ -279,34 +380,15 @@ export class DeterministicExecutionPlanner
   }
 
   compare(plan: ExecutionPlan, current: PlanningInputs): PlanDriftReport {
-    const expected = {
-      projectSnapshot: plan.projectSnapshot,
-      catalogSnapshot: plan.catalogSnapshot,
-      policySnapshot: plan.policySnapshot,
-      routePlan: plan.routePlan,
-      contextReferences: plan.contextReferences,
-      objective: plan.objective,
-      constraints: plan.constraints,
-      lockfile: plan.lockfile,
-      runnerCapabilities: plan.runnerCapabilities
-    };
-    const actual = {
-      projectSnapshot: current.projectSnapshot,
-      catalogSnapshot: current.catalogSnapshot,
-      policySnapshot: current.policySnapshot,
-      routePlan: current.routePlan,
-      contextReferences: stable(
-        current.contextReferences,
-        (reference) => reference.id
-      ),
-      objective: current.objective,
-      constraints: stableStrings(current.constraints),
-      lockfile: current.lockfile,
-      runnerCapabilities: current.runnerCapabilities
-    };
-    const differences = Object.keys(expected).filter((key) => {
+    const expected = comparisonRecord(plan, "plan");
+    const actual = comparisonRecord(current, "current");
+    const differences = [...new Set([...Object.keys(expected), ...Object.keys(actual)])].filter((key) => {
+      if (!(key in expected) || !(key in actual)) return true;
       const field = key as keyof typeof expected;
-      return !sameJson(expected[field], actual[field]);
+      const expectedValue = expected[field];
+      const actualValue = actual[field];
+      if (expectedValue === undefined || actualValue === undefined) return true;
+      return !sameJson(expectedValue, actualValue);
     });
     return { drifted: differences.length > 0, differences };
   }

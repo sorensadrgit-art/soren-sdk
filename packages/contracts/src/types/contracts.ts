@@ -1,4 +1,5 @@
 import type { JsonValue } from "./json.js";
+import type { VerificationState } from "./phase8.js";
 
 export const PERSISTED_SCHEMA_VERSION = "1.0.0-draft.1" as const;
 export const CONNECTOR_SCHEMA_VERSION = "2.0.0-draft.1" as const;
@@ -344,38 +345,35 @@ export interface ExecutionPlan {
   };
 }
 
+export interface EvidenceCheck {
+  id: string;
+  required: boolean;
+  status: VerificationState;
+  diagnostics: Array<{
+    code: string;
+    message: string;
+  }>;
+  artifacts: Digest[];
+}
+
 export interface EvidenceEnvelope {
   schemaVersion: "1.0.0-draft.1";
   contractKind: "evidence-envelope";
-  runId: string;
-  startedAt: string;
-  completedAt: string;
-  principal: {
-    id: string;
-    type: "agent" | "service" | "user";
-  };
-  agent?: {
-    profile?: string;
-    provider?: string;
-    model?: string;
-  };
-  projectSnapshotId: Digest;
-  catalogSnapshotId: Digest;
-  policySnapshotId: Digest;
-  routePlanId: string;
-  executionPlanId?: null | string;
-  checks: Array<{
-    id: string;
-    status: CheckStatus;
-    command?: string[];
-    exitCode?: null | number;
-    durationMs?: null | number;
-    artifacts: string[];
-  }>;
-  changes: Array<{ path: string; operation: "created" | "deleted" | "updated" }>;
-  unverified: string[];
-  resultingRevision: null | string;
+  evidenceId: string;
   digest: Digest;
+  projectSnapshot: Digest;
+  catalogSnapshot: Digest;
+  policySnapshot: Digest;
+  routePlan: {
+    id: string;
+    digest: Digest;
+  };
+  executionPlan: {
+    id: string;
+    digest: Digest;
+  };
+  checks: EvidenceCheck[];
+  unverified: string[];
 }
 
 export interface SorenSdkLock {

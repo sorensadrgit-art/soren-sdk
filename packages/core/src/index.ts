@@ -7,13 +7,19 @@ export * from "./router/types.js";
 export * from "./router/policy.js";
 export * from "./router/route-capabilities.js";
 export * from "./context-gateway.js";
+export * from "./read-only-gateway.js";
+export * from "./schema-validation.js";
 export {
   InMemoryRunGrantRepository,
   RunGrantStore,
-  type RunGrant as OpaqueRunGrant,
+  type CallReservation,
+  type RunGrant,
   type RunGrantRepository,
   type RunGrantRequest,
   type RunGrantState,
   type RunGrantStoreOptions,
   type StoredRunGrant
 } from "./run-grants.js";
+export { InMemoryAuditSink, auditEventDigest, type AuditEventInput, type AuditSink, type StoredAuditEvent } from "./audit.js";
+export { SqliteAuditSink } from "./sqlite-audit.js";
+export { SqliteRunGrantRepository } from "./sqlite-run-grants.js";

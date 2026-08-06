@@ -1,51 +1,21 @@
-name: Contracts CI
+name: Node 24 release gates
 
 on:
   workflow_dispatch:
   pull_request:
-    paths:
-      - ".github/workflows/contracts-ci.yml"
-      - "capabilities/**"
-      - "packages/contracts/**"
-      - "packages/core/**"
-      - "packages/connectors/**"
-      - "packages/config/**"
-      - "packages/cli/**"
-      - "schemas/**"
-      - "sdk-connectors/**"
-      - "evaluations/**"
-      - "docs/superpowers/**"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "tsconfig.json"
-      - "eslint.config.js"
   push:
     branches:
       - main
-    paths:
-      - ".github/workflows/contracts-ci.yml"
-      - "capabilities/**"
-      - "packages/contracts/**"
-      - "packages/core/**"
-      - "packages/connectors/**"
-      - "packages/config/**"
-      - "packages/cli/**"
-      - "schemas/**"
-      - "sdk-connectors/**"
-      - "evaluations/**"
-      - "docs/superpowers/**"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "tsconfig.json"
-      - "eslint.config.js"
 
 permissions:
   contents: read
 
+concurrency:
+  group: node-24-release-gates-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  contracts:
+  release-gates:
     runs-on: ubuntu-latest
     timeout-minutes: 14
 
@@ -84,3 +54,6 @@ jobs:
 
       - name: CLI smoke tests
         run: pnpm smoke:cli
+
+      - name: Production dependency audit
+        run: pnpm audit --prod

@@ -7,182 +7,83 @@
   "required": [
     "schemaVersion",
     "contractKind",
-    "runId",
-    "startedAt",
-    "completedAt",
-    "principal",
-    "projectSnapshotId",
-    "catalogSnapshotId",
-    "policySnapshotId",
-    "routePlanId",
+    "evidenceId",
+    "digest",
+    "projectSnapshot",
+    "catalogSnapshot",
+    "policySnapshot",
+    "routePlan",
+    "executionPlan",
     "checks",
-    "changes",
-    "unverified",
-    "resultingRevision",
-    "digest"
+    "unverified"
   ],
   "properties": {
-    "schemaVersion": {
-      "const": "1.0.0-draft.1"
-    },
-    "contractKind": {
-      "const": "evidence-envelope"
-    },
-    "runId": {
-      "type": "string"
-    },
-    "startedAt": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "completedAt": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "principal": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "type"
-      ],
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "type": {
-          "enum": [
-            "user",
-            "service",
-            "agent"
-          ]
-        }
-      }
-    },
-    "agent": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "profile": {
-          "type": "string"
-        },
-        "provider": {
-          "type": "string"
-        },
-        "model": {
-          "type": "string"
-        }
-      }
-    },
-    "projectSnapshotId": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    },
-    "catalogSnapshotId": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    },
-    "policySnapshotId": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    },
-    "routePlanId": {
-      "type": "string"
-    },
-    "executionPlanId": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
+    "schemaVersion": { "const": "1.0.0-draft.1" },
+    "contractKind": { "const": "evidence-envelope" },
+    "evidenceId": { "type": "string", "pattern": "^evidence_[0-9a-f]{24}$" },
+    "digest": { "$ref": "#/$defs/digest" },
+    "projectSnapshot": { "$ref": "#/$defs/digest" },
+    "catalogSnapshot": { "$ref": "#/$defs/digest" },
+    "policySnapshot": { "$ref": "#/$defs/digest" },
+    "routePlan": { "$ref": "#/$defs/identity" },
+    "executionPlan": { "$ref": "#/$defs/identity" },
     "checks": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "id",
-          "status",
-          "artifacts"
-        ],
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "status": {
-            "enum": [
-              "passed",
-              "failed",
-              "not-required",
-              "not-run"
-            ]
-          },
-          "command": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "exitCode": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "durationMs": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 0
-          },
-          "artifacts": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      }
-    },
-    "changes": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "path",
-          "operation"
-        ],
-        "properties": {
-          "path": {
-            "type": "string"
-          },
-          "operation": {
-            "enum": [
-              "created",
-              "updated",
-              "deleted"
-            ]
-          }
-        }
-      }
+      "items": { "$ref": "#/$defs/check" }
     },
     "unverified": {
       "type": "array",
-      "items": {
-        "type": "string"
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "digest"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "digest": { "$ref": "#/$defs/digest" }
       }
     },
-    "resultingRevision": {
-      "type": [
-        "string",
-        "null"
-      ]
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" }
+      }
     },
-    "digest": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "required", "status", "diagnostics", "artifacts"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "required": { "type": "boolean" },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "not-run",
+            "not-required",
+            "blocked",
+            "cancelled",
+            "timed-out",
+            "unverified"
+          ]
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/diagnostic" }
+        },
+        "artifacts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/digest" }
+        }
+      }
     }
   }
 }
