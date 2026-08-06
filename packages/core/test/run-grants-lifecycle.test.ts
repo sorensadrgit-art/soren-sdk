@@ -4,6 +4,7 @@ import { inventoryDigest, type ToolInventory } from "../src/context-gateway.js";
 import {
   InMemoryRunGrantRepository,
   RunGrantStore,
+  type CallReservation,
   type RunGrantRequest
 } from "../src/run-grants.js";
 
@@ -34,13 +35,21 @@ function request(value: ToolInventory): RunGrantRequest {
   };
 }
 
+function concurrentRequest(value: ToolInventory): RunGrantRequest {
+  return {
+    ...request(value),
+    maxCalls: 2,
+    maxResponseBytes: 10,
+    maxTotalResponseBytes: 20
+  };
+}
+
 describe("canonical opaque run grants", () => {
   it("authorizes a copied durable handle only with its token and rejects forged tokens", () => {
     const value = inventory();
     const repository = new InMemoryRunGrantRepository();
     const original = new RunGrantStore({ issuerId: "issuer-a", repository });
-
-      const issued = original.issue(request(value), value, NOW);
+    const issued = original.issue(request(value), value, NOW);
     const restarted = new RunGrantStore({ issuerId: "issuer-a", repository });
 
     expect(restarted.authorize({ ...issued }, NOW)?.id).toBe(issued.id);
@@ -105,6 +114,65 @@ describe("canonical opaque run grants", () => {
     expect(() => store.releaseCall(issued, first, NOW)).toThrow("reservation");
   });
 
+  it("commits concurrent reservations independently in creation order", () => {
+    const value = inventory();
+    const store = new RunGrantStore({ issuerId: "issuer-a", repository: new InMemoryRunGrantRepository() });
+    const issued = store.issue(concurrentRequest(value), value, NOW);
+    const first = store.reserveCall(issued, NOW);
+    const second = store.reserveCall(issued, NOW);
+
+    store.commitCall(issued, first, 3, NOW);
+    const committed = store.commitCall(issued, second, 4, NOW);
+
+    expect(committed).toMatchObject({
+      callsUsed: 2,
+      responseBytesUsed: 7,
+      reservedCalls: 0,
+      reservedResponseBytes: 0,
+      state: "exhausted"
+    });
+  });
+
+  it("commits concurrent reservations independently in reverse order", () => {
+    const value = inventory();
+    const store = new RunGrantStore({ issuerId: "issuer-a", repository: new InMemoryRunGrantRepository() });
+    const issued = store.issue(concurrentRequest(value), value, NOW);
+    const first = store.reserveCall(issued, NOW);
+    const second = store.reserveCall(issued, NOW);
+
+    store.commitCall(issued, second, 4, NOW);
+    const committed = store.commitCall(issued, first, 3, NOW);
+
+    expect(committed).toMatchObject({
+      callsUsed: 2,
+      responseBytesUsed: 7,
+      reservedCalls: 0,
+      reservedResponseBytes: 0,
+      state: "exhausted"
+    });
+  });
+
+  it("rejects a tampered concurrent reservation handle", () => {
+    const tamperCases: readonly [string, (reservation: CallReservation) => CallReservation][] = [
+      ["grantId", (reservation) => ({ ...reservation, grantId: "other-grant" })],
+      ["issuerId", (reservation) => ({ ...reservation, issuerId: "other-issuer" })],
+      ["revision", (reservation) => ({ ...reservation, revision: reservation.revision + 1 })],
+      ["maxResponseBytes", (reservation) => ({ ...reservation, maxResponseBytes: reservation.maxResponseBytes - 1 })]
+    ];
+
+    for (const [field, tamper] of tamperCases) {
+      const value = inventory();
+      const store = new RunGrantStore({ issuerId: "issuer-a", repository: new InMemoryRunGrantRepository() });
+      const issued = store.issue(concurrentRequest(value), value, NOW);
+      const first = store.reserveCall(issued, NOW);
+      const second = store.reserveCall(issued, NOW);
+
+      expect(() => store.commitCall(issued, tamper(first), 3, NOW), field).toThrow("Unknown call reservation.");
+      expect(store.commitCall(issued, first, 3, NOW)).toMatchObject({ callsUsed: 1, reservedCalls: 1, reservedResponseBytes: 10 });
+      expect(store.commitCall(issued, second, 4, NOW)).toMatchObject({ callsUsed: 2, responseBytesUsed: 7, reservedCalls: 0 });
+    }
+  });
+
   it("persists only a token hash and enforces lifecycle transitions", () => {
     const value = inventory();
     const repository = new InMemoryRunGrantRepository();
@@ -116,64 +184,5 @@ describe("canonical opaque run grants", () => {
     expect(record?.tokenHash).toMatch(/^[a-f0-9]{64}$/);
     expect(store.revoke(issued, NOW).state).toBe("revoked");
     expect(store.authorize(issued, NOW)).toBeUndefined();
-  });
-});
-
-
-describe("concurrent reservation commits", () => {
-  function setup() {
-    const value = inventory();
-    const repository = new InMemoryRunGrantRepository();
-    const store = new RunGrantStore({ issuerId: "issuer-a", repository });
-    const issued = store.issue({ ...request(value), maxCalls: 2, maxResponseBytes: 10, maxTotalResponseBytes: 20 }, value, NOW);
-    return { store, issued };
-  }
-
-  it("commits two reservations in creation order", () => {
-    const { store, issued } = setup();
-    const a = store.reserveCall(issued, NOW);
-    const b = store.reserveCall(issued, NOW);
-    store.commitCall(issued, a, 3, NOW);
-    const record = store.commitCall(issued, b, 4, NOW);
-
-    expect(record.callsUsed).toBe(2);
-    expect(record.responseBytesUsed).toBe(7);
-    expect(record.reservedCalls).toBe(0);
-    expect(record.reservedResponseBytes).toBe(0);
-    expect(record.state).toBe("exhausted");
-  });
-
-  it("commits two reservations in reverse order", () => {
-    const { store, issued } = setup();
-    const a = store.reserveCall(issued, NOW);
-    const b = store.reserveCall(issued, NOW);
-    store.commitCall(issued, b, 4, NOW);
-    const record = store.commitCall(issued, a, 3, NOW);
-
-    expect(record.callsUsed).toBe(2);
-    expect(record.responseBytesUsed).toBe(7);
-    expect(record.reservedCalls).toBe(0);
-    expect(record.reservedResponseBytes).toBe(0);
-    expect(record.state).toBe("exhausted");
-  });
-
-  it("rejects tampered grantId, issuerId, revision, maxResponseBytes, and allows valid commit after", () => {
-    const { store, issued } = setup();
-    const a = store.reserveCall(issued, NOW);
-    const b = store.reserveCall(issued, NOW);
-
-    expect(() => store.commitCall(issued, { ...a, grantId: "tampered" }, 3, NOW)).toThrow("Unknown call reservation.");
-    expect(() => store.commitCall(issued, { ...a, issuerId: "tampered" }, 3, NOW)).toThrow("Unknown call reservation.");
-    expect(() => store.commitCall(issued, { ...a, revision: a.revision + 1 }, 3, NOW)).toThrow("Unknown call reservation.");
-    expect(() => store.commitCall(issued, { ...a, maxResponseBytes: 999 }, 3, NOW)).toThrow("Unknown call reservation.");
-
-    store.commitCall(issued, a, 3, NOW);
-    const record = store.commitCall(issued, b, 4, NOW);
-
-    expect(record.callsUsed).toBe(2);
-    expect(record.responseBytesUsed).toBe(7);
-    expect(record.reservedCalls).toBe(0);
-    expect(record.reservedResponseBytes).toBe(0);
-    expect(record.state).toBe("exhausted");
   });
 });
