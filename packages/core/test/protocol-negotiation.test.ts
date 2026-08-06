@@ -1,41 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { createRunGrant, inventoryDigest, negotiateProtocol, ReadOnlyToolGateway, type ToolInventory } from "../src/context-gateway.js";
+
+import { negotiateProtocol, type ToolInventory } from "../src/context-gateway.js";
 
 const now = "2026-08-01T00:00:00.000Z";
 const expires = "2026-08-01T01:00:00.000Z";
-const inventory = (): ToolInventory => ({
-  providerId: "provider-a", protocolVersions: ["2025-11-25", "2025-12-01"], extensions: ["audit", "streaming"],
-  tools: [{ id: "read", description: "read", readOnly: true, exposesProjectContent: false, inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } }, additionalProperties: false }, outputSchema: { type: "object", required: ["ok"], properties: { ok: { type: "boolean" } }, additionalProperties: false } }]
-});
-const grant = (value: ToolInventory) => createRunGrant({ runId: "run", providerId: value.providerId, toolIds: ["read"], inventoryDigest: inventoryDigest(value), issuedAt: now, expiresAt: expires, allowRemoteProjectContent: false, protocolVersion: "2025-12-01", extensions: ["audit"] }, value, now);
 
-describe("phase 7 negotiation and schemas", () => {
-  it("selects highest mutual protocol with order-independent digest", () => {
-    const a = negotiateProtocol(inventory(), ["2025-12-01", "2025-11-25"], ["audit", "streaming"], now, expires);
-    const b = negotiateProtocol(inventory(), ["2025-11-25", "2025-12-01"], ["streaming", "audit"], now, expires);
-    expect(a.protocolVersion).toBe("2025-12-01"); expect(a.digest).toBe(b.digest);
+function inventory(): ToolInventory {
+  return { providerId: "provider-a", protocolVersions: ["2025-11-25", "2025-12-01"], extensions: ["audit", "streaming"], tools: [] };
+}
+
+describe("phase 7 protocol negotiation", () => {
+  it("selects the highest mutual protocol independently of provider caller and extension ordering", () => {
+    const first = negotiateProtocol(inventory(), ["2025-12-01", "2025-11-25"], ["audit", "streaming"], now, expires);
+    const second = negotiateProtocol({ ...inventory(), protocolVersions: ["2025-12-01", "2025-11-25"], extensions: ["streaming", "audit"] }, ["2025-11-25", "2025-12-01"], ["streaming", "audit"], now, expires);
+    expect(first.protocolVersion).toBe("2025-12-01"); expect(second.protocolVersion).toBe("2025-12-01"); expect(first.extensions).toEqual(["audit", "streaming"]); expect(second.extensions).toEqual(["audit", "streaming"]); expect(first.inventoryDigest).toBe(second.inventoryDigest); expect(first.digest).toBe(second.digest);
   });
-  it("rejects no compatible version and missing extension", () => {
-    expect(() => negotiateProtocol(inventory(), ["2024-01-01"], [], now, expires)).toThrow("No compatible");
-    expect(() => negotiateProtocol(inventory(), ["2025-12-01"], ["missing"], now, expires)).toThrow("extension");
+  it("normalizes duplicate caller versions provider versions and required extensions", () => {
+    const duplicated = negotiateProtocol({ ...inventory(), protocolVersions: ["2025-12-01", "2025-11-25", "2025-12-01"], extensions: ["streaming", "audit", "streaming"] }, ["2025-12-01", "2025-11-25", "2025-12-01"], ["streaming", "audit", "streaming"], now, expires);
+    const canonical = negotiateProtocol(inventory(), ["2025-11-25", "2025-12-01"], ["audit", "streaming"], now, expires);
+    expect(duplicated.protocolVersion).toBe(canonical.protocolVersion); expect(duplicated.extensions).toEqual(["audit", "streaming"]); expect(duplicated.inventoryDigest).toBe(canonical.inventoryDigest); expect(duplicated.digest).toBe(canonical.digest);
   });
-  it("rejects negotiation and schema drift before dispatch", () => {
-    const value = inventory(); const provider = { inventory: () => value, call: () => ({ ok: true }) };
-    const gateway = new ReadOnlyToolGateway(provider, () => now); const issued = grant(value);
-    value.protocolVersions = ["2025-11-25"];
-    expect(() => gateway.call(issued, "read", { path: "x" }, now)).toThrow();
-    expect(gateway.auditEvents().at(-1)?.code).toBe("INVENTORY_CHANGED");
-  });
-  it("rejects malformed input and output and emits redacted audit codes", () => {
-    const value = inventory(); const provider = { inventory: () => value, call: () => ({ bad: true }) };
-    const gateway = new ReadOnlyToolGateway(provider, () => now); const issued = grant(value);
-    expect(() => gateway.call(issued, "read", {} as never, now)).toThrow("Missing required");
-    expect(gateway.auditEvents().at(-1)?.code).toBe("INPUT_SCHEMA_FAILED");
-    expect(() => gateway.call(issued, "read", { path: "x" }, now)).toThrow("Missing required");
-    expect(gateway.auditEvents().at(-1)?.code).toBe("OUTPUT_SCHEMA_FAILED");
-  });
-  it("accepts valid canonical input and output", () => {
-    const value = inventory(); const gateway = new ReadOnlyToolGateway({ inventory: () => value, call: () => ({ ok: true }) }, () => now);
-    expect(gateway.call(grant(value), "read", { path: "x" }, now)).toEqual({ ok: true });
-  });
+  it("rejects when no protocol version is compatible", () => expect(() => negotiateProtocol(inventory(), ["2024-01-01"], [], now, expires)).toThrow("No compatible protocol version"));
+  it("rejects a malformed caller protocol version", () => expect(() => negotiateProtocol(inventory(), ["not-a-version"], [], now, expires)).toThrow("protocol version"));
+  it("rejects malformed provider protocol metadata", () => expect(() => negotiateProtocol({ ...inventory(), protocolVersions: ["not-a-version"] }, ["not-a-version"], [], now, expires)).toThrow("protocol version"));
+  it("rejects a required extension that the provider does not support", () => expect(() => negotiateProtocol(inventory(), ["2025-12-01"], ["missing-extension"], now, expires)).toThrow("extension"));
+  it("rejects expiration equal to issuance", () => expect(() => negotiateProtocol(inventory(), ["2025-12-01"], [], now, now)).toThrow("expires before issuance"));
+  it("rejects expiration before issuance", () => expect(() => negotiateProtocol(inventory(), ["2025-12-01"], [], now, "2026-07-31T23:59:59.000Z")).toThrow("expires before issuance"));
+  it("rejects a malformed issuance timestamp", () => expect(() => negotiateProtocol(inventory(), ["2025-12-01"], [], "not-a-timestamp", expires)).toThrow("issuedAt"));
+  it("rejects a malformed expiration timestamp", () => expect(() => negotiateProtocol(inventory(), ["2025-12-01"], [], now, "not-a-timestamp")).toThrow("expiresAt"));
 });

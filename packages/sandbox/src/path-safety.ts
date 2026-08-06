@@ -204,12 +204,15 @@ export async function assertRegularFileOrDirectory(
   target: string,
   policy: { allowSpecialFiles: boolean; allowSymlinkEscapes: boolean }
 ): Promise<void> {
-  let stat: Awaited<ReturnType<typeof fsp.stat>>;
+  let stat: Awaited<ReturnType<typeof fsp.lstat>>;
   try {
-    stat = await fsp.stat(target);
-  } catch {
-    // Missing target is allowed for create operations.
-    return;
+    stat = await fsp.lstat(target);
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      // Missing targets are allowed for create operations.
+      return;
+    }
+    throw error;
   }
 
   if (stat.isSymbolicLink()) {
