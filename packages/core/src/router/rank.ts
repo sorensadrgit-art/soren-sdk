@@ -29,21 +29,29 @@ function sortedAssignments(
       ...assignment,
       integrationIds: [...assignment.integrationIds].sort()
     }))
-    .sort((left, right) => {
-      let cmp = left.capabilityId.localeCompare(right.capabilityId);
-      if (cmp !== 0) return cmp;
-      cmp = left.providerId.localeCompare(right.providerId);
-      if (cmp !== 0) return cmp;
-      cmp = left.integrationIds.join(",").localeCompare(right.integrationIds.join(","));
-      if (cmp !== 0) return cmp;
-      cmp = left.support.localeCompare(right.support);
-      if (cmp !== 0) return cmp;
-      cmp = compareNumbers(left.confidence, right.confidence);
-      if (cmp !== 0) return cmp;
-      cmp = compareNumbers(left.installed ? 1 : 0, right.installed ? 1 : 0);
-      if (cmp !== 0) return cmp;
-      return compareNumbers(left.preferredRank ?? UNRANKED, right.preferredRank ?? UNRANKED);
-    });
+    .sort((left, right) =>
+      [
+        left.capabilityId,
+        left.providerId,
+        left.integrationIds.join(","),
+        left.support,
+        String(left.confidence),
+        String(left.installed),
+        String(left.preferredRank ?? UNRANKED)
+      ]
+        .join("\0")
+        .localeCompare(
+          [
+            right.capabilityId,
+            right.providerId,
+            right.integrationIds.join(","),
+            right.support,
+            String(right.confidence),
+            String(right.installed),
+            String(right.preferredRank ?? UNRANKED)
+          ].join("\0")
+        )
+    );
 }
 
 function compareNumbers(left: number, right: number): number {

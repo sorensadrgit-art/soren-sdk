@@ -72,13 +72,11 @@ const MOTION_REACT_MINIMUM: VersionTuple = [18, 2, 0];
 function stableRejections(
   rejections: CandidateRejection[]
 ): CandidateRejection[] {
-  return rejections.sort((left, right) => {
-    let cmp = left.providerId.localeCompare(right.providerId);
-    if (cmp !== 0) return cmp;
-    cmp = left.reasonCode.localeCompare(right.reasonCode);
-    if (cmp !== 0) return cmp;
-    return left.reason.localeCompare(right.reason);
-  });
+  return rejections.sort((left, right) =>
+    [left.providerId, left.reasonCode, left.reason]
+      .join("\0")
+      .localeCompare([right.providerId, right.reasonCode, right.reason].join("\0"))
+  );
 }
 
 function dependencyVersions(
