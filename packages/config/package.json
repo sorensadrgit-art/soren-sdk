@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@soren-sdk/contracts": "workspace:*",
-    "js-yaml": "4.3.0"
+    "js-yaml": "5.2.2"
   },
   "devDependencies": {
     "@types/js-yaml": "4.0.9"
